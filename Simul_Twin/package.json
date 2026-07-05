@@ -1,0 +1,12 @@
+{
+  "name": "kuglass-simul-twin-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "sh scripts/dev.sh",
+    "backend": "cd backend && .venv/bin/python app.py",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "test": "cd backend && .venv/bin/python -m pytest && cd ../frontend && npm run typecheck"
+  }
+}
