@@ -1,0 +1,16 @@
+[Unit]
+Description=KUGLASS Raspberry Pi control service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/kuglass/RasPi_Algo
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/kuglass/RasPi_Algo/.venv/bin/python -m kuglass.control_service --config config/config.yaml
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
