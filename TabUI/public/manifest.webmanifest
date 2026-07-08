@@ -1,0 +1,10 @@
+{
+  "name": "KUGLASS TabUI",
+  "short_name": "KUGLASS",
+  "start_url": "/demo",
+  "display": "standalone",
+  "background_color": "#eef3f1",
+  "theme_color": "#12312f",
+  "orientation": "landscape"
+}
+

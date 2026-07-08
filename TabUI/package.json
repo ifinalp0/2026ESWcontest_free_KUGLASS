@@ -1,0 +1,10 @@
+{
+  "name": "kuglass-tabui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tablet /demo UI for the KUGLASS active smart glass mobility project.",
+  "scripts": {
+    "dev": "python3 server.py --host 0.0.0.0 --port 5173",
+    "check": "python3 -c \"import ast,pathlib; ast.parse(pathlib.Path('server.py').read_text())\" && node --check public/app.js"
+  }
+}
