@@ -1,6 +1,7 @@
 export type VehicleMode = 'driving' | 'stopped' | 'camping' | 'parked';
 export type DemoMode = 'none' | 'hot_summer' | 'camping' | 'parked' | 'camera_saturation' | 'flashlight_360';
 export type OpticalState = 'CLEAR' | 'DIM' | 'FROST';
+export type BrandTheme = 'hyundai' | 'konkuk';
 
 export interface ChannelState {
   channel: number;

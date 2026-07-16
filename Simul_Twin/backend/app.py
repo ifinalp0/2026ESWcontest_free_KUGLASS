@@ -105,7 +105,11 @@ def on_connect():
 @socketio.on("command")
 def on_command(payload):
     engine.apply_command(payload or {})
-    emit_all()
+    # Flashlight drag commands arrive continuously. The fixed-rate simulation
+    # loop below publishes their resulting state without a four-event burst for
+    # every pointer sample.
+    if (payload or {}).get("type") != "setFlashlightAngle":
+        emit_all()
 
 
 def emit_all() -> None:

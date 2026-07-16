@@ -44,7 +44,8 @@ Simul_Twin/
         defaultState.ts       초기 mock 상태
         labels.ts             한국어 라벨, 퍼센트, 조도 방위 계산
       components/
-        DigitalTwin.tsx       3D 자동차, 채널 선택, 360도 손전등 상단 뷰
+        DigitalTwin.tsx       3D 자동차와 채널 선택
+        FlashlightDemo.tsx    360도 손전등 상단 뷰와 원형 궤도 조작
         EvidencePanel.tsx     카메라/조도/판단 근거 표시
         ControlPanel.tsx      채널 수동 제어와 mock 입력 조절
         ScenarioBar.tsx       시연 시나리오 버튼
@@ -303,7 +304,7 @@ ScenarioBar
 
 기본 백엔드 URL은 `http://localhost:5050`이며, `VITE_BACKEND_URL` 환경변수로 바꿀 수 있다.
 
-### 5.3 `DigitalTwin.tsx`: 3D 자동차와 360도 손전등 뷰
+### 5.3 `DigitalTwin.tsx`와 `FlashlightDemo.tsx`: 3D 자동차와 360도 손전등 뷰
 
 `DigitalTwin`은 아이오닉 5 GLB 모델과 코드에서 생성한 CH0~CH7 PDLC 필름 mesh를 함께 사용한다.
 
@@ -315,7 +316,6 @@ ScenarioBar
 - 삼각형 subdivision과 약 6mm 시각 gap으로 곡면 추종 및 z-fighting 방지
 - 수평 회전 슬라이더와 드래그 회전
 - 8채널 범례 버튼
-- `flashlight_360` 모드에서 나타나는 360도 손전등 상단 뷰
 
 각 유리 mesh는 차량과 함께 회전하며 `appliedMi`에 따라 opacity, roughness, transmission, haze가 바뀐다. 평면을 차체 근처에 단순 배치하지 않고 GLB의 실제 삼각형 surface에 투영하므로 전면·측면·후면·선루프 필름이 차체 형상에 밀착된다.
 
@@ -325,11 +325,16 @@ ScenarioBar
 
 360도 손전등 상단 뷰는 다음 기능을 제공한다.
 
-- 원형 궤도 위 손전등 핸들 드래그
-- 좌/우 방향키로 방위각 5도 단위 조절
+- 정사각형 상면도 안의 완전한 원형 궤도 위 손전등 핸들 드래그
+- 손전등 표시는 `requestAnimationFrame`으로 화면 주사율에 맞춰 갱신
+- 정책 명령은 최대 20Hz로 묶어 보내고 드래그 종료 각도는 즉시 반영
+- 방향키로 방위각 5도 단위 조절
 - `setFlashlightAngle` 명령 전송
 - 전방/우측/후방/좌측 lux readout 표시
-- 상단 뷰의 CH0~CH7 버튼으로 채널 선택
+- CH0~CH7의 실제 차량 위치와 산란 반응 표시
+- 시연 중 채널 선택·선택 강조를 비활성화하고 일반 모드 복귀 시 이전 선택을 복원
+
+`flashlight_360` 모드에서는 정책 근거(02), 채널 제어(03), 8채널 상태(04) 패널을 잠시 렌더링하지 않는다. TopBar와 시나리오 선택은 유지하며, 3D 트윈과 360도 손전등 창만 좌우 두 패널로 배치한다. 다른 시나리오로 전환하면 02~04 패널이 다시 나타난다.
 
 ### 5.4 `EvidencePanel.tsx`: 판단 근거 표시
 

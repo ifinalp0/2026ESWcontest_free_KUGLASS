@@ -87,12 +87,12 @@ class SimulationState:
 
 
 CHANNEL_CONFIGS: tuple[ChannelConfig, ...] = (
-    ChannelConfig(0, "CH0 전면 좌측", "운전자 전방 강광 및 시야 안전 하한", 340.0, 0.58),
-    ChannelConfig(1, "CH1 전면 우측", "동승석 전방 강광 대응", 20.0, 0.50),
-    ChannelConfig(2, "CH2 좌측 전방 도어", "좌측 측면 일사 및 프라이버시", 290.0, 0.34),
-    ChannelConfig(3, "CH3 우측 전방 도어", "우측 측면 일사 및 프라이버시", 70.0, 0.34),
-    ChannelConfig(4, "CH4 좌측 후방 도어", "좌측 후방 열부하 및 프라이버시", 235.0, 0.18),
-    ChannelConfig(5, "CH5 우측 후방 도어", "우측 후방 열부하 및 프라이버시", 125.0, 0.18),
+    ChannelConfig(0, "CH0 전면 좌측", "운전자 전방 강광 및 시야 안전 하한", 345.0, 0.58),
+    ChannelConfig(1, "CH1 전면 우측", "동승석 전방 강광 대응", 15.0, 0.50),
+    ChannelConfig(2, "CH2 좌측 전방 도어", "좌측 측면 일사 및 프라이버시", 285.0, 0.34),
+    ChannelConfig(3, "CH3 우측 전방 도어", "우측 측면 일사 및 프라이버시", 75.0, 0.34),
+    ChannelConfig(4, "CH4 좌측 후방 도어", "좌측 후방 열부하 및 프라이버시", 245.0, 0.18),
+    ChannelConfig(5, "CH5 우측 후방 도어", "우측 후방 열부하 및 프라이버시", 115.0, 0.18),
     ChannelConfig(6, "CH6 후면 유리", "후방 광원 및 열부하", 180.0, 0.16),
     ChannelConfig(7, "CH7 선루프", "상부 일사 및 열부하", None, 0.12),
 )

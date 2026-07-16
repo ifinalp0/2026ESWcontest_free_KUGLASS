@@ -11,6 +11,10 @@ export const channelLabels = [
   'CH7 선루프'
 ];
 
+export function channelDisplayName(name: string) {
+  return name.replace(/^ch0*\d+\s*/i, '');
+}
+
 export const opticalStateLabels: Record<OpticalState, string> = {
   CLEAR: '투명',
   DIM: '중간 산란',
@@ -37,12 +41,22 @@ export function pct(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+function luxVector(environment: EnvironmentInput): [number, number] {
+  const vectorX = environment.rightLux !== null && environment.leftLux !== null
+    ? environment.rightLux - environment.leftLux
+    : 0;
+  const vectorY = environment.frontLux !== null && environment.rearLux !== null
+    ? environment.frontLux - environment.rearLux
+    : 0;
+  return [vectorX, vectorY];
+}
+
+export function hasLuxBearing(environment: EnvironmentInput) {
+  const [vectorX, vectorY] = luxVector(environment);
+  return Math.hypot(vectorX, vectorY) > 1;
+}
+
 export function luxBearing(environment: EnvironmentInput) {
-  const frontLux = environment.frontLux ?? 0;
-  const rightLux = environment.rightLux ?? 0;
-  const rearLux = environment.rearLux ?? 0;
-  const leftLux = environment.leftLux ?? 0;
-  const vectorX = rightLux - leftLux;
-  const vectorY = frontLux - rearLux;
+  const [vectorX, vectorY] = luxVector(environment);
   return (Math.atan2(vectorX, vectorY) * 180 / Math.PI + 360) % 360;
 }

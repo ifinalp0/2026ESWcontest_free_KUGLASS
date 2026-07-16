@@ -1,6 +1,6 @@
 import { useRef } from 'react';
-import { AlertTriangle, CheckCircle2, RotateCcw, SlidersHorizontal, Unplug } from 'lucide-react';
-import { opticalStateLabels } from '../lib/labels';
+import { AlertTriangle, CheckCircle2, ChevronDown, RotateCcw, SlidersHorizontal, Unplug } from 'lucide-react';
+import { channelDisplayName } from '../lib/labels';
 import type { ChannelState, ControlCommand, EnvironmentInput } from '../types';
 
 interface Props {
@@ -27,6 +27,9 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
   const manualRemaining = selected.manualUntil ? Math.max(0, Math.round(selected.manualUntil - Date.now() / 1000)) : null;
 
   const setManual = (value: number) => {
+    if (selected.fault) {
+      return;
+    }
     const mi = Number((1 - value / 100).toFixed(3));
     sendCommand({ type: 'setManualChannel', channel: selected.channel, mi, ttlSeconds: 30 });
   };
@@ -51,9 +54,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
         <div className="panel-title-group">
           <span className="panel-index">03</span>
           <div>
-            <span className="panel-eyebrow">CHANNEL CONTROL</span>
-            <h2>제어 및 검증</h2>
-            <p>선택 채널의 목표값과 mock 입력을 조정합니다.</p>
+            <h2>채널 제어</h2>
           </div>
         </div>
         <span className={`panel-state ${manualRemaining === null ? 'ok' : 'manual'}`}>
@@ -64,32 +65,17 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
 
       <div className="selected-channel-summary">
         <div className="selected-channel-title">
-          <span className="selected-channel-id">CH{String(selected.channel).padStart(2, '0')}</span>
+          <span className="selected-channel-id">CH{selected.channel}</span>
           <span>
-            <small>SELECTED WINDOW</small>
-            <strong>{selected.name}</strong>
+            <strong>{channelDisplayName(selected.name)}</strong>
           </span>
         </div>
-        <dl className="channel-kpis">
-          <div>
-            <dt>상태</dt>
-            <dd>{opticalStateLabels[selected.opticalState]}</dd>
-          </div>
-          <div>
-            <dt>목표 MI</dt>
-            <dd>{Math.round(selected.targetMi * 100)}%</dd>
-          </div>
-          <div>
-            <dt>적용 MI</dt>
-            <dd>{Math.round(selected.appliedMi * 100)}%</dd>
-          </div>
-        </dl>
       </div>
 
       <div className="manual-control">
         <div className="control-section-title">
-          <span>MANUAL OVERRIDE</span>
-          <small>30초 후 자동 복귀</small>
+          <span>수동 조절</span>
+          <small>{selected.fault ? '고장 중 비활성' : '30초 자동 복귀'}</small>
         </div>
         <div className="range-label">
           <span>투명</span>
@@ -101,22 +87,21 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
           min="0"
           max="100"
           value={frostStrength}
+          disabled={selected.fault}
+          aria-disabled={selected.fault}
           onChange={(event) => setManual(Number(event.target.value))}
         />
-        {manualRemaining === null ? (
-          <p className="control-note">자동 정책 제어 중</p>
-        ) : (
+        {manualRemaining !== null ? (
           <button className="secondary-button" type="button" onClick={() => sendCommand({ type: 'returnAuto', channel: selected.channel })}>
             <RotateCcw size={17} />
             수동 제어 해제 · {manualRemaining}초
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="env-controls">
         <div className="control-section-title">
-          <span>ENVIRONMENT INPUT</span>
-          <small>정책 입력값</small>
+          <span>환경 입력</span>
         </div>
         <EnvSlider label="외기온" unit="°C" min={15} max={45} value={environment.weatherTemp} onChange={(value) => setEnvironmentValue('weatherTemp', value)} />
         <EnvSlider label="내부온도" unit="°C" min={15} max={48} value={environment.internalTemp} onChange={(value) => setEnvironmentValue('internalTemp', value)} />
@@ -127,42 +112,40 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
         <EnvSlider label="상부 조도" unit="lx" min={0} max={1300} value={environment.topLux ?? 0} onChange={(value) => setEnvironmentValue('topLux', value)} />
       </div>
 
-      <div className="validation-tools">
-        <div className="validation-heading">
-          <div>
-            <span className="section-overline">FAIL-SAFE TEST</span>
-            <h3>고장·결측 검증</h3>
-            <p>제어기 fail-safe와 센서 결측 대응을 실제 정책 루프에서 확인합니다.</p>
+      <details className="validation-tools">
+        <summary>
+          <span><AlertTriangle size={16} /> 고장·결측 검증</span>
+          <ChevronDown size={16} className="details-chevron" />
+        </summary>
+        <div className="validation-content">
+          <button
+            className={`fault-toggle ${selected.fault ? 'active' : ''}`}
+            type="button"
+            onClick={() => sendCommand({ type: 'setChannelFault', channel: selected.channel, fault: !selected.fault })}
+          >
+            {selected.fault ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+            {selected.fault ? `CH${selected.channel} 고장 해제` : `CH${selected.channel} 고장 주입`}
+          </button>
+          <div className="sensor-toggle-grid" aria-label="조도 센서 결측 주입">
+            {luxSensors.map(({ key, label, fallback }) => {
+              const missing = environment[key] === null;
+              return (
+                <button
+                  key={key}
+                  className={missing ? 'sensor-toggle missing' : 'sensor-toggle'}
+                  type="button"
+                  onClick={() => toggleLuxSensor(key, fallback)}
+                  title={`${label} 조도 센서 ${missing ? '복구' : '결측 주입'}`}
+                >
+                  <Unplug size={14} />
+                  <span>{label}</span>
+                  <strong>{missing ? '결측' : '정상'}</strong>
+                </button>
+              );
+            })}
           </div>
-          <AlertTriangle size={18} />
         </div>
-        <button
-          className={`fault-toggle ${selected.fault ? 'active' : ''}`}
-          type="button"
-          onClick={() => sendCommand({ type: 'setChannelFault', channel: selected.channel, fault: !selected.fault })}
-        >
-          {selected.fault ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
-          {selected.fault ? `CH${selected.channel} 고장 해제` : `CH${selected.channel} 구동기 고장 주입`}
-        </button>
-        <div className="sensor-toggle-grid" aria-label="조도 센서 결측 주입">
-          {luxSensors.map(({ key, label, fallback }) => {
-            const missing = environment[key] === null;
-            return (
-              <button
-                key={key}
-                className={missing ? 'sensor-toggle missing' : 'sensor-toggle'}
-                type="button"
-                onClick={() => toggleLuxSensor(key, fallback)}
-                title={`${label} 조도 센서 ${missing ? '복구' : '결측 주입'}`}
-              >
-                <Unplug size={14} />
-                <span>{label}</span>
-                <strong>{missing ? '결측' : '정상'}</strong>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      </details>
     </section>
   );
 }

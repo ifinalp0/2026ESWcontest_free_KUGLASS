@@ -4,6 +4,7 @@ from pathlib import Path
 
 from simulator.config import load_policy_config
 from simulator.engine import SimulationEngine
+from simulator.models import CHANNEL_CONFIGS
 
 
 class FakeClock:
@@ -90,6 +91,31 @@ def test_missing_lux_sensor_values_fall_back_without_crashing() -> None:
     assert len(snapshot["channels"]) == 8
 
 
+def test_unpaired_lux_sensor_does_not_create_a_false_direction() -> None:
+    engine = SimulationEngine()
+    engine.apply_command(
+        {
+            "type": "setEnvironment",
+            "environment": {
+                "frontLux": None,
+                "rightLux": 1200,
+                "rearLux": None,
+                "leftLux": None,
+                "topLux": 0,
+                "internalTemp": 20,
+                "weatherTemp": 20,
+            },
+        }
+    )
+    engine.step(0.1)
+    snapshot = engine.snapshot()
+    channels = {channel["channel"]: channel for channel in snapshot["channels"]}
+
+    assert "방향성" not in snapshot["decisionReason"]
+    assert channels[2]["targetMi"] == channels[3]["targetMi"]
+    assert channels[4]["targetMi"] == channels[5]["targetMi"]
+
+
 def test_channel_fault_uses_fail_safe_frost_and_can_recover() -> None:
     engine = SimulationEngine()
     engine.apply_command({"type": "setChannelFault", "channel": 4, "fault": True})
@@ -108,13 +134,29 @@ def test_channel_fault_uses_fail_safe_frost_and_can_recover() -> None:
     assert recovered["channels"][4]["appliedMi"] > 0.0
 
 
+def test_faulted_channel_rejects_manual_override() -> None:
+    engine = SimulationEngine()
+    engine.apply_command({"type": "setChannelFault", "channel": 2, "fault": True})
+
+    response = engine.apply_command(
+        {"type": "setManualChannel", "channel": 2, "mi": 0.8, "ttlSeconds": 30}
+    )
+    engine.step(0.1)
+
+    assert response["ok"] is False
+    assert engine.snapshot()["channels"][2]["manualUntil"] is None
+    assert engine.snapshot()["channels"][2]["appliedMi"] == 0.0
+
+
 def test_flashlight_360_uses_manual_angle_without_auto_rotation() -> None:
     engine = SimulationEngine()
     engine.apply_command({"type": "setScenario", "demoMode": "flashlight_360"})
     engine.apply_command({"type": "setFlashlightAngle", "angleDeg": 90})
     run_steps(engine, count=3, dt=0.5)
-    first_environment = engine.snapshot()["environment"]
+    first_snapshot = engine.snapshot()
+    first_environment = first_snapshot["environment"]
 
+    assert first_snapshot["vehicleMode"] == "stopped"
     assert first_environment["rightLux"] > first_environment["frontLux"]
     assert first_environment["rightLux"] > first_environment["rearLux"]
     assert first_environment["rightLux"] > first_environment["leftLux"]
@@ -126,6 +168,57 @@ def test_flashlight_360_uses_manual_angle_without_auto_rotation() -> None:
     assert later_environment["rightLux"] == first_environment["rightLux"]
     assert later_environment["rearLux"] == first_environment["rearLux"]
     assert later_environment["leftLux"] == first_environment["leftLux"]
+
+
+def test_channel_layout_matches_the_project_channel_manifest() -> None:
+    expected = [
+        (0, "CH0 전면 좌측", 345.0),
+        (1, "CH1 전면 우측", 15.0),
+        (2, "CH2 좌측 전방 도어", 285.0),
+        (3, "CH3 우측 전방 도어", 75.0),
+        (4, "CH4 좌측 후방 도어", 245.0),
+        (5, "CH5 우측 후방 도어", 115.0),
+        (6, "CH6 후면 유리", 180.0),
+        (7, "CH7 선루프", None),
+    ]
+
+    assert [
+        (config.channel, config.name, config.bearing_deg)
+        for config in CHANNEL_CONFIGS
+    ] == expected
+
+
+def test_flashlight_360_reacts_in_canonical_clockwise_channel_order() -> None:
+    engine = SimulationEngine()
+    engine.apply_command({"type": "setScenario", "demoMode": "flashlight_360"})
+
+    def targets_at(angle: float) -> dict[int, float]:
+        engine.apply_command({"type": "setFlashlightAngle", "angleDeg": angle})
+        engine.step(0.1)
+        return {
+            channel["channel"]: channel["targetMi"]
+            for channel in engine.snapshot()["channels"]
+        }
+
+    front = targets_at(0)
+    assert front[0] < front[2]
+    assert front[1] < front[3]
+
+    right = targets_at(90)
+    assert right[3] < right[2]
+    assert right[5] < right[4]
+
+    rear = targets_at(180)
+    assert rear[6] < rear[4]
+    assert rear[6] < rear[5]
+
+    left = targets_at(270)
+    assert left[2] < left[3]
+    assert left[4] < left[5]
+
+    seam = targets_at(359)
+    assert seam[0] < seam[2]
+    assert seam[1] < seam[3]
 
 
 def test_policy_config_override_changes_camping_target(tmp_path: Path) -> None:

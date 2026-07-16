@@ -74,6 +74,12 @@ npm run dev
 
 The frontend listens on Vite's default port, usually `http://localhost:5173`.
 
+### UI theme rule
+
+The Hyundai Motor and Konkuk University themes must differ **only in color tokens**. They must use the same DOM structure, icons, labels, spacing, component shapes, motion, and interactions. Do not add theme-specific UI elements or branch component behavior by theme. The `KUGLASS SIMUL TWIN` title remains the shared double-click target for switching the color theme.
+
+Keep each piece of information in one primary location. Overview components should support quick scanning and selection, while detailed values belong in the selected-item view; avoid repeating the same status or metric across the Topbar, panels, and channel table.
+
 ## Tests
 
 ```bash

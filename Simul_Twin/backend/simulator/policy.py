@@ -42,22 +42,41 @@ def angular_hit(channel_bearing: float, source_bearing: float, config: dict[str,
 
 
 def light_vector(env: EnvironmentInput) -> tuple[float, float]:
-    x = safe_lux(env.rightLux) - safe_lux(env.leftLux)
-    y = safe_lux(env.frontLux) - safe_lux(env.rearLux)
+    x = (
+        safe_lux(env.rightLux) - safe_lux(env.leftLux)
+        if env.rightLux is not None and env.leftLux is not None
+        else 0.0
+    )
+    y = (
+        safe_lux(env.frontLux) - safe_lux(env.rearLux)
+        if env.frontLux is not None and env.rearLux is not None
+        else 0.0
+    )
     return x, y
 
 
 def light_bearing_and_confidence(env: EnvironmentInput, config: dict[str, Any]) -> tuple[float, float]:
     x, y = light_vector(env)
     magnitude = math.hypot(x, y)
-    total = sum(
-        safe_lux(value)
-        for value in (env.frontLux, env.rightLux, env.rearLux, env.leftLux)
-    )
-    if total <= 1.0 or magnitude <= 1.0:
+    paired_values: list[float] = []
+    available_axes = 0
+    if env.rightLux is not None and env.leftLux is not None:
+        paired_values.extend((safe_lux(env.rightLux), safe_lux(env.leftLux)))
+        available_axes += 1
+    if env.frontLux is not None and env.rearLux is not None:
+        paired_values.extend((safe_lux(env.frontLux), safe_lux(env.rearLux)))
+        available_axes += 1
+    total = sum(paired_values)
+    if available_axes == 0 or total <= 1.0 or magnitude <= 1.0:
         return 0.0, 0.0
     bearing = (math.degrees(math.atan2(x, y)) + 360.0) % 360.0
-    return bearing, clamp(magnitude / max(total, 1.0) * cfg_float(config, "directional", "confidence_scale"))
+    availability = available_axes / 2.0
+    return bearing, clamp(
+        magnitude
+        / max(total, 1.0)
+        * cfg_float(config, "directional", "confidence_scale")
+        * availability
+    )
 
 
 def thermal_risk(env: EnvironmentInput, demo_mode: DemoMode, config: dict[str, Any]) -> float:

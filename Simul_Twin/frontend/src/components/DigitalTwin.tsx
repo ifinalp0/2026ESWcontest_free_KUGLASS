@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent } from 'react';
+import type { PointerEvent } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { Flashlight, MousePointer2, RotateCw } from 'lucide-react';
+import { MousePointer2 } from 'lucide-react';
 import {
   BufferGeometry,
   Color,
@@ -26,22 +26,19 @@ import {
 } from 'three';
 import type { Material, Texture } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { ChannelState, ControlCommand, DemoMode, EnvironmentInput } from '../types';
-import { luxBearing, opticalStateLabels } from '../lib/labels';
+import { channelDisplayName } from '../lib/labels';
+import type { ChannelState } from '../types';
 
 interface Props {
   channels: ChannelState[];
-  demoMode: DemoMode;
-  environment: EnvironmentInput;
-  selectedChannel: number;
-  onSelectChannel: (channel: number) => void;
-  sendCommand: (command: ControlCommand) => void;
+  selectedChannel: number | null;
+  onSelectChannel?: (channel: number) => void;
 }
 
 interface CarModelProps {
   channels: ChannelState[];
-  onSelectChannel: (channel: number) => void;
-  selectedChannel: number;
+  onSelectChannel?: (channel: number) => void;
+  selectedChannel: number | null;
   rotationY: number;
 }
 
@@ -73,44 +70,47 @@ const IONIQ_TIRE_NORMAL_URL = '/models/textures/M_Tires_normal.png';
 const IONIQ_MODEL_POSITION: [number, number, number] = [0, -0.58, -0.2];
 const IONIQ_MODEL_SCALE = 0.9;
 
+// The GLB uses +X for vehicle-left and -X for vehicle-right (the wheel nodes use
+// the same convention). Keep the canonical channel mapping here instead of the
+// screen-facing left/right convention: CH0/2/4 are vehicle-left, CH1/3/5 right.
 const windowParts: WindowPart[] = [
   {
-    channel: 0,
+    channel: 1,
     position: [-0.13, 0.56, 1.14],
     points: [[-0.58, -0.16], [0.12, -0.16], [0.13, 0.4], [-0.44, 0.34], [-0.62, 0.08]],
     rotation: [-0.62, 0, 0],
     projectionDirection: [0, -0.58, -0.81]
   },
   {
-    channel: 1,
+    channel: 0,
     position: [0.13, 0.56, 1.14],
     points: [[-0.12, -0.16], [0.58, -0.16], [0.62, 0.08], [0.44, 0.34], [-0.13, 0.4]],
     rotation: [-0.62, 0, 0],
     projectionDirection: [0, -0.58, -0.81]
   },
   {
-    channel: 2,
+    channel: 3,
     position: [-1.012, 0.56, 0.44],
     points: [[-0.67, -0.08], [0.35, -0.08], [0.39, 0.1], [0.03, 0.25], [-0.63, 0.27], [-0.72, 0.12]],
     rotation: [0, -Math.PI / 2, 0.03],
     projectionDirection: [1, -0.3, 0]
   },
   {
-    channel: 3,
+    channel: 2,
     position: [1.012, 0.56, 0.44],
     points: [[-0.35, -0.08], [0.67, -0.08], [0.72, 0.12], [0.63, 0.27], [-0.03, 0.25], [-0.39, 0.1]],
     rotation: [0, Math.PI / 2, -0.03],
     projectionDirection: [-1, -0.3, 0]
   },
   {
-    channel: 4,
+    channel: 5,
     position: [-1.012, 0.55, -0.49],
     points: [[-0.57, -0.08], [0.21, -0.08], [0.25, 0.1], [0.08, 0.25], [-0.51, 0.27], [-0.62, 0.1]],
     rotation: [0, -Math.PI / 2, 0.02],
     projectionDirection: [1, -0.3, 0]
   },
   {
-    channel: 5,
+    channel: 4,
     position: [1.012, 0.55, -0.49],
     points: [[-0.21, -0.08], [0.57, -0.08], [0.62, 0.1], [0.51, 0.27], [-0.08, 0.25], [-0.25, 0.1]],
     rotation: [0, Math.PI / 2, -0.02],
@@ -132,7 +132,6 @@ const windowParts: WindowPart[] = [
   }
 ];
 
-const topWindowClasses = ['ch0', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6', 'ch7'];
 const clearFilmColor = new Color('#62b9ca');
 const frostedFilmColor = new Color('#eff5f1');
 const passiveEdgeColor = new Color('#7892a8');
@@ -301,13 +300,16 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
   part: FittedWindowPart;
   channel: ChannelState;
   selected: boolean;
-  onSelectChannel: (channel: number) => void;
+  onSelectChannel?: (channel: number) => void;
 }) {
   const visualMiRef = useRef(channel.appliedMi);
   const filmMaterialRef = useRef<MeshPhysicalMaterial>(null);
   const hazeMaterialRef = useRef<MeshBasicMaterial>(null);
   const edgeMaterialRef = useRef<LineBasicMaterial>(null);
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
+    if (!onSelectChannel) {
+      return;
+    }
     event.stopPropagation();
     onSelectChannel(part.channel);
   };
@@ -326,7 +328,7 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
 
   return (
     <group>
-        <mesh geometry={part.filmGeometry} onClick={handleClick} renderOrder={selected ? 12 : 8}>
+        <mesh geometry={part.filmGeometry} onClick={onSelectChannel ? handleClick : undefined} renderOrder={selected ? 12 : 8}>
           <meshPhysicalMaterial
             ref={filmMaterialRef}
             color="#6dc9d0"
@@ -346,7 +348,7 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
             polygonOffsetFactor={-1}
           />
         </mesh>
-        <mesh geometry={part.filmGeometry} onClick={handleClick} renderOrder={selected ? 13 : 9}>
+        <mesh geometry={part.filmGeometry} onClick={onSelectChannel ? handleClick : undefined} renderOrder={selected ? 13 : 9}>
           <meshBasicMaterial
             ref={hazeMaterialRef}
             color="#f7fffd"
@@ -506,132 +508,8 @@ function CarModel({ channels, onSelectChannel, selectedChannel, rotationY }: Car
   );
 }
 
-function bearingLabel(angle: number) {
-  const directions = ['전방', '우전방', '우측', '우후방', '후방', '좌후방', '좌측', '좌전방'];
-  return directions[Math.round(angle / 45) % directions.length];
-}
-
-function FlashlightTopView({ channels, environment, sendCommand }: Props) {
-  const bearing = luxBearing(environment);
-  const [draftAngle, setDraftAngle] = useState(bearing);
-  const draggingRef = useRef(false);
-
-  useEffect(() => {
-    setDraftAngle(bearing);
-  }, [bearing]);
-
-  const emitAngle = (angle: number) => {
-    const normalized = (angle + 360) % 360;
-    setDraftAngle(normalized);
-    sendCommand({ type: 'setFlashlightAngle', angleDeg: Number(normalized.toFixed(1)) });
-  };
-
-  const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const dx = event.clientX - (rect.left + rect.width / 2);
-    const dy = event.clientY - (rect.top + rect.height / 2);
-    emitAngle((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
-  };
-
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    draggingRef.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    updateFromPointer(event);
-  };
-
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (draggingRef.current) {
-      updateFromPointer(event);
-    }
-  };
-
-  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    draggingRef.current = false;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      emitAngle(draftAngle - 5);
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      emitAngle(draftAngle + 5);
-    }
-  };
-
-  const rad = draftAngle * Math.PI / 180;
-  const handleStyle = {
-    left: `${50 + Math.sin(rad) * 42}%`,
-    top: `${50 - Math.cos(rad) * 42}%`
-  };
-
-  const luxValues = [
-    ['전방', environment.frontLux],
-    ['우측', environment.rightLux],
-    ['후방', environment.rearLux],
-    ['좌측', environment.leftLux]
-  ] as const;
-
-  return (
-    <div className="flashlight-demo">
-      <div className="flashlight-demo-heading">
-        <h3>360° 손전등 시연</h3>
-        <span>{Math.round(draftAngle)}° · {bearingLabel(draftAngle)}</span>
-      </div>
-      <div className="top-view-grid">
-        <div
-          className="flashlight-map"
-          role="slider"
-          aria-label="손전등 방위각"
-          aria-valuemin={0}
-          aria-valuemax={359}
-          aria-valuenow={Math.round(draftAngle)}
-          tabIndex={0}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onKeyDown={onKeyDown}
-        >
-          <span className="bearing-mark front">전</span>
-          <span className="bearing-mark right">우</span>
-          <span className="bearing-mark rear">후</span>
-          <span className="bearing-mark left">좌</span>
-          <span className="orbit-track" />
-          <span className="flashlight-handle" style={handleStyle}>
-            <Flashlight size={16} />
-          </span>
-          <div className="top-car">
-            <div className="top-car-body" />
-            {channels.map((channel) => (
-              <span
-                key={channel.channel}
-                className={`top-window ${topWindowClasses[channel.channel]}`}
-                style={{ opacity: 0.48 + (1 - channel.appliedMi) * 0.48 }}
-                title={`${channel.name} · ${opticalStateLabels[channel.opticalState]}`}
-              >
-                CH{channel.channel}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="flashlight-readout">
-          {luxValues.map(([label, value]) => (
-            <div key={label}>
-              <span>{label}</span>
-              <strong>{value === null ? '결측' : Math.round(value)}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DigitalTwin(props: Props) {
-  const selected = props.channels[props.selectedChannel];
+  const selected = props.selectedChannel === null ? null : props.channels[props.selectedChannel];
   const [rotationY, setRotationY] = useState(-0.5);
   const dragRef = useRef<{ x: number; rotationY: number } | null>(null);
 
@@ -657,14 +535,10 @@ export function DigitalTwin(props: Props) {
     <section className="panel twin-panel">
       <div className="panel-heading">
         <div className="panel-title-group">
-          <span className="panel-index">01</span>
           <div>
-            <span className="panel-eyebrow">VEHICLE RESPONSE</span>
-            <h2>3D 디지털 트윈</h2>
-            <p>{selected.name} · {opticalStateLabels[selected.opticalState]} · 적용 MI {Math.round(selected.appliedMi * 100)}%</p>
+            <h2>3D 트윈</h2>
           </div>
         </div>
-        <span className="panel-state"><RotateCw size={14} /> DRAG TO ROTATE</span>
       </div>
       <div
         className="canvas-shell"
@@ -673,19 +547,21 @@ export function DigitalTwin(props: Props) {
         onPointerUp={onCanvasPointerUp}
         onPointerCancel={onCanvasPointerUp}
       >
-        <div className="canvas-channel-readout">
-          <span>SELECTED WINDOW</span>
-          <strong>CH{String(selected.channel).padStart(2, '0')}</strong>
-          <small>{selected.name}</small>
-        </div>
-        <div className="canvas-telemetry">
-          <span><small>TARGET MI</small><strong>{Math.round(selected.targetMi * 100)}%</strong></span>
-          <span><small>APPLIED MI</small><strong>{Math.round(selected.appliedMi * 100)}%</strong></span>
-          <span><small>TRANSMITTANCE</small><strong>{Math.round(selected.estimatedTransmittance * 100)}%</strong></span>
-        </div>
-        <div className="canvas-interaction-hint"><MousePointer2 size={13} /> 유리를 선택하고 차체를 회전하세요</div>
+        {selected ? (
+          <>
+            <div className="canvas-channel-readout">
+              <strong>CH{selected.channel}</strong>
+              <small>{channelDisplayName(selected.name)}</small>
+            </div>
+            <div className="canvas-telemetry">
+              <span><small>목표</small><strong>{Math.round(selected.targetMi * 100)}%</strong></span>
+              <span><small>적용</small><strong>{Math.round(selected.appliedMi * 100)}%</strong></span>
+              <span><small>투과</small><strong>{Math.round(selected.estimatedTransmittance * 100)}%</strong></span>
+            </div>
+          </>
+        ) : null}
+        <div className="canvas-interaction-hint"><MousePointer2 size={13} /> {selected ? '유리 선택 · 드래그 회전' : '드래그 회전'}</div>
         <Canvas camera={{ position: [3.35, 2.25, 4.1], fov: 42 }} dpr={[1, 1.6]}>
-          <color attach="background" args={['#e8edf1']} />
           <hemisphereLight args={['#f8fbff', '#677784', 0.74]} />
           <directionalLight position={[4.5, 6, 4.5]} intensity={1.38} />
           <directionalLight position={[-3, 2.4, -4]} intensity={0.42} />
@@ -693,7 +569,6 @@ export function DigitalTwin(props: Props) {
           <gridHelper args={[6, 6, '#7f98ad', '#cad4dc']} position={[0, -0.43, 0]} />
         </Canvas>
       </div>
-      {props.demoMode === 'flashlight_360' ? <FlashlightTopView {...props} /> : null}
     </section>
   );
 }

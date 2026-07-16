@@ -16,7 +16,10 @@ export function useSimulationSocket(): SimClient {
   const [state, setState] = useState<SimulationState>(defaultState);
   const [connected, setConnected] = useState(false);
 
-  const socket = useMemo<Socket>(() => io(backendUrl, { transports: ['websocket', 'polling'] }), []);
+  const socket = useMemo<Socket>(() => io(backendUrl, {
+    transports: ['websocket', 'polling'],
+    autoConnect: false
+  }), []);
 
   const refreshState = () => {
     return fetch(`${backendUrl}/api/state`)
@@ -27,12 +30,12 @@ export function useSimulationSocket(): SimClient {
   useEffect(() => {
     refreshState().catch(() => undefined);
 
-    socket.on('connect', () => {
+    const onConnect = () => {
       setConnected(true);
       refreshState().catch(() => undefined);
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('state:fast', (fast: FastState) => {
+    };
+    const onDisconnect = () => setConnected(false);
+    const onFastState = (fast: FastState) => {
       setState((current) => ({
         ...current,
         schemaVersion: fast.schemaVersion,
@@ -41,25 +44,34 @@ export function useSimulationSocket(): SimClient {
         channels: fast.channels,
         timestamp: fast.timestamp
       }));
-    });
-    socket.on('camera:metrics', (cameraMetrics: CameraMetrics) => {
+    };
+    const onCameraMetrics = (cameraMetrics: CameraMetrics) => {
       setState((current) => ({ ...current, cameraMetrics }));
-    });
-    socket.on('sensor:update', (environment: EnvironmentInput) => {
+    };
+    const onSensorUpdate = (environment: EnvironmentInput) => {
       setState((current) => ({ ...current, environment }));
-    });
-    socket.on('sim:decision', (decisionReason: string) => {
+    };
+    const onDecision = (decisionReason: string) => {
       setState((current) => ({ ...current, decisionReason }));
-    });
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('state:fast', onFastState);
+    socket.on('camera:metrics', onCameraMetrics);
+    socket.on('sensor:update', onSensorUpdate);
+    socket.on('sim:decision', onDecision);
+    socket.connect();
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('state:fast');
-      socket.off('camera:metrics');
-      socket.off('sensor:update');
-      socket.off('sim:decision');
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('state:fast', onFastState);
+      socket.off('camera:metrics', onCameraMetrics);
+      socket.off('sensor:update', onSensorUpdate);
+      socket.off('sim:decision', onDecision);
       socket.disconnect();
+      setConnected(false);
     };
   }, [socket]);
 

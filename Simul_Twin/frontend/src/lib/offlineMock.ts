@@ -22,12 +22,12 @@ interface PolicyResult {
 }
 
 const CHANNEL_CONFIGS: ChannelConfig[] = [
-  { channel: 0, bearingDeg: 340, visibilityFloor: 0.58 },
-  { channel: 1, bearingDeg: 20, visibilityFloor: 0.5 },
-  { channel: 2, bearingDeg: 290, visibilityFloor: 0.34 },
-  { channel: 3, bearingDeg: 70, visibilityFloor: 0.34 },
-  { channel: 4, bearingDeg: 235, visibilityFloor: 0.18 },
-  { channel: 5, bearingDeg: 125, visibilityFloor: 0.18 },
+  { channel: 0, bearingDeg: 345, visibilityFloor: 0.58 },
+  { channel: 1, bearingDeg: 15, visibilityFloor: 0.5 },
+  { channel: 2, bearingDeg: 285, visibilityFloor: 0.34 },
+  { channel: 3, bearingDeg: 75, visibilityFloor: 0.34 },
+  { channel: 4, bearingDeg: 245, visibilityFloor: 0.18 },
+  { channel: 5, bearingDeg: 115, visibilityFloor: 0.18 },
   { channel: 6, bearingDeg: 180, visibilityFloor: 0.16 },
   { channel: 7, bearingDeg: null, visibilityFloor: 0.12 }
 ];
@@ -168,7 +168,8 @@ function uniformTargets(mi: number) {
 }
 
 function angularDistance(a: number, b: number) {
-  return Math.abs((a - b + 180) % 360 - 180);
+  const signedDelta = ((a - b + 180) % 360 + 360) % 360 - 180;
+  return Math.abs(signedDelta);
 }
 
 function angularHit(channelBearing: number, sourceBearing: number) {
@@ -180,16 +181,20 @@ function angularHit(channelBearing: number, sourceBearing: number) {
 }
 
 function lightBearingAndConfidence(environment: EnvironmentInput): [number, number] {
-  const x = safeLux(environment.rightLux) - safeLux(environment.leftLux);
-  const y = safeLux(environment.frontLux) - safeLux(environment.rearLux);
+  const hasHorizontalPair = environment.rightLux !== null && environment.leftLux !== null;
+  const hasVerticalPair = environment.frontLux !== null && environment.rearLux !== null;
+  const x = hasHorizontalPair ? safeLux(environment.rightLux) - safeLux(environment.leftLux) : 0;
+  const y = hasVerticalPair ? safeLux(environment.frontLux) - safeLux(environment.rearLux) : 0;
   const magnitude = Math.hypot(x, y);
-  const total = safeLux(environment.frontLux) + safeLux(environment.rightLux) + safeLux(environment.rearLux) + safeLux(environment.leftLux);
-  if (total <= 1 || magnitude <= 1) {
+  const total = (hasHorizontalPair ? safeLux(environment.rightLux) + safeLux(environment.leftLux) : 0)
+    + (hasVerticalPair ? safeLux(environment.frontLux) + safeLux(environment.rearLux) : 0);
+  const availableAxes = Number(hasHorizontalPair) + Number(hasVerticalPair);
+  if (availableAxes === 0 || total <= 1 || magnitude <= 1) {
     return [0, 0];
   }
   return [
     (Math.atan2(x, y) * 180 / Math.PI + 360) % 360,
-    clamp(magnitude / Math.max(total, 1) * DIRECTIONAL.confidenceScale)
+    clamp(magnitude / Math.max(total, 1) * DIRECTIONAL.confidenceScale * availableAxes / 2)
   ];
 }
 
@@ -224,6 +229,9 @@ function vehicleModeForDemo(demoMode: DemoMode): VehicleMode {
   }
   if (demoMode === 'parked') {
     return 'parked';
+  }
+  if (demoMode === 'flashlight_360') {
+    return 'stopped';
   }
   return 'driving';
 }
@@ -491,7 +499,7 @@ function flashlightEnvironment(angleDeg: number): EnvironmentInput {
 
 export function stepOfflineMock(state: SimulationState, at = nowSeconds(), preferredDt?: number): SimulationState {
   const previousTimestamp = state.timestamp > 0 ? state.timestamp : at - 0.1;
-  const dt = preferredDt ?? clamp(at - previousTimestamp, 0.05, 0.3);
+  const dt = preferredDt ?? clamp(at - previousTimestamp, 0, 0.3);
   const policy = computePolicy(state);
 
   const channels = state.channels.map((channel) => {
@@ -524,11 +532,19 @@ export function applyOfflineMockCommand(state: SimulationState, command: Control
 
   if (command.type === 'setManualChannel') {
     const channelId = Math.max(0, Math.min(state.channels.length - 1, Math.trunc(command.channel)));
+    const selectedChannel = state.channels.find((channel) => channel.channel === channelId);
+    if (selectedChannel?.fault) {
+      return {
+        ...state,
+        decisionReason: `오프라인 MOCK 정책: CH${channelId}은 구동기 고장 상태이므로 수동 제어를 적용하지 않습니다.`,
+        timestamp: at
+      };
+    }
     const mi = round3(clamp(command.mi));
     const ttl = Math.max(0, command.ttlSeconds ?? 15);
     const channels = state.channels.map((channel) => (
       channel.channel === channelId
-        ? withOptics({ ...channel, targetMi: mi, manualUntil: at + ttl }, mi)
+        ? withOptics({ ...channel, targetMi: mi, manualUntil: at + ttl }, channel.appliedMi)
         : channel
     ));
     const next = {
@@ -565,12 +581,16 @@ export function applyOfflineMockCommand(state: SimulationState, command: Control
 
   if (command.type === 'setFlashlightAngle') {
     const angle = ((command.angleDeg % 360) + 360) % 360;
+    const channels = state.demoMode === 'flashlight_360'
+      ? state.channels
+      : state.channels.map((channel) => ({ ...channel, manualUntil: null }));
     return stepOfflineMock({
       ...state,
       demoMode: 'flashlight_360',
       vehicleMode: vehicleModeForDemo('flashlight_360'),
-      environment: flashlightEnvironment(angle)
-    }, at, 0.18);
+      environment: flashlightEnvironment(angle),
+      channels
+    }, at);
   }
 
   if (command.type === 'setEnvironment') {

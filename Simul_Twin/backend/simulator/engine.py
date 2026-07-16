@@ -100,6 +100,13 @@ class SimulationEngine:
             command = payload.get("type")
             if command == "setManualChannel":
                 channel = self._channel_id(payload["channel"])
+                if self.state.channels[channel].fault:
+                    return {
+                        "ok": False,
+                        "type": command,
+                        "channel": channel,
+                        "error": f"CH{channel} is faulted; manual control is disabled",
+                    }
                 mi = clamp(float(payload["mi"]))
                 ttl = max(0.0, float(payload.get("ttlSeconds", 15.0)))
                 self._manual_mi[channel] = mi
@@ -145,6 +152,9 @@ class SimulationEngine:
                 if self.state.demoMode != "flashlight_360":
                     self.state.demoMode = "flashlight_360"
                     self.state.vehicleMode = self._vehicle_mode_for_demo(self.state.demoMode)
+                    self._manual_mi.clear()
+                    for channel in self.state.channels:
+                        channel.manualUntil = None
                 self._apply_flashlight_vector()
                 return {"ok": True, "type": command, "angleDeg": round(angle, 1)}
 
@@ -333,6 +343,8 @@ class SimulationEngine:
             return "camping"
         if demo_mode == "parked":
             return "parked"
+        if demo_mode == "flashlight_360":
+            return "stopped"
         return "driving"
 
     def _advance_demo_inputs(self, dt: float) -> None:
