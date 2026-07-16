@@ -129,6 +129,15 @@ class SimulationEngine:
                         setattr(self.state.environment, key, None if value is None else float(value))
                 return {"ok": True, "type": command}
 
+            if command == "setFlashlightAngle":
+                angle = float(payload.get("angleDeg", self._flashlight_angle)) % 360.0
+                self._flashlight_angle = angle
+                if self.state.demoMode != "flashlight_360":
+                    self.state.demoMode = "flashlight_360"
+                    self.state.vehicleMode = self._vehicle_mode_for_demo(self.state.demoMode)
+                self._apply_flashlight_vector()
+                return {"ok": True, "type": command, "angleDeg": round(angle, 1)}
+
             if command == "resetFault":
                 for channel in self.state.channels:
                     channel.fault = False
@@ -225,13 +234,13 @@ class SimulationEngine:
 
     def _manual_reason_suffix(self, reason: str, now: float) -> str:
         active = [
-            f"CH{channel.channel} auto resumes in {max(0.0, (channel.manualUntil or now) - now):.0f}s"
+            f"CH{channel.channel} {max(0.0, (channel.manualUntil or now) - now):.0f}초 후 자동 복귀"
             for channel in self.state.channels
             if channel.manualUntil is not None
         ]
         if not active:
             return reason
-        return f"{reason} Manual override active: {', '.join(active)}."
+        return f"{reason} 수동 오버라이드 적용 중: {', '.join(active)}."
 
     def _set_scenario(self, demo_mode: str) -> None:
         allowed: set[DemoMode] = {
@@ -311,10 +320,9 @@ class SimulationEngine:
         return "driving"
 
     def _advance_demo_inputs(self, dt: float) -> None:
+        del dt
         if self.state.demoMode != "flashlight_360":
             return
-        self._flashlight_angle = (self._flashlight_angle + cfg_float(self.config, "flashlight", "angular_speed_deg_s") * dt) % 360.0
-        self._apply_flashlight_vector()
 
     def _apply_flashlight_vector(self) -> None:
         angle = math.radians(self._flashlight_angle)

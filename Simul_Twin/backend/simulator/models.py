@@ -70,7 +70,7 @@ class SimulationState:
     environment: EnvironmentInput = field(default_factory=EnvironmentInput)
     channels: list[ChannelState] = field(default_factory=list)
     cameraMetrics: CameraMetrics = field(default_factory=CameraMetrics)
-    decisionReason: str = "Driving baseline: all channels remain mostly clear."
+    decisionReason: str = "주행 기본 상태: 전 채널을 투명에 가깝게 유지합니다."
     timestamp: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -87,12 +87,12 @@ class SimulationState:
 
 
 CHANNEL_CONFIGS: tuple[ChannelConfig, ...] = (
-    ChannelConfig(0, "CH0 Front Left", "driver forward glare and safety floor", 340.0, 0.58),
-    ChannelConfig(1, "CH1 Front Right", "front passenger glare", 20.0, 0.50),
-    ChannelConfig(2, "CH2 Left Front Door", "left side glare and privacy", 290.0, 0.34),
-    ChannelConfig(3, "CH3 Right Front Door", "right side glare and privacy", 70.0, 0.34),
-    ChannelConfig(4, "CH4 Left Rear Door", "left rear thermal and privacy", 235.0, 0.18),
-    ChannelConfig(5, "CH5 Right Rear Door", "right rear thermal and privacy", 125.0, 0.18),
-    ChannelConfig(6, "CH6 Rear Glass", "rear glare and thermal load", 180.0, 0.16),
-    ChannelConfig(7, "CH7 Sunroof", "top solar thermal load", None, 0.12),
+    ChannelConfig(0, "CH0 전면 좌측", "운전자 전방 강광 및 시야 안전 하한", 340.0, 0.58),
+    ChannelConfig(1, "CH1 전면 우측", "동승석 전방 강광 대응", 20.0, 0.50),
+    ChannelConfig(2, "CH2 좌측 전방 도어", "좌측 측면 일사 및 프라이버시", 290.0, 0.34),
+    ChannelConfig(3, "CH3 우측 전방 도어", "우측 측면 일사 및 프라이버시", 70.0, 0.34),
+    ChannelConfig(4, "CH4 좌측 후방 도어", "좌측 후방 열부하 및 프라이버시", 235.0, 0.18),
+    ChannelConfig(5, "CH5 우측 후방 도어", "우측 후방 열부하 및 프라이버시", 125.0, 0.18),
+    ChannelConfig(6, "CH6 후면 유리", "후방 광원 및 열부하", 180.0, 0.16),
+    ChannelConfig(7, "CH7 선루프", "상부 일사 및 열부하", None, 0.12),
 )

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { CameraMetrics, ControlCommand, EnvironmentInput, FastState, SimulationState } from '../types';
 import { defaultState } from './defaultState';
+import { applyOfflineMockCommand, stepOfflineMock } from './offlineMock';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5050';
 
@@ -17,13 +18,19 @@ export function useSimulationSocket(): SimClient {
 
   const socket = useMemo<Socket>(() => io(backendUrl, { transports: ['websocket', 'polling'] }), []);
 
-  useEffect(() => {
-    fetch(`${backendUrl}/api/state`)
+  const refreshState = () => {
+    return fetch(`${backendUrl}/api/state`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error(response.statusText)))
-      .then((snapshot: SimulationState) => setState((current) => ({ ...current, ...snapshot })))
-      .catch(() => undefined);
+      .then((snapshot: SimulationState) => setState((current) => ({ ...current, ...snapshot })));
+  };
 
-    socket.on('connect', () => setConnected(true));
+  useEffect(() => {
+    refreshState().catch(() => undefined);
+
+    socket.on('connect', () => {
+      setConnected(true);
+      refreshState().catch(() => undefined);
+    });
     socket.on('disconnect', () => setConnected(false));
     socket.on('state:fast', (fast: FastState) => {
       setState((current) => ({
@@ -56,16 +63,22 @@ export function useSimulationSocket(): SimClient {
     };
   }, [socket]);
 
+  useEffect(() => {
+    if (connected) {
+      return undefined;
+    }
+    const intervalId = window.setInterval(() => {
+      setState((current) => stepOfflineMock(current));
+    }, 100);
+    return () => window.clearInterval(intervalId);
+  }, [connected]);
+
   const sendCommand = (command: ControlCommand) => {
     if (socket.connected) {
       socket.emit('command', command);
       return;
     }
-    fetch(`${backendUrl}/api/command`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(command)
-    }).catch(() => undefined);
+    setState((current) => applyOfflineMockCommand(current, command));
   };
 
   return { state, connected, sendCommand };
