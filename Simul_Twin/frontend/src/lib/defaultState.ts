@@ -1,15 +1,5 @@
 import type { SimulationState } from '../types';
-
-const channelNames = [
-  'CH0 Front Left',
-  'CH1 Front Right',
-  'CH2 Left Front Door',
-  'CH3 Right Front Door',
-  'CH4 Left Rear Door',
-  'CH5 Right Rear Door',
-  'CH6 Rear Glass',
-  'CH7 Sunroof'
-];
+import { channelLabels } from './labels';
 
 export const defaultState: SimulationState = {
   schemaVersion: 1,
@@ -27,7 +17,7 @@ export const defaultState: SimulationState = {
     frontRightSaturation: 0.07,
     edgeDensity: 0.86
   },
-  channels: channelNames.map((name, channel) => ({
+  channels: channelLabels.map((name, channel) => ({
     channel,
     name,
     targetMi: 0.95,
@@ -45,6 +35,6 @@ export const defaultState: SimulationState = {
     frameId: 0,
     timestamp: 0
   },
-  decisionReason: 'Backend not connected yet. UI is showing default MOCK state.',
+  decisionReason: '백엔드 연결 전입니다. UI는 기본 MOCK 상태를 표시합니다.',
   timestamp: 0
 };

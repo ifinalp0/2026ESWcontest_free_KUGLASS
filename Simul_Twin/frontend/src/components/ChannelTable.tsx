@@ -1,3 +1,4 @@
+import { opticalStateLabels } from '../lib/labels';
 import type { ChannelState } from '../types';
 
 interface Props {
@@ -11,8 +12,8 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
     <section className="panel channel-panel">
       <div className="panel-heading">
         <div>
-          <h2>Channel State</h2>
-          <p>Target/applied MI and estimated optical state.</p>
+          <h2>채널 상태</h2>
+          <p>목표 MI, 적용 MI, 추정 투과율.</p>
         </div>
       </div>
       <div className="channel-table">
@@ -24,9 +25,9 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
             onClick={() => onSelectChannel(channel.channel)}
           >
             <span>CH{channel.channel}</span>
-            <strong>{channel.opticalState}</strong>
-            <span>{Math.round(channel.appliedMi * 100)} MI</span>
-            <span>{Math.round(channel.estimatedTransmittance * 100)} T</span>
+            <strong>{opticalStateLabels[channel.opticalState]}</strong>
+            <span>적용 MI {Math.round(channel.appliedMi * 100)}%</span>
+            <span>투과율 {Math.round(channel.estimatedTransmittance * 100)}%</span>
           </button>
         ))}
       </div>

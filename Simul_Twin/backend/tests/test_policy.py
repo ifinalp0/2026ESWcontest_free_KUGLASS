@@ -86,8 +86,28 @@ def test_missing_lux_sensor_values_fall_back_without_crashing() -> None:
     run_steps(engine)
     snapshot = engine.snapshot()
 
-    assert "directional" in snapshot["decisionReason"] or "thermal" in snapshot["decisionReason"]
+    assert "방향성" in snapshot["decisionReason"] or "열부하" in snapshot["decisionReason"]
     assert len(snapshot["channels"]) == 8
+
+
+def test_flashlight_360_uses_manual_angle_without_auto_rotation() -> None:
+    engine = SimulationEngine()
+    engine.apply_command({"type": "setScenario", "demoMode": "flashlight_360"})
+    engine.apply_command({"type": "setFlashlightAngle", "angleDeg": 90})
+    run_steps(engine, count=3, dt=0.5)
+    first_environment = engine.snapshot()["environment"]
+
+    assert first_environment["rightLux"] > first_environment["frontLux"]
+    assert first_environment["rightLux"] > first_environment["rearLux"]
+    assert first_environment["rightLux"] > first_environment["leftLux"]
+
+    run_steps(engine, count=8, dt=0.5)
+    later_environment = engine.snapshot()["environment"]
+
+    assert later_environment["frontLux"] == first_environment["frontLux"]
+    assert later_environment["rightLux"] == first_environment["rightLux"]
+    assert later_environment["rearLux"] == first_environment["rearLux"]
+    assert later_environment["leftLux"] == first_environment["leftLux"]
 
 
 def test_policy_config_override_changes_camping_target(tmp_path: Path) -> None:

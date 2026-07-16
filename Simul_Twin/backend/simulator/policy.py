@@ -124,14 +124,14 @@ class PolicyEngine:
         if demo_mode == "camping" or vehicle_mode == "camping":
             return PolicyResult(
                 targets={config.channel: cfg_float(self.config, "policy", "camping_mi") for config in CHANNEL_CONFIGS},
-                reason="Camping privacy: all PDLC channels move to maximum Frost.",
+                reason="차박 프라이버시: 전 채널을 최저 투명도에 가까운 산란 상태로 전환합니다.",
                 fast_attack_channels=set(),
             )
 
         if demo_mode == "parked" or vehicle_mode == "parked":
             return PolicyResult(
                 targets={config.channel: cfg_float(self.config, "policy", "parked_mi") for config in CHANNEL_CONFIGS},
-                reason="Parked mode: all glass is Frost for theft deterrence and parked heat load.",
+                reason="주차 도난방지·열부하: 전 채널을 최대 불투명에 가깝게 유지합니다.",
                 fast_attack_channels=set(),
             )
 
@@ -186,13 +186,13 @@ class PolicyEngine:
 
         reason_parts: list[str] = []
         if risk > cfg_float(self.config, "thermal", "reason_threshold"):
-            reason_parts.append("thermal priority CH7->CH6->CH4/5->CH2/3->CH0/1")
+            reason_parts.append("열부하 우선순위 CH7→CH6→CH4/5→CH2/3→CH0/1 적용")
         if confidence > cfg_float(self.config, "directional", "reason_confidence"):
-            reason_parts.append(f"directional lux bearing {bearing:.0f} deg")
+            reason_parts.append(f"방향성 조도 벡터 {bearing:.0f}° 방향 감지")
         if strong_front_light:
-            reason_parts.append("front glare fast-attack on CH0/CH1")
+            reason_parts.append("전면 순간 강광 fast-attack으로 CH0/CH1 산란 개입")
         if not reason_parts:
-            reason_parts.append("driving baseline keeps windows mostly Clear")
+            reason_parts.append("주행 기본 상태로 유리부를 투명에 가깝게 유지")
 
         return PolicyResult(
             targets={channel: round(clamp(mi), 3) for channel, mi in targets.items()},
@@ -232,6 +232,6 @@ class PolicyEngine:
                 )
                 for channel, mi in targets.items()
             },
-            reason=f"360 flashlight mock: strongest direction is {bearing:.0f} deg; nearest glass frosts first.",
+            reason=f"360° 손전등: {bearing:.0f}° 방향의 실측 조도 벡터를 기준으로 가장 가까운 유리부터 산란 개입합니다.",
             fast_attack_channels={0, 1},
         )
