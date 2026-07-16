@@ -60,6 +60,7 @@ export type ControlCommand =
   | { type: 'setScenario'; demoMode: DemoMode }
   | { type: 'setFlashlightAngle'; angleDeg: number }
   | { type: 'setEnvironment'; environment: Partial<EnvironmentInput> }
+  | { type: 'setChannelFault'; channel: number; fault: boolean }
   | { type: 'resetFault' }
   | { type: 'saveReplay'; name?: string }
   | { type: 'loadReplay'; name: string };

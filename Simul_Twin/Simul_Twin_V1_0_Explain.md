@@ -171,6 +171,7 @@ demo 입력 확인
 | `setScenario` | `demoMode` | 시연 모드와 해당 preset 환경 입력 적용 |
 | `setFlashlightAngle` | `angleDeg` | 360도 손전등 방위각을 수동 지정 |
 | `setEnvironment` | `environment` | mock 온도/조도/카메라 입력 일부 갱신 |
+| `setChannelFault` | `channel`, `fault` | 선택 채널 구동기 고장 주입 또는 해제 |
 | `resetFault` | 없음 | 채널 fault flag 초기화 |
 | `saveReplay` | `name?` | 메모리 replay buffer 저장 |
 | `loadReplay` | `name` | 저장된 replay를 메모리와 현재 상태로 복원 |
@@ -304,19 +305,19 @@ ScenarioBar
 
 ### 5.3 `DigitalTwin.tsx`: 3D 자동차와 360도 손전등 뷰
 
-`DigitalTwin`은 외부 GLB/STL 없이 코드로 만든 저폴리 자동차다.
+`DigitalTwin`은 아이오닉 5 GLB 모델과 코드에서 생성한 CH0~CH7 PDLC 필름 mesh를 함께 사용한다.
 
 구성은 다음과 같다.
 
-- 차체/캐빈/범퍼: box geometry
-- 바퀴: cylinder geometry
-- 픽셀 램프: 작은 box geometry
-- 유리 8개: CH0~CH7에 대응하는 개별 mesh
+- 차체/바퀴/램프: `frontend/public/models`의 아이오닉 5 GLB와 texture
+- 유리 8개: CH0~CH7에 대응하는 개별 PDLC film mesh
+- 각 film mesh를 채널별 투영 방향으로 실제 차량 surface에 ray projection
+- 삼각형 subdivision과 약 6mm 시각 gap으로 곡면 추종 및 z-fighting 방지
 - 수평 회전 슬라이더와 드래그 회전
 - 8채널 범례 버튼
 - `flashlight_360` 모드에서 나타나는 360도 손전등 상단 뷰
 
-각 유리 mesh는 `appliedMi`에 따라 opacity와 색이 바뀐다.
+각 유리 mesh는 차량과 함께 회전하며 `appliedMi`에 따라 opacity, roughness, transmission, haze가 바뀐다. 평면을 차체 근처에 단순 배치하지 않고 GLB의 실제 삼각형 surface에 투영하므로 전면·측면·후면·선루프 필름이 차체 형상에 밀착된다.
 
 - MI가 높을수록 Clear에 가까움
 - MI가 낮을수록 Frost에 가까움
@@ -360,6 +361,8 @@ Control Panel은 다음 기능을 제공한다.
 - replay buffer 저장
 - mock 외기온/내부온도 조절
 - mock 전방/우측/후방/좌측/상부 조도 조절
+- 선택 채널 구동기 고장 주입과 해제
+- 전방/우측/후방/좌측/상부 조도 센서 결측 주입과 원래 값 복구
 
 수동 조절은 `setManualChannel` 명령으로 백엔드에 전달된다. 백엔드는 해당 채널의 `manualUntil`을 설정하고, TTL이 끝나면 자동 정책으로 복귀한다.
 
@@ -386,7 +389,7 @@ TopBar는 다음 정보를 표시한다.
 - 자동 정책 또는 수동 TTL 상태
 - fault flag 초기화 버튼
 
-현재 `Simul_Twin_V1_0`은 실제 fault를 발생시키는 하드웨어 입력은 없지만, 상태 계약과 UI 경로 검증을 위해 `fault` 필드와 reset 명령을 유지한다.
+현재 `Simul_Twin_V1_0`은 검증 도구에서 mock 구동기 fault를 주입할 수 있다. fault 채널은 `appliedMi = 0`의 fail-safe 산란 상태로 전환되고, 3D 필름과 채널 표에 고장 상태가 표시된다. 개별 해제 또는 TopBar의 전체 reset으로 자동 정책에 복귀한다.
 
 ### 5.8 `ScenarioBar.tsx`: 시연 모드 전환
 
@@ -581,10 +584,10 @@ V1.0은 시뮬레이터의 골격과 주요 정책 검증에 초점을 둔다. �
    - 저장 기능은 UI에 있지만, 파일 목록/로드 UI는 아직 API 중심이다.
    - `/logs` 또는 Replay panel을 만들면 시연 준비와 비교 검증에 더 유용하다.
 
-3. 3D 모델 교체 가능성
-   - 현재 모델은 코드 기반 저폴리 차체다.
-   - 나중에 GLB/STL 기반 실제 아이오닉5 형태로 교체할 수 있다.
-   - 단, CH0~CH7 유리 mesh 이름/매핑 규칙은 유지해야 한다.
+3. 3D 모델 정밀화
+   - 현재 아이오닉 5 GLB 위에 CH0~CH7 필름을 runtime projection한다.
+   - 향후 유리별 mesh가 분리된 CAD/GLB를 사용하면 ray projection 없이 원본 유리 topology를 직접 복제할 수 있다.
+   - 모델 교체 시 채널별 초기 영역과 투영 방향은 새 차체 형상에 맞춰 보정해야 한다.
 
 4. 물리 근사 모델 고도화
    - 현재 열/광학 모델은 정책 검증용 근사치다.

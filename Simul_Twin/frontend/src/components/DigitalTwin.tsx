@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent, RefObject } from 'react';
+import type { KeyboardEvent, PointerEvent } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Flashlight, RotateCw } from 'lucide-react';
@@ -7,6 +7,7 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
+  Euler,
   Float32BufferAttribute,
   LineBasicMaterial,
   MathUtils,
@@ -14,10 +15,14 @@ import {
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
+  Object3D,
+  Raycaster,
   RepeatWrapping,
   Shape,
+  ShapeGeometry,
   SRGBColorSpace,
-  TextureLoader
+  TextureLoader,
+  Vector3
 } from 'three';
 import type { Material, Texture } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -45,8 +50,14 @@ interface WindowPart {
   position: [number, number, number];
   points: Array<[number, number]>;
   rotation?: [number, number, number];
-  bandWidth?: number;
-  normalOffset?: number;
+  projectionDirection: [number, number, number];
+  maxProjectionDistance?: number;
+}
+
+interface FittedWindowPart {
+  channel: number;
+  filmGeometry: BufferGeometry;
+  outlineGeometry: BufferGeometry;
 }
 
 interface IoniqMaterialTextures {
@@ -68,57 +79,56 @@ const windowParts: WindowPart[] = [
     position: [-0.13, 0.56, 1.14],
     points: [[-0.35, -0.13], [-0.02, -0.13], [0, 0.15], [-0.31, 0.18], [-0.44, 0.04]],
     rotation: [-0.62, 0, 0],
-    bandWidth: 0.28
+    projectionDirection: [0, -0.58, -0.81]
   },
   {
     channel: 1,
     position: [0.13, 0.56, 1.14],
     points: [[0.02, -0.13], [0.35, -0.13], [0.44, 0.04], [0.31, 0.18], [0, 0.15]],
     rotation: [-0.62, 0, 0],
-    bandWidth: 0.28
+    projectionDirection: [0, -0.58, -0.81]
   },
   {
     channel: 2,
     position: [-1.012, 0.56, 0.44],
     points: [[-0.4, -0.15], [0.27, -0.15], [0.34, 0.09], [0.14, 0.19], [-0.36, 0.22], [-0.48, 0.05]],
     rotation: [0, -Math.PI / 2, 0.03],
-    bandWidth: 0.46
+    projectionDirection: [1, -0.3, 0]
   },
   {
     channel: 3,
     position: [1.012, 0.56, 0.44],
     points: [[-0.27, -0.15], [0.4, -0.15], [0.48, 0.05], [0.36, 0.22], [-0.14, 0.19], [-0.34, 0.09]],
     rotation: [0, Math.PI / 2, -0.03],
-    bandWidth: 0.46
+    projectionDirection: [-1, -0.3, 0]
   },
   {
     channel: 4,
     position: [-1.012, 0.55, -0.49],
     points: [[-0.35, -0.14], [0.29, -0.14], [0.36, 0.05], [0.18, 0.18], [-0.31, 0.2], [-0.41, 0.05]],
     rotation: [0, -Math.PI / 2, 0.02],
-    bandWidth: 0.42
+    projectionDirection: [1, -0.3, 0]
   },
   {
     channel: 5,
     position: [1.012, 0.55, -0.49],
     points: [[-0.29, -0.14], [0.35, -0.14], [0.41, 0.05], [0.31, 0.2], [-0.18, 0.18], [-0.36, 0.05]],
     rotation: [0, Math.PI / 2, -0.02],
-    bandWidth: 0.42
+    projectionDirection: [-1, -0.3, 0]
   },
   {
     channel: 6,
     position: [0, 0.58, -1.36],
     points: [[-0.52, -0.15], [0.52, -0.15], [0.42, 0.16], [0.2, 0.21], [-0.2, 0.21], [-0.42, 0.16]],
     rotation: [0.4, 0, 0],
-    bandWidth: 0.66,
-    normalOffset: -0.008
+    projectionDirection: [0, 0.4, -0.9]
   },
   {
     channel: 7,
     position: [0, 0.88, -0.12],
     points: [[-0.36, -0.38], [0.36, -0.38], [0.46, -0.22], [0.42, 0.32], [0.28, 0.43], [-0.28, 0.43], [-0.42, 0.32], [-0.46, -0.22]],
     rotation: [-Math.PI / 2, 0, 0],
-    bandWidth: 0.52
+    projectionDirection: [0, -1, 0]
   }
 ];
 
@@ -127,6 +137,9 @@ const clearFilmColor = new Color('#6dc9d0');
 const frostedFilmColor = new Color('#edf7f4');
 const passiveEdgeColor = new Color('#83aaa5');
 const activeEdgeColor = new Color('#f2a12f');
+const faultEdgeColor = new Color('#d34848');
+const FILM_SURFACE_GAP = 0.006;
+const FILM_SUBDIVISIONS = 3;
 
 function frostAmount(mi: number) {
   const frost = 1 - mi;
@@ -142,34 +155,120 @@ function windowShape(points: Array<[number, number]>) {
   return shape;
 }
 
-function WindowFilmGeometry({ points }: { points: Array<[number, number]> }) {
-  const shape = useMemo(() => windowShape(points), [points]);
-  return <shapeGeometry args={[shape]} />;
+function isWheelObject(object: Object3D) {
+  let current: Object3D | null = object;
+  while (current) {
+    if (current.name.startsWith('SM_Wheel_')) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
-function WindowFilmOutline({ points, materialRef }: {
-  points: Array<[number, number]>;
-  materialRef: RefObject<LineBasicMaterial | null>;
-}) {
-  const geometry = useMemo(() => {
-    const outlineGeometry = new BufferGeometry();
-    outlineGeometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(points.flatMap(([x, y]) => [x, y, 0.004]), 3)
-    );
-    return outlineGeometry;
-  }, [points]);
+function projectToVehicle(
+  seed: Vector3,
+  direction: Vector3,
+  vehicle: Object3D,
+  raycaster: Raycaster,
+  maxDistance: number
+) {
+  raycaster.set(seed, direction);
+  raycaster.far = maxDistance;
+  const hit = raycaster.intersectObject(vehicle, true).find((candidate) => !isWheelObject(candidate.object));
+  if (!hit) {
+    return seed;
+  }
+  return hit.point.clone().addScaledVector(direction, -FILM_SURFACE_GAP);
+}
 
-  return (
-    <lineLoop geometry={geometry} renderOrder={14}>
-      <lineBasicMaterial ref={materialRef} color="#83aaa5" transparent opacity={0.42} depthTest depthWrite={false} />
-    </lineLoop>
-  );
+function pointInPartSpace(point: Vector3, part: WindowPart, rotation: Euler) {
+  return point.applyEuler(rotation).add(new Vector3(...part.position));
+}
+
+function subdivideTriangle(a: Vector3, b: Vector3, c: Vector3, segments: number) {
+  const pointAt = (i: number, j: number) => {
+    const bWeight = i / segments;
+    const cWeight = j / segments;
+    return a.clone()
+      .multiplyScalar(1 - bWeight - cWeight)
+      .addScaledVector(b, bWeight)
+      .addScaledVector(c, cWeight);
+  };
+  const triangles: Vector3[] = [];
+  for (let i = 0; i < segments; i += 1) {
+    for (let j = 0; j < segments - i; j += 1) {
+      triangles.push(pointAt(i, j), pointAt(i + 1, j), pointAt(i, j + 1));
+      if (i + j < segments - 1) {
+        triangles.push(pointAt(i + 1, j), pointAt(i + 1, j + 1), pointAt(i, j + 1));
+      }
+    }
+  }
+  return triangles;
+}
+
+function fitWindowPartToVehicle(part: WindowPart, vehicle: Object3D): FittedWindowPart {
+  const source = new ShapeGeometry(windowShape(part.points)).toNonIndexed();
+  const position = source.getAttribute('position');
+  const rotation = new Euler(...(part.rotation ?? [0, 0, 0]));
+  const direction = new Vector3(...part.projectionDirection).normalize();
+  const raycaster = new Raycaster();
+  const maxDistance = part.maxProjectionDistance ?? 0.85;
+  const projectedPositions: number[] = [];
+
+  for (let index = 0; index < position.count; index += 3) {
+    const triangle = [0, 1, 2].map((offset) => (
+      new Vector3().fromBufferAttribute(position, index + offset)
+    ));
+    subdivideTriangle(triangle[0], triangle[1], triangle[2], FILM_SUBDIVISIONS)
+      .map((point) => pointInPartSpace(point, part, rotation))
+      .map((point) => projectToVehicle(point, direction, vehicle, raycaster, maxDistance))
+      .forEach((point) => projectedPositions.push(point.x, point.y, point.z));
+  }
+
+  const filmGeometry = new BufferGeometry();
+  filmGeometry.setAttribute('position', new Float32BufferAttribute(projectedPositions, 3));
+  filmGeometry.computeVertexNormals();
+  filmGeometry.computeBoundingSphere();
+
+  const outlinePositions = part.points.flatMap(([x, y]) => {
+    const seed = pointInPartSpace(new Vector3(x, y, 0), part, rotation);
+    const point = projectToVehicle(seed, direction, vehicle, raycaster, maxDistance);
+    return [point.x, point.y, point.z];
+  });
+  const outlineGeometry = new BufferGeometry();
+  outlineGeometry.setAttribute('position', new Float32BufferAttribute(outlinePositions, 3));
+
+  source.dispose();
+  return { channel: part.channel, filmGeometry, outlineGeometry };
+}
+
+function fitWindowPartsToVehicle(vehicle: Object3D) {
+  const materialSides = new Map<Material, Material['side']>();
+  vehicle.traverse((object) => {
+    if (!(object instanceof Mesh)) {
+      return;
+    }
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      materialSides.set(material, material.side);
+      material.side = DoubleSide;
+    });
+  });
+
+  try {
+    return windowParts.map((part) => fitWindowPartToVehicle(part, vehicle));
+  } finally {
+    materialSides.forEach((side, material) => {
+      material.side = side;
+    });
+  }
 }
 
 function applyFilmVisuals(
   mi: number,
   selected: boolean,
+  fault: boolean,
   filmMaterial: MeshPhysicalMaterial | null,
   hazeMaterial: MeshBasicMaterial | null,
   edgeMaterial: LineBasicMaterial | null
@@ -184,8 +283,8 @@ function applyFilmVisuals(
     filmMaterial.thickness = 0.028 + frost * 0.09;
     filmMaterial.clearcoat = MathUtils.lerp(0.78, 0.28, frost);
     filmMaterial.clearcoatRoughness = 0.14 + frost * 0.38;
-    filmMaterial.emissive.copy(activeEdgeColor);
-    filmMaterial.emissiveIntensity = selected ? 0.035 : 0;
+    filmMaterial.emissive.copy(fault ? faultEdgeColor : activeEdgeColor);
+    filmMaterial.emissiveIntensity = fault ? 0.16 : selected ? 0.035 : 0;
   }
 
   if (hazeMaterial) {
@@ -193,13 +292,13 @@ function applyFilmVisuals(
   }
 
   if (edgeMaterial) {
-    edgeMaterial.color.copy(selected ? activeEdgeColor : passiveEdgeColor);
-    edgeMaterial.opacity = selected ? 0.86 : 0.34 + frost * 0.2;
+    edgeMaterial.color.copy(fault ? faultEdgeColor : selected ? activeEdgeColor : passiveEdgeColor);
+    edgeMaterial.opacity = fault ? 0.96 : selected ? 0.86 : 0.34 + frost * 0.2;
   }
 }
 
 function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
-  part: WindowPart;
+  part: FittedWindowPart;
   channel: ChannelState;
   selected: boolean;
   onSelectChannel: (channel: number) => void;
@@ -208,7 +307,6 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
   const filmMaterialRef = useRef<MeshPhysicalMaterial>(null);
   const hazeMaterialRef = useRef<MeshBasicMaterial>(null);
   const edgeMaterialRef = useRef<LineBasicMaterial>(null);
-  const normalOffset = part.normalOffset ?? 0.008;
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     onSelectChannel(part.channel);
@@ -219,6 +317,7 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
     applyFilmVisuals(
       visualMiRef.current,
       selected,
+      channel.fault,
       filmMaterialRef.current,
       hazeMaterialRef.current,
       edgeMaterialRef.current
@@ -226,10 +325,8 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
   });
 
   return (
-    <group position={part.position} rotation={part.rotation}>
-      <group position={[0, 0, normalOffset]}>
-        <mesh onClick={handleClick} renderOrder={selected ? 12 : 8}>
-          <WindowFilmGeometry points={part.points} />
+    <group>
+        <mesh geometry={part.filmGeometry} onClick={handleClick} renderOrder={selected ? 12 : 8}>
           <meshPhysicalMaterial
             ref={filmMaterialRef}
             color="#6dc9d0"
@@ -249,8 +346,7 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
             polygonOffsetFactor={-1}
           />
         </mesh>
-        <mesh position={[0, 0, 0.002]} onClick={handleClick} renderOrder={selected ? 13 : 9}>
-          <WindowFilmGeometry points={part.points} />
+        <mesh geometry={part.filmGeometry} onClick={handleClick} renderOrder={selected ? 13 : 9}>
           <meshBasicMaterial
             ref={hazeMaterialRef}
             color="#f7fffd"
@@ -263,8 +359,9 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
             polygonOffsetFactor={-2}
           />
         </mesh>
-        <WindowFilmOutline points={part.points} materialRef={edgeMaterialRef} />
-      </group>
+        <lineLoop geometry={part.outlineGeometry} renderOrder={14}>
+          <lineBasicMaterial ref={edgeMaterialRef} color="#83aaa5" transparent opacity={0.42} depthTest depthWrite={false} />
+        </lineLoop>
     </group>
   );
 }
@@ -331,21 +428,22 @@ function GroundShadow() {
   );
 }
 
-function IoniqModel() {
+function useIoniqModel() {
   const gltf = useLoader(GLTFLoader, IONIQ_MODEL_URL);
   const [bodyTexture, tireTexture, tireNormalTexture] = useLoader(TextureLoader, [
     IONIQ_BODY_TEXTURE_URL,
     IONIQ_TIRE_TEXTURE_URL,
     IONIQ_TIRE_NORMAL_URL
   ]);
-  const model = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
   const textures = useMemo<IoniqMaterialTextures>(() => ({
     bodyMap: prepareColorTexture(bodyTexture),
     tireMap: prepareTireTexture(prepareColorTexture(tireTexture)),
     tireNormalMap: prepareTireTexture(tireNormalTexture)
   }), [bodyTexture, tireNormalTexture, tireTexture]);
-
-  useEffect(() => {
+  return useMemo(() => {
+    const model = gltf.scene.clone(true);
+    model.position.set(...IONIQ_MODEL_POSITION);
+    model.scale.setScalar(IONIQ_MODEL_SCALE);
     model.traverse((object) => {
       object.castShadow = true;
       object.receiveShadow = true;
@@ -355,19 +453,29 @@ function IoniqModel() {
           : tuneIoniqMaterial(object.material, textures);
       }
     });
-  }, [model, textures]);
-
-  return <primitive object={model} position={IONIQ_MODEL_POSITION} scale={IONIQ_MODEL_SCALE} />;
+    model.updateMatrixWorld(true);
+    return model;
+  }, [gltf.scene, textures]);
 }
 
-function CarModel({ channels, onSelectChannel, selectedChannel, rotationY }: CarModelProps) {
+function VehicleAssembly({ channels, onSelectChannel, selectedChannel }: Omit<CarModelProps, 'rotationY'>) {
+  const model = useIoniqModel();
+  const fittedParts = useMemo(
+    () => fitWindowPartsToVehicle(model),
+    [model]
+  );
+
+  useEffect(() => () => {
+    fittedParts.forEach((part) => {
+      part.filmGeometry.dispose();
+      part.outlineGeometry.dispose();
+    });
+  }, [fittedParts]);
+
   return (
-    <group rotation={[0, rotationY, 0]}>
-      <GroundShadow />
-      <Suspense fallback={null}>
-        <IoniqModel />
-      </Suspense>
-      {windowParts.map((part) => {
+    <>
+      <primitive object={model} />
+      {fittedParts.map((part) => {
         const channel = channels[part.channel];
         return (
           <PdlcFilmSurface
@@ -379,6 +487,21 @@ function CarModel({ channels, onSelectChannel, selectedChannel, rotationY }: Car
           />
         );
       })}
+    </>
+  );
+}
+
+function CarModel({ channels, onSelectChannel, selectedChannel, rotationY }: CarModelProps) {
+  return (
+    <group rotation={[0, rotationY, 0]}>
+      <GroundShadow />
+      <Suspense fallback={null}>
+        <VehicleAssembly
+          channels={channels}
+          selectedChannel={selectedChannel}
+          onSelectChannel={onSelectChannel}
+        />
+      </Suspense>
     </group>
   );
 }

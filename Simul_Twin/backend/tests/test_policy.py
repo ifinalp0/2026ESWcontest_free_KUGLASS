@@ -90,6 +90,24 @@ def test_missing_lux_sensor_values_fall_back_without_crashing() -> None:
     assert len(snapshot["channels"]) == 8
 
 
+def test_channel_fault_uses_fail_safe_frost_and_can_recover() -> None:
+    engine = SimulationEngine()
+    engine.apply_command({"type": "setChannelFault", "channel": 4, "fault": True})
+    engine.step(0.1)
+
+    faulted = engine.snapshot()
+    assert faulted["channels"][4]["fault"] is True
+    assert faulted["channels"][4]["appliedMi"] == 0.0
+    assert "fail-safe" in faulted["decisionReason"]
+
+    engine.apply_command({"type": "setChannelFault", "channel": 4, "fault": False})
+    engine.step(0.1)
+    recovered = engine.snapshot()
+
+    assert recovered["channels"][4]["fault"] is False
+    assert recovered["channels"][4]["appliedMi"] > 0.0
+
+
 def test_flashlight_360_uses_manual_angle_without_auto_rotation() -> None:
     engine = SimulationEngine()
     engine.apply_command({"type": "setScenario", "demoMode": "flashlight_360"})

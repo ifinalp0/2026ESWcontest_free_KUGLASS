@@ -21,11 +21,11 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
           <button
             key={channel.channel}
             type="button"
-            className={channel.channel === selectedChannel ? 'channel-row selected' : 'channel-row'}
+            className={`channel-row${channel.channel === selectedChannel ? ' selected' : ''}${channel.fault ? ' fault' : ''}`}
             onClick={() => onSelectChannel(channel.channel)}
           >
             <span>CH{channel.channel}</span>
-            <strong>{opticalStateLabels[channel.opticalState]}</strong>
+            <strong>{channel.fault ? '구동기 고장' : opticalStateLabels[channel.opticalState]}</strong>
             <span>적용 MI {Math.round(channel.appliedMi * 100)}%</span>
             <span>투과율 {Math.round(channel.estimatedTransmittance * 100)}%</span>
           </button>

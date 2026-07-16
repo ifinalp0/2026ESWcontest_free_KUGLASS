@@ -740,6 +740,15 @@ p {
   box-shadow: inset 4px 0 0 var(--accent);
 }
 
+.channel-row.fault {
+  border-color: #c76a5e;
+  background: #fff0ed;
+}
+
+.channel-row.fault strong {
+  color: var(--danger);
+}
+
 .channel-row,
 .scenario-select {
   font-size: 0.78rem;
@@ -821,6 +830,94 @@ input[type="range"] {
 .env-slider input[type="range"] {
   width: 100%;
   margin: 0;
+}
+
+.validation-tools {
+  display: grid;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ui);
+  background: var(--panel);
+}
+
+.validation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.validation-heading p {
+  margin-top: 3px;
+  font-size: 0.72rem;
+}
+
+.validation-heading svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.fault-toggle,
+.sensor-toggle {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ui);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.fault-toggle {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fault-toggle:hover,
+.sensor-toggle:hover {
+  border-color: var(--line-strong);
+}
+
+.fault-toggle.active,
+.sensor-toggle.missing {
+  border-color: #c76a5e;
+  background: #fff0ed;
+  color: var(--danger);
+}
+
+.sensor-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sensor-toggle {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  justify-items: center;
+  padding: 7px 3px;
+  font-size: 0.68rem;
+}
+
+.sensor-toggle svg {
+  color: var(--muted);
+}
+
+.sensor-toggle strong {
+  color: var(--accent);
+  font-size: 0.66rem;
+}
+
+.sensor-toggle.missing strong,
+.sensor-toggle.missing svg {
+  color: var(--danger);
 }
 
 .channel-panel {

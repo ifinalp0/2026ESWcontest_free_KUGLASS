@@ -505,7 +505,11 @@ export function stepOfflineMock(state: SimulationState, at = nowSeconds(), prefe
     }, appliedMi);
   });
 
-  const reason = `오프라인 MOCK 정책: ${manualReasonSuffix(policy.reason, channels, at)}`;
+  const faultedChannels = channels.filter((channel) => channel.fault).map((channel) => `CH${channel.channel}`);
+  const faultReason = faultedChannels.length > 0
+    ? ` 구동기 고장 ${faultedChannels.join(', ')}은 fail-safe 산란 상태입니다.`
+    : '';
+  const reason = `오프라인 MOCK 정책: ${manualReasonSuffix(policy.reason, channels, at)}${faultReason}`;
   return {
     ...state,
     channels,
@@ -574,6 +578,22 @@ export function applyOfflineMockCommand(state: SimulationState, command: Control
       ...state,
       environment: mergeEnvironment(state.environment, command.environment)
     }, at, 0.16);
+  }
+
+  if (command.type === 'setChannelFault') {
+    const channelId = Math.max(0, Math.min(state.channels.length - 1, Math.trunc(command.channel)));
+    const channels = state.channels.map((channel) => (
+      channel.channel === channelId
+        ? { ...channel, fault: command.fault, manualUntil: command.fault ? null : channel.manualUntil }
+        : channel
+    ));
+    return stepOfflineMock({
+      ...state,
+      channels,
+      decisionReason: command.fault
+        ? `오프라인 MOCK 정책: CH${channelId} 구동기 고장을 주입해 fail-safe 산란 상태를 검증합니다.`
+        : `오프라인 MOCK 정책: CH${channelId} 구동기 고장을 해제하고 자동 정책으로 복귀합니다.`
+    }, at, 0.1);
   }
 
   if (command.type === 'resetFault') {

@@ -74,7 +74,8 @@ class SimulationEngine:
 
             self._frame_id += 1
             self.state.cameraMetrics = self._camera_metrics(now)
-            self.state.decisionReason = self._manual_reason_suffix(result.reason, now)
+            reason = self._manual_reason_suffix(result.reason, now)
+            self.state.decisionReason = self._fault_reason_suffix(reason)
             self.state.timestamp = now
             self._record_snapshot()
 
@@ -98,7 +99,7 @@ class SimulationEngine:
         with self._lock:
             command = payload.get("type")
             if command == "setManualChannel":
-                channel = int(payload["channel"])
+                channel = self._channel_id(payload["channel"])
                 mi = clamp(float(payload["mi"]))
                 ttl = max(0.0, float(payload.get("ttlSeconds", 15.0)))
                 self._manual_mi[channel] = mi
@@ -112,10 +113,19 @@ class SimulationEngine:
                     for state in self.state.channels:
                         state.manualUntil = None
                 else:
-                    channel_id = int(channel)
+                    channel_id = self._channel_id(channel)
                     self._manual_mi.pop(channel_id, None)
                     self.state.channels[channel_id].manualUntil = None
                 return {"ok": True, "type": command}
+
+            if command == "setChannelFault":
+                channel = self._channel_id(payload["channel"])
+                fault = bool(payload.get("fault", True))
+                self.state.channels[channel].fault = fault
+                if fault:
+                    self._manual_mi.pop(channel, None)
+                    self.state.channels[channel].manualUntil = None
+                return {"ok": True, "type": command, "channel": channel, "fault": fault}
 
             if command == "setScenario":
                 demo_mode = str(payload.get("demoMode", "none"))
@@ -241,6 +251,12 @@ class SimulationEngine:
         if not active:
             return reason
         return f"{reason} 수동 오버라이드 적용 중: {', '.join(active)}."
+
+    def _fault_reason_suffix(self, reason: str) -> str:
+        faulted = [f"CH{channel.channel}" for channel in self.state.channels if channel.fault]
+        if not faulted:
+            return reason
+        return f"{reason} 구동기 고장 {', '.join(faulted)}은 fail-safe 산란 상태입니다."
 
     def _set_scenario(self, demo_mode: str) -> None:
         allowed: set[DemoMode] = {
@@ -382,6 +398,12 @@ class SimulationEngine:
     def _safe_replay_name(self, name: str) -> str:
         safe = "".join(char if char.isalnum() or char in ("-", "_") else "_" for char in name.strip())
         return safe or self._run_id
+
+    def _channel_id(self, value: Any) -> int:
+        channel = int(value)
+        if not 0 <= channel < len(self.state.channels):
+            raise ValueError(f"Channel must be between 0 and {len(self.state.channels) - 1}: {channel}")
+        return channel
 
     def _replay_path(self, name: str) -> Path:
         safe_name = self._safe_replay_name(name)

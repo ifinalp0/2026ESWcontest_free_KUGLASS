@@ -7,8 +7,10 @@ This simulator is intentionally not a precise optical or thermal physics engine.
 - CH0-CH7 PDLC policy tuning before hardware is ready
 - hot-summer, camping, parked, front-glare, and 360-degree flashlight demos
 - manual Clear/Frost override behavior with auto-return TTL
-- mock sensor dropout and replay-safe UI flows
+- actuator fault injection, mock sensor dropout, and replay-safe UI flows
 - a reusable prototype shape for the final `/demo` HMI
+
+The 3D dashboard projects each PDLC channel film onto the loaded vehicle mesh at runtime. The film geometry therefore follows the actual windshield, door glass, rear glass, and roof surfaces instead of floating as independent flat planes.
 
 ## Structure
 
