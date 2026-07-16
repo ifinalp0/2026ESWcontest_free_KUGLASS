@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { Flashlight, RotateCw } from 'lucide-react';
+import { Flashlight, MousePointer2, RotateCw } from 'lucide-react';
 import {
   BufferGeometry,
   Color,
@@ -77,66 +77,66 @@ const windowParts: WindowPart[] = [
   {
     channel: 0,
     position: [-0.13, 0.56, 1.14],
-    points: [[-0.35, -0.13], [-0.02, -0.13], [0, 0.15], [-0.31, 0.18], [-0.44, 0.04]],
+    points: [[-0.58, -0.16], [0.12, -0.16], [0.13, 0.4], [-0.44, 0.34], [-0.62, 0.08]],
     rotation: [-0.62, 0, 0],
     projectionDirection: [0, -0.58, -0.81]
   },
   {
     channel: 1,
     position: [0.13, 0.56, 1.14],
-    points: [[0.02, -0.13], [0.35, -0.13], [0.44, 0.04], [0.31, 0.18], [0, 0.15]],
+    points: [[-0.12, -0.16], [0.58, -0.16], [0.62, 0.08], [0.44, 0.34], [-0.13, 0.4]],
     rotation: [-0.62, 0, 0],
     projectionDirection: [0, -0.58, -0.81]
   },
   {
     channel: 2,
     position: [-1.012, 0.56, 0.44],
-    points: [[-0.4, -0.15], [0.27, -0.15], [0.34, 0.09], [0.14, 0.19], [-0.36, 0.22], [-0.48, 0.05]],
+    points: [[-0.67, -0.08], [0.35, -0.08], [0.39, 0.1], [0.03, 0.25], [-0.63, 0.27], [-0.72, 0.12]],
     rotation: [0, -Math.PI / 2, 0.03],
     projectionDirection: [1, -0.3, 0]
   },
   {
     channel: 3,
     position: [1.012, 0.56, 0.44],
-    points: [[-0.27, -0.15], [0.4, -0.15], [0.48, 0.05], [0.36, 0.22], [-0.14, 0.19], [-0.34, 0.09]],
+    points: [[-0.35, -0.08], [0.67, -0.08], [0.72, 0.12], [0.63, 0.27], [-0.03, 0.25], [-0.39, 0.1]],
     rotation: [0, Math.PI / 2, -0.03],
     projectionDirection: [-1, -0.3, 0]
   },
   {
     channel: 4,
     position: [-1.012, 0.55, -0.49],
-    points: [[-0.35, -0.14], [0.29, -0.14], [0.36, 0.05], [0.18, 0.18], [-0.31, 0.2], [-0.41, 0.05]],
+    points: [[-0.57, -0.08], [0.21, -0.08], [0.25, 0.1], [0.08, 0.25], [-0.51, 0.27], [-0.62, 0.1]],
     rotation: [0, -Math.PI / 2, 0.02],
     projectionDirection: [1, -0.3, 0]
   },
   {
     channel: 5,
     position: [1.012, 0.55, -0.49],
-    points: [[-0.29, -0.14], [0.35, -0.14], [0.41, 0.05], [0.31, 0.2], [-0.18, 0.18], [-0.36, 0.05]],
+    points: [[-0.21, -0.08], [0.57, -0.08], [0.62, 0.1], [0.51, 0.27], [-0.08, 0.25], [-0.25, 0.1]],
     rotation: [0, Math.PI / 2, -0.02],
     projectionDirection: [-1, -0.3, 0]
   },
   {
     channel: 6,
     position: [0, 0.58, -1.36],
-    points: [[-0.52, -0.15], [0.52, -0.15], [0.42, 0.16], [0.2, 0.21], [-0.2, 0.21], [-0.42, 0.16]],
+    points: [[-0.52, -0.25], [0.52, -0.25], [0.5, -0.08], [0.28, -0.03], [-0.28, -0.03], [-0.5, -0.08]],
     rotation: [0.4, 0, 0],
     projectionDirection: [0, 0.4, -0.9]
   },
   {
     channel: 7,
     position: [0, 0.88, -0.12],
-    points: [[-0.36, -0.38], [0.36, -0.38], [0.46, -0.22], [0.42, 0.32], [0.28, 0.43], [-0.28, 0.43], [-0.42, 0.32], [-0.46, -0.22]],
+    points: [[-0.38, -0.48], [0.38, -0.48], [0.49, -0.35], [0.5, 0.57], [0.38, 0.72], [-0.38, 0.72], [-0.5, 0.57], [-0.49, -0.35]],
     rotation: [-Math.PI / 2, 0, 0],
     projectionDirection: [0, -1, 0]
   }
 ];
 
 const topWindowClasses = ['ch0', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6', 'ch7'];
-const clearFilmColor = new Color('#6dc9d0');
-const frostedFilmColor = new Color('#edf7f4');
-const passiveEdgeColor = new Color('#83aaa5');
-const activeEdgeColor = new Color('#f2a12f');
+const clearFilmColor = new Color('#62b9ca');
+const frostedFilmColor = new Color('#eff5f1');
+const passiveEdgeColor = new Color('#7892a8');
+const activeEdgeColor = new Color('#007a4d');
 const faultEdgeColor = new Color('#d34848');
 const FILM_SURFACE_GAP = 0.006;
 const FILM_SUBDIVISIONS = 3;
@@ -656,11 +656,15 @@ export function DigitalTwin(props: Props) {
   return (
     <section className="panel twin-panel">
       <div className="panel-heading">
-        <div>
-          <h2>3D 디지털 트윈</h2>
-          <p>{selected.name}: {opticalStateLabels[selected.opticalState]}, 적용 MI {Math.round(selected.appliedMi * 100)}%.</p>
+        <div className="panel-title-group">
+          <span className="panel-index">01</span>
+          <div>
+            <span className="panel-eyebrow">VEHICLE RESPONSE</span>
+            <h2>3D 디지털 트윈</h2>
+            <p>{selected.name} · {opticalStateLabels[selected.opticalState]} · 적용 MI {Math.round(selected.appliedMi * 100)}%</p>
+          </div>
         </div>
-        <RotateCw size={20} />
+        <span className="panel-state"><RotateCw size={14} /> DRAG TO ROTATE</span>
       </div>
       <div
         className="canvas-shell"
@@ -669,13 +673,24 @@ export function DigitalTwin(props: Props) {
         onPointerUp={onCanvasPointerUp}
         onPointerCancel={onCanvasPointerUp}
       >
+        <div className="canvas-channel-readout">
+          <span>SELECTED WINDOW</span>
+          <strong>CH{String(selected.channel).padStart(2, '0')}</strong>
+          <small>{selected.name}</small>
+        </div>
+        <div className="canvas-telemetry">
+          <span><small>TARGET MI</small><strong>{Math.round(selected.targetMi * 100)}%</strong></span>
+          <span><small>APPLIED MI</small><strong>{Math.round(selected.appliedMi * 100)}%</strong></span>
+          <span><small>TRANSMITTANCE</small><strong>{Math.round(selected.estimatedTransmittance * 100)}%</strong></span>
+        </div>
+        <div className="canvas-interaction-hint"><MousePointer2 size={13} /> 유리를 선택하고 차체를 회전하세요</div>
         <Canvas camera={{ position: [3.35, 2.25, 4.1], fov: 42 }} dpr={[1, 1.6]}>
-          <color attach="background" args={['#eef3f2']} />
-          <hemisphereLight args={['#f8fbff', '#6e7e79', 0.72]} />
+          <color attach="background" args={['#e8edf1']} />
+          <hemisphereLight args={['#f8fbff', '#677784', 0.74]} />
           <directionalLight position={[4.5, 6, 4.5]} intensity={1.38} />
           <directionalLight position={[-3, 2.4, -4]} intensity={0.42} />
           <CarModel {...props} rotationY={rotationY} />
-          <gridHelper args={[6, 6, '#8ca7a0', '#d2ddda']} position={[0, -0.43, 0]} />
+          <gridHelper args={[6, 6, '#7f98ad', '#cad4dc']} position={[0, -0.43, 0]} />
         </Canvas>
       </div>
       {props.demoMode === 'flashlight_360' ? <FlashlightTopView {...props} /> : null}

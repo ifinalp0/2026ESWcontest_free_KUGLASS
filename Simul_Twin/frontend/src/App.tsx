@@ -20,6 +20,7 @@ export default function App() {
         onResetFault={() => sendCommand({ type: 'resetFault' })}
         onSaveReplay={() => sendCommand({ type: 'saveReplay' })}
       />
+      <ScenarioBar active={state.demoMode} sendCommand={sendCommand} />
       <section className="dashboard-grid">
         <Suspense fallback={<section className="panel twin-panel loading-panel">3D 디지털 트윈 로딩 중...</section>}>
           <DigitalTwin
@@ -40,7 +41,6 @@ export default function App() {
         />
         <ChannelTable channels={state.channels} selectedChannel={selectedChannel} onSelectChannel={setSelectedChannel} />
       </section>
-      <ScenarioBar active={state.demoMode} sendCommand={sendCommand} />
     </main>
   );
 }

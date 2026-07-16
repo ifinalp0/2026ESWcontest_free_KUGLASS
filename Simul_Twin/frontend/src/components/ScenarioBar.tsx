@@ -22,27 +22,33 @@ export function ScenarioBar({ active, sendCommand }: Props) {
   return (
     <section className="scenario-bar" aria-label="시연 시나리오">
       <div className="scenario-context">
-        <span className="scenario-icon">
+        <span className="scenario-index">DEMO</span>
+        <span className="scenario-icon" aria-hidden="true">
           <ActiveIcon size={18} />
         </span>
         <div>
-          <h2>시연 모드</h2>
-          <p>{activeScenario.label} · {activeScenario.meta}</p>
+          <span>현재 시나리오</span>
+          <h2>{activeScenario.label}</h2>
+          <p>{activeScenario.meta}</p>
         </div>
       </div>
-      <label className="scenario-select">
-        <span>모드</span>
-        <select
-          value={active}
-          onChange={(event) => sendCommand({ type: 'setScenario', demoMode: event.target.value as DemoMode })}
-        >
-          {scenarios.map(({ mode, label }) => (
-            <option key={mode} value={mode}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="scenario-options" role="group" aria-label="시연 모드 선택">
+        {scenarios.map(({ mode, label, meta, Icon }) => (
+          <button
+            key={mode}
+            className={`scenario-option${mode === active ? ' active' : ''}`}
+            type="button"
+            aria-pressed={mode === active}
+            onClick={() => sendCommand({ type: 'setScenario', demoMode: mode })}
+          >
+            <Icon size={16} />
+            <span>
+              <strong>{label}</strong>
+              <small>{meta}</small>
+            </span>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

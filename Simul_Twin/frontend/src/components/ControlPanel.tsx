@@ -48,17 +48,27 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
   return (
     <section className="panel control-panel">
       <div className="panel-heading">
-        <div>
-          <h2>제어</h2>
-          <p>{selected.name}</p>
+        <div className="panel-title-group">
+          <span className="panel-index">03</span>
+          <div>
+            <span className="panel-eyebrow">CHANNEL CONTROL</span>
+            <h2>제어 및 검증</h2>
+            <p>선택 채널의 목표값과 mock 입력을 조정합니다.</p>
+          </div>
         </div>
-        <SlidersHorizontal size={20} />
+        <span className={`panel-state ${manualRemaining === null ? 'ok' : 'manual'}`}>
+          <SlidersHorizontal size={14} />
+          {manualRemaining === null ? 'AUTO' : `TTL ${manualRemaining}s`}
+        </span>
       </div>
 
       <div className="selected-channel-summary">
         <div className="selected-channel-title">
-          <span>선택 채널</span>
-          <strong>{selected.name}</strong>
+          <span className="selected-channel-id">CH{String(selected.channel).padStart(2, '0')}</span>
+          <span>
+            <small>SELECTED WINDOW</small>
+            <strong>{selected.name}</strong>
+          </span>
         </div>
         <dl className="channel-kpis">
           <div>
@@ -77,6 +87,10 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
       </div>
 
       <div className="manual-control">
+        <div className="control-section-title">
+          <span>MANUAL OVERRIDE</span>
+          <small>30초 후 자동 복귀</small>
+        </div>
         <div className="range-label">
           <span>투명</span>
           <strong>산란 {frostStrength}%</strong>
@@ -100,19 +114,23 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
       </div>
 
       <div className="env-controls">
-        <h3>환경 입력</h3>
-        <EnvSlider label="외기온" min={15} max={45} value={environment.weatherTemp} onChange={(value) => setEnvironmentValue('weatherTemp', value)} />
-        <EnvSlider label="내부온도" min={15} max={48} value={environment.internalTemp} onChange={(value) => setEnvironmentValue('internalTemp', value)} />
-        <EnvSlider label="전방 조도" min={0} max={1300} value={environment.frontLux ?? 0} onChange={(value) => setEnvironmentValue('frontLux', value)} />
-        <EnvSlider label="우측 조도" min={0} max={1300} value={environment.rightLux ?? 0} onChange={(value) => setEnvironmentValue('rightLux', value)} />
-        <EnvSlider label="후방 조도" min={0} max={1300} value={environment.rearLux ?? 0} onChange={(value) => setEnvironmentValue('rearLux', value)} />
-        <EnvSlider label="좌측 조도" min={0} max={1300} value={environment.leftLux ?? 0} onChange={(value) => setEnvironmentValue('leftLux', value)} />
-        <EnvSlider label="상부 조도" min={0} max={1300} value={environment.topLux ?? 0} onChange={(value) => setEnvironmentValue('topLux', value)} />
+        <div className="control-section-title">
+          <span>ENVIRONMENT INPUT</span>
+          <small>정책 입력값</small>
+        </div>
+        <EnvSlider label="외기온" unit="°C" min={15} max={45} value={environment.weatherTemp} onChange={(value) => setEnvironmentValue('weatherTemp', value)} />
+        <EnvSlider label="내부온도" unit="°C" min={15} max={48} value={environment.internalTemp} onChange={(value) => setEnvironmentValue('internalTemp', value)} />
+        <EnvSlider label="전방 조도" unit="lx" min={0} max={1300} value={environment.frontLux ?? 0} onChange={(value) => setEnvironmentValue('frontLux', value)} />
+        <EnvSlider label="우측 조도" unit="lx" min={0} max={1300} value={environment.rightLux ?? 0} onChange={(value) => setEnvironmentValue('rightLux', value)} />
+        <EnvSlider label="후방 조도" unit="lx" min={0} max={1300} value={environment.rearLux ?? 0} onChange={(value) => setEnvironmentValue('rearLux', value)} />
+        <EnvSlider label="좌측 조도" unit="lx" min={0} max={1300} value={environment.leftLux ?? 0} onChange={(value) => setEnvironmentValue('leftLux', value)} />
+        <EnvSlider label="상부 조도" unit="lx" min={0} max={1300} value={environment.topLux ?? 0} onChange={(value) => setEnvironmentValue('topLux', value)} />
       </div>
 
       <div className="validation-tools">
         <div className="validation-heading">
           <div>
+            <span className="section-overline">FAIL-SAFE TEST</span>
             <h3>고장·결측 검증</h3>
             <p>제어기 fail-safe와 센서 결측 대응을 실제 정책 루프에서 확인합니다.</p>
           </div>
@@ -151,18 +169,19 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
 
 interface EnvSliderProps {
   label: string;
+  unit: string;
   min: number;
   max: number;
   value: number;
   onChange: (value: number) => void;
 }
 
-function EnvSlider({ label, min, max, value, onChange }: EnvSliderProps) {
+function EnvSlider({ label, unit, min, max, value, onChange }: EnvSliderProps) {
   return (
     <label className="env-slider">
       <span>{label}</span>
       <input type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
-      <strong>{Math.round(value)}</strong>
+      <strong>{Math.round(value)}<small>{unit}</small></strong>
     </label>
   );
 }

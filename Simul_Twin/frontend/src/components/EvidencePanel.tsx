@@ -23,13 +23,22 @@ export function EvidencePanel({ state }: Props) {
   return (
     <section className="panel evidence-panel">
       <div className="panel-heading">
-        <div>
-          <h2>판단 근거</h2>
-          <p>{state.decisionReason}</p>
+        <div className="panel-title-group">
+          <span className="panel-index">02</span>
+          <div>
+            <span className="panel-eyebrow">POLICY EVIDENCE</span>
+            <h2>판단 근거와 개입 효과</h2>
+            <p>{state.decisionReason}</p>
+          </div>
         </div>
+        <span className="panel-state ok"><Activity size={14} /> 정책 루프</span>
       </div>
       <div className="mock-camera">
         <div className="mock-camera-frame">
+          <div className="camera-hud">
+            <span>FRONT CAM · MOCK</span>
+            <strong>ROI SATURATION</strong>
+          </div>
           <div className="road-line" />
           <div className="roi left">좌측 ROI {pct(cameraMetrics.frontLeftSaturation)}</div>
           <div className="roi right">우측 ROI {pct(cameraMetrics.frontRightSaturation)}</div>
@@ -53,18 +62,22 @@ export function EvidencePanel({ state }: Props) {
           <strong>{pct(cameraMetrics.glare)}</strong>
         </div>
       </div>
+      <div className="evidence-section-label">
+        <span>INTERVENTION DELTA</span>
+        <strong>포화 면적 {pct(reduction)} 감소</strong>
+      </div>
       <div className="comparison-strip">
-        <div>
+        <div className="comparison-before">
           <span>산란 미개입</span>
           <div className="bar-track"><span style={{ width: pct(beforeSat) }} /></div>
           <strong>{pct(beforeSat)}</strong>
         </div>
-        <div>
+        <div className="comparison-after">
           <span>산란 개입</span>
           <div className="bar-track"><span style={{ width: pct(afterSat) }} /></div>
           <strong>{pct(afterSat)}</strong>
         </div>
-        <div>
+        <div className="comparison-result">
           <span>감소율</span>
           <strong>{pct(reduction)}</strong>
         </div>
@@ -72,10 +85,11 @@ export function EvidencePanel({ state }: Props) {
       <div className="vector-panel">
         <div className="compass">
           <span className="compass-arrow" style={{ transform: `translate(-50%, -50%) rotate(${bearing}deg)` }} />
-          <b>전</b>
+          <b>N / 전</b>
         </div>
         <div>
-          <h3>방향성 조도 벡터</h3>
+          <span className="section-overline">DIRECTIONAL LUX</span>
+          <h3>방향성 조도 벡터 · {Math.round(bearing)}°</h3>
           <p>차량 전방 기준 {Math.round(bearing)}°. 가까운 유리 채널부터 목표 MI가 낮아집니다.</p>
         </div>
       </div>
