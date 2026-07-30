@@ -31,7 +31,7 @@ export function TopBar({ state, connected, onToggleTheme, onResetFault, onSaveRe
               onDoubleClick={onToggleTheme}
               onKeyDown={onTitleKeyDown}
               title="더블클릭하여 브랜드 테마 전환"
-              aria-label="KUGLASS SIMUL TWIN. 더블클릭하여 색상 테마 전환"
+              aria-label="KUGLASS SIMUL WIN. 더블클릭하여 색상 테마 전환"
             >
               KUGLASS <span>SIMUL TWIN</span>
             </h1>

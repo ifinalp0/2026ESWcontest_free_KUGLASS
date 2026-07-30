@@ -1,0 +1,16 @@
+{
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "idf.port": "/dev/cu.usbserial-1120",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "clangd.path": "/Users/mooyoung/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/mooyoung/Developer/KuGlass_dev/ESP32_A_Algo/ESP_Camera/build"
+  ],
+  "idf.monitorPort": "/dev/cu.usbserial-1120"
+}

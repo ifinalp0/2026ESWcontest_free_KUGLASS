@@ -1,0 +1,5 @@
+# ESP32-S3-DevKitC-1U-N8R8 has 8 MB flash. This initial factory layout keeps
+# the upper flash region unallocated for a future OTA/storage partition plan.
+# Name,    Type, SubType, Offset,   Size,     Flags
+nvs,       data, nvs,     0x9000,   0x6000,
+factory,   app,  factory, 0x10000,  0x300000,

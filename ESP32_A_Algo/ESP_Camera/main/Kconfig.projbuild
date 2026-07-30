@@ -1,0 +1,20 @@
+menu "OV2640 camera application"
+
+    config CAMERA_APP_SERIAL_BAUD
+        int "USB-to-UART frame baud rate"
+        range 115200 2000000
+        default 2000000
+        help
+            Baud rate used after camera initialization to transmit RGB565
+            camera frames as software-encoded JPEG through the DevKitC
+            USB-to-UART bridge.
+
+    config CAMERA_APP_JPEG_QUALITY
+        int "Software JPEG quality"
+        range 1 100
+        default 85
+        help
+            Quality passed to the esp32-camera software JPEG encoder.
+            Higher values preserve more detail but produce larger frames.
+
+endmenu
