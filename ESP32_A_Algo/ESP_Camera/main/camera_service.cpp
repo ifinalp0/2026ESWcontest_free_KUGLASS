@@ -3,7 +3,6 @@
 #include "camera_pins.h"
 
 #include "esp_camera.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -15,7 +14,7 @@ constexpr unsigned kInitialCaptureAttempts = 5;
 constexpr TickType_t kInitialCaptureSettleDelay = pdMS_TO_TICKS(500);
 constexpr TickType_t kInitialCaptureRetryDelay = pdMS_TO_TICKS(250);
 
-camera_config_t make_camera_config(bool has_psram) {
+camera_config_t make_camera_config() {
     camera_config_t config = {};
 
     config.pin_pwdn = camera_pins::kPwdn;
@@ -39,16 +38,12 @@ camera_config_t make_camera_config(bool has_psram) {
     // This value describes the oscillator already fitted to this camera PCB.
     // No ESP32 GPIO is used to generate XCLK.
     config.xclk_freq_hz = camera_pins::kXclkFrequencyHz;
-    config.ledc_timer = LEDC_TIMER_0;
-    config.ledc_channel = LEDC_CHANNEL_0;
-
     // Raw RGB565 avoids depending on the sensor's broken JPEG byte stream.
     // The serial transport converts this stable raw frame to JPEG in software.
     config.pixel_format = PIXFORMAT_RGB565;
     config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 12;  // Ignored for RGB565.
     config.fb_count = 1;
-    config.fb_location = has_psram ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
     config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
 
     return config;
@@ -57,20 +52,13 @@ camera_config_t make_camera_config(bool has_psram) {
 }  // namespace
 
 esp_err_t camera_service_start() {
-    const bool has_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
-    camera_config_t config = make_camera_config(has_psram);
+    camera_config_t config = make_camera_config();
 
     ESP_LOGI(kTag, "GPIO profile: %s", camera_pins::kProfileName);
     ESP_LOGI(kTag, "On-board XCLK: %d Hz; module DCLK/PCLK GPIO: %d",
              camera_pins::kXclkFrequencyHz, camera_pins::kPclk);
-    ESP_LOGI(kTag, "PSRAM: %s; frame: RGB565 QVGA 320x240; buffers: %u",
-             has_psram ? "available" : "not available",
+    ESP_LOGI(kTag, "PSRAM frame: RGB565 QVGA 320x240; buffers: %u",
              static_cast<unsigned>(config.fb_count));
-    if (!has_psram) {
-        ESP_LOGW(kTag,
-                 "Using DRAM mode. Check the full WROOM-1U suffix and enable "
-                 "the matching PSRAM mode only for an R2/R8/R16 variant.");
-    }
 
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {

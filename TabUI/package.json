@@ -1,10 +1,31 @@
 {
   "name": "kuglass-tabui",
   "private": true,
-  "version": "0.1.0",
-  "description": "Tablet /demo UI for the KUGLASS active smart glass mobility project.",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "KUGLASS tablet UI and ESP32_A gateway.",
   "scripts": {
-    "dev": "python3 server.py --host 0.0.0.0 --port 5173",
-    "check": "python3 -c \"import ast,pathlib; ast.parse(pathlib.Path('server.py').read_text())\" && node --check public/app.js"
+    "dev": "vite --host 0.0.0.0",
+    "dev:api": "python3 server.py --host 0.0.0.0 --port 8080",
+    "build": "tsc --noEmit --incremental false && vite build",
+    "typecheck": "tsc --noEmit --incremental false",
+    "check:python": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+    "check": "npm run typecheck && npm run check:python"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.1.2",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.171.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
   }
 }

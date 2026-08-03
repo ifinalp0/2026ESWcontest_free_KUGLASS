@@ -77,7 +77,7 @@ constexpr bool is_devkit_reserved_pin(int pin) {
     // USB-to-UART bridge: 43, 44
     return pin == 0 || pin == 3 || pin == 19 || pin == 20 ||
            (pin >= 26 && pin <= 38) || pin == 43 || pin == 44 ||
-           pin == 45 || pin == 46 || pin == 47 || pin == 48;
+           pin == 45 || pin == 46 || pin == 48;
 }
 
 constexpr bool assigned_pins_avoid_devkit_resources() {

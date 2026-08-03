@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.22)
 
 # This project is dedicated to ESP32-S3-DevKitC-1U-N8R8. A command-line
 # -DIDF_TARGET value can still be supplied, but configuration rejects
@@ -11,4 +11,8 @@ if(NOT IDF_TARGET STREQUAL "esp32s3")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(ov2640_web_camera)
+# Build only the components required by the wired camera application and its
+# dependency graph. This keeps unused networking and Bluetooth stacks out of
+# configuration and compilation.
+idf_build_set_property(MINIMAL_BUILD ON)
+project(ov2640_serial_camera)

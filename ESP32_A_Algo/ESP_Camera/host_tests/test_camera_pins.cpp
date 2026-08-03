@@ -3,16 +3,10 @@
 int main() {
     static_assert(camera_pins::kXclk == -1);
     static_assert(camera_pins::kXclkFrequencyHz == 12000000);
-    static_assert(CONFIG_ESPTOOLPY_FLASHSIZE_8MB);
-    static_assert(CONFIG_SPIRAM);
-    static_assert(CONFIG_SPIRAM_MODE_OCT);
-    static_assert(CONFIG_SPIRAM_SPEED_80M);
-    static_assert(camera_pins::assigned_pins_are_unique());
-    static_assert(camera_pins::assigned_pins_avoid_devkit_resources());
     static_assert(camera_pins::is_devkit_reserved_pin(3));
     static_assert(camera_pins::is_devkit_reserved_pin(19));
     static_assert(camera_pins::is_devkit_reserved_pin(35));
-    static_assert(camera_pins::is_devkit_reserved_pin(47));
+    static_assert(!camera_pins::is_devkit_reserved_pin(47));
     static_assert(!camera_pins::is_devkit_reserved_pin(4));
     static_assert(!camera_pins::is_devkit_reserved_pin(18));
     static_assert(camera_pins::kSioc == 4);

@@ -86,11 +86,6 @@ esp_err_t serial_frame_server_run() {
     }
     err = uart_driver_install(
         kUart, kRxBufferSize, kTxBufferSize, 0, nullptr, 0);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-        return err;
-    }
-
-    err = uart_set_baudrate(kUart, CONFIG_CAMERA_APP_SERIAL_BAUD);
     if (err != ESP_OK) {
         return err;
     }

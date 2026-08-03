@@ -2,7 +2,7 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
   },
-  "idf.port": "/dev/cu.usbserial-1120",
+  "idf.port": "/dev/tty.usbserial-110",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
@@ -12,5 +12,6 @@
     "--query-driver=**",
     "--compile-commands-dir=/Users/mooyoung/Developer/KuGlass_dev/ESP32_A_Algo/ESP_Camera/build"
   ],
-  "idf.monitorPort": "/dev/cu.usbserial-1120"
+  "idf.monitorPort": "/dev/cu.usbserial-1120",
+  "idf.currentSetup": "/Users/mooyoung/.espressif/v6.0.2/esp-idf"
 }

@@ -1,85 +1,47 @@
 #include "protocol.h"
+#include "strict_json.h"
 
-#include <cctype>
+#include <cstdarg>
+#include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 
 namespace {
 
-const char* skip_ws(const char* p) {
-    while (p != nullptr && *p != '\0' && std::isspace(static_cast<unsigned char>(*p))) {
-        ++p;
-    }
-    return p;
-}
+constexpr uint8_t kExpectedChannelMask =
+    static_cast<uint8_t>((1U << KUGLASS_MAX_COMMAND_CHANNELS) - 1U);
 
-const char* find_key_value(const char* line, const char* key) {
-    char pattern[32];
-    std::snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-    const char* key_pos = std::strstr(line, pattern);
-    if (key_pos == nullptr) {
-        return nullptr;
-    }
-    const char* colon = std::strchr(key_pos + std::strlen(pattern), ':');
-    return colon == nullptr ? nullptr : skip_ws(colon + 1);
-}
-
-bool parse_u32_key(const char* line, const char* key, uint32_t* out) {
-    const char* p = find_key_value(line, key);
-    if (p == nullptr) {
+bool append_text(char* output, size_t output_size, size_t* used, const char* format, ...) {
+    if (output == nullptr || used == nullptr || *used >= output_size) {
         return false;
     }
-    char* end = nullptr;
-    unsigned long value = std::strtoul(p, &end, 10);
-    if (end == p) {
+    va_list args;
+    va_start(args, format);
+    const int written = std::vsnprintf(output + *used, output_size - *used, format, args);
+    va_end(args);
+    if (written < 0 || static_cast<size_t>(written) >= output_size - *used) {
+        output[output_size - 1] = '\0';
         return false;
     }
-    *out = static_cast<uint32_t>(value);
+    *used += static_cast<size_t>(written);
     return true;
 }
 
-bool parse_bool_or_int(const char*& p, bool* out) {
-    p = skip_ws(p);
-    if (std::strncmp(p, "true", 4) == 0) {
-        *out = true;
-        p += 4;
-        return true;
-    }
-    if (std::strncmp(p, "false", 5) == 0) {
-        *out = false;
-        p += 5;
-        return true;
-    }
-    char* end = nullptr;
-    long value = std::strtol(p, &end, 10);
-    if (end == p) {
+bool parse_channel_array(StrictJsonCursor* cursor,
+                         ProtocolCommand* out,
+                         ProtocolError* error) {
+    if (!cursor->consume('[')) {
+        *error = ProtocolError::BAD_CHANNEL_ARRAY;
         return false;
     }
-    *out = value != 0;
-    p = end;
-    return true;
-}
-
-bool parse_channel_array(const char* line, ProtocolCommand* out, ProtocolError* error) {
-    const char* p = find_key_value(line, "ch");
-    if (p == nullptr || *p != '[') {
-        *error = ProtocolError::MISSING_CHANNELS;
-        return false;
-    }
-    ++p;
     out->channel_count = 0;
-    while (*p != '\0') {
-        p = skip_ws(p);
-        if (*p == ']') {
-            *error = ProtocolError::OK;
-            return true;
-        }
-        if (*p == ',') {
-            ++p;
-            continue;
-        }
-        if (*p != '[') {
+    uint8_t seen = 0;
+    if (cursor->consume(']')) {
+        *error = ProtocolError::BAD_CHANNEL_ARRAY;
+        return false;
+    }
+    while (true) {
+        if (!cursor->consume('[')) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
         }
@@ -87,53 +49,47 @@ bool parse_channel_array(const char* line, ProtocolCommand* out, ProtocolError* 
             *error = ProtocolError::TOO_MANY_CHANNELS;
             return false;
         }
-        ++p;
-        char* end = nullptr;
-        unsigned long channel_id = std::strtoul(skip_ws(p), &end, 10);
-        if (end == p || channel_id > 255) {
+        uint32_t channel_id = 0;
+        if (!cursor->parse_u32(&channel_id) ||
+            channel_id >= KUGLASS_MAX_COMMAND_CHANNELS || !cursor->consume(',')) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
         }
-        p = skip_ws(end);
-        if (*p != ',') {
+        const uint8_t channel_bit = static_cast<uint8_t>(1U << channel_id);
+        if ((seen & channel_bit) != 0U) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
         }
-        ++p;
-        float mi = std::strtof(skip_ws(p), &end);
-        if (end == p) {
+        float mi = 0.0f;
+        if (!cursor->parse_number(&mi) || mi < 0.0f || mi > 1.0f ||
+            !cursor->consume(',')) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
         }
-        p = skip_ws(end);
-        bool enable = true;
-        if (*p == ',') {
-            ++p;
-            if (!parse_bool_or_int(p, &enable)) {
-                *error = ProtocolError::BAD_CHANNEL_ARRAY;
-                return false;
-            }
-            p = skip_ws(p);
-        }
-        if (*p != ']') {
+        bool enable = false;
+        if (!cursor->parse_bool(&enable) || !cursor->consume(']')) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
         }
-        ++p;
-        if (mi < 0.0f) {
-            mi = 0.0f;
+        ProtocolChannelCommand item;
+        item.channel_id = static_cast<uint8_t>(channel_id);
+        item.mi = mi;
+        item.enable = enable;
+        out->channels[out->channel_count++] = item;
+        seen |= channel_bit;
+        if (cursor->consume(']')) break;
+        if (!cursor->consume(',')) {
+            *error = ProtocolError::BAD_CHANNEL_ARRAY;
+            return false;
         }
-        if (mi > 1.0f) {
-            mi = 1.0f;
-        }
-        out->channels[out->channel_count++] = ProtocolChannelCommand{
-            .channel_id = static_cast<uint8_t>(channel_id),
-            .mi = mi,
-            .enable = enable,
-        };
     }
-    *error = ProtocolError::BAD_CHANNEL_ARRAY;
-    return false;
+    if (out->channel_count != KUGLASS_MAX_COMMAND_CHANNELS ||
+        seen != kExpectedChannelMask) {
+        *error = ProtocolError::BAD_CHANNEL_ARRAY;
+        return false;
+    }
+    *error = ProtocolError::OK;
+    return true;
 }
 
 }  // namespace
@@ -144,25 +100,128 @@ bool parse_command_line(const char* line, ProtocolCommand* out, ProtocolError* e
     }
     *out = ProtocolCommand{};
     *error = ProtocolError::OK;
-    if (line == nullptr || *skip_ws(line) == '\0') {
+    if (line == nullptr) {
         *error = ProtocolError::EMPTY;
         return false;
     }
-    if (!parse_u32_key(line, "seq", &out->seq)) {
-        *error = ProtocolError::MISSING_SEQ;
+    StrictJsonCursor cursor(line);
+    if (cursor.at_end()) {
+        *error = ProtocolError::EMPTY;
         return false;
     }
-    if (!parse_u32_key(line, "ttl_ms", &out->ttl_ms)) {
-        *error = ProtocolError::MISSING_TTL;
+    if (!cursor.consume('{')) {
+        *error = ProtocolError::BAD_JSON;
         return false;
     }
-    if (out->ttl_ms < 50) {
-        out->ttl_ms = 50;
+
+    bool have_version = false;
+    bool have_type = false;
+    bool have_seq = false;
+    bool have_ttl = false;
+    bool have_channels = false;
+    uint32_t version = 0;
+
+    if (!cursor.consume('}')) {
+        while (true) {
+            char key[32] = {};
+            bool lossy_key = false;
+            if (!cursor.parse_string(key, sizeof(key), &lossy_key) ||
+                !cursor.consume(':')) {
+                *error = ProtocolError::BAD_JSON;
+                return false;
+            }
+
+            if (!lossy_key && std::strcmp(key, "v") == 0) {
+                if (have_version) { *error = ProtocolError::DUPLICATE_FIELD; return false; }
+                if (!cursor.parse_u32(&version)) { *error = ProtocolError::BAD_VERSION; return false; }
+                have_version = true;
+            } else if (!lossy_key && std::strcmp(key, "type") == 0) {
+                if (have_type) { *error = ProtocolError::DUPLICATE_FIELD; return false; }
+                char value[32] = {};
+                bool lossy_value = false;
+                if (!cursor.parse_string(value, sizeof(value), &lossy_value) || lossy_value ||
+                    std::strcmp(value, "actuator_command") != 0) {
+                    *error = ProtocolError::BAD_TYPE;
+                    return false;
+                }
+                have_type = true;
+            } else if (!lossy_key && std::strcmp(key, "seq") == 0) {
+                if (have_seq) { *error = ProtocolError::DUPLICATE_FIELD; return false; }
+                if (!cursor.parse_u32(&out->seq)) { *error = ProtocolError::BAD_SEQ; return false; }
+                have_seq = true;
+            } else if (!lossy_key && std::strcmp(key, "ttl_ms") == 0) {
+                if (have_ttl) { *error = ProtocolError::DUPLICATE_FIELD; return false; }
+                if (!cursor.parse_u32(&out->ttl_ms)) { *error = ProtocolError::BAD_TTL; return false; }
+                have_ttl = true;
+            } else if (!lossy_key && std::strcmp(key, "ch") == 0) {
+                if (have_channels) { *error = ProtocolError::DUPLICATE_FIELD; return false; }
+                if (!parse_channel_array(&cursor, out, error)) return false;
+                have_channels = true;
+            } else if (!cursor.skip_value()) {
+                *error = ProtocolError::BAD_JSON;
+                return false;
+            }
+
+            if (cursor.consume('}')) break;
+            if (!cursor.consume(',')) {
+                *error = ProtocolError::BAD_JSON;
+                return false;
+            }
+        }
     }
-    if (out->ttl_ms > 1000) {
-        out->ttl_ms = 1000;
+    if (!cursor.at_end()) { *error = ProtocolError::BAD_JSON; return false; }
+    if (!have_version) { *error = ProtocolError::MISSING_VERSION; return false; }
+    if (version != 1U) { *error = ProtocolError::BAD_VERSION; return false; }
+    if (!have_type) { *error = ProtocolError::MISSING_TYPE; return false; }
+    if (!have_seq) { *error = ProtocolError::MISSING_SEQ; return false; }
+    if (!have_ttl) { *error = ProtocolError::MISSING_TTL; return false; }
+    if (!have_channels) { *error = ProtocolError::MISSING_CHANNELS; return false; }
+    if (out->ttl_ms < 50U || out->ttl_ms > 1000U) {
+        *error = ProtocolError::BAD_TTL;
+        return false;
     }
-    return parse_channel_array(line, out, error);
+    *error = ProtocolError::OK;
+    return true;
+}
+
+bool format_command_line(const ProtocolCommand& command, char* output, size_t output_size) {
+    if (output == nullptr || output_size == 0 ||
+        command.channel_count != KUGLASS_MAX_COMMAND_CHANNELS) {
+        return false;
+    }
+    uint8_t seen = 0;
+    for (size_t i = 0; i < command.channel_count; ++i) {
+        const ProtocolChannelCommand& channel = command.channels[i];
+        if (channel.channel_id >= KUGLASS_MAX_COMMAND_CHANNELS ||
+            !std::isfinite(channel.mi) || channel.mi < 0.0f || channel.mi > 1.0f) {
+            return false;
+        }
+        const uint8_t bit = static_cast<uint8_t>(1U << channel.channel_id);
+        if ((seen & bit) != 0U) return false;
+        seen |= bit;
+    }
+    if (seen != kExpectedChannelMask) return false;
+    output[0] = '\0';
+    size_t used = 0;
+    if (!append_text(output, output_size, &used,
+                     "{\"v\":1,\"type\":\"actuator_command\","
+                     "\"seq\":%lu,\"ttl_ms\":%lu,\"ch\":[",
+                     static_cast<unsigned long>(command.seq),
+                     static_cast<unsigned long>(command.ttl_ms))) {
+        return false;
+    }
+    for (size_t i = 0; i < command.channel_count; ++i) {
+        const ProtocolChannelCommand& channel = command.channels[i];
+        if (!append_text(output, output_size, &used,
+                         "%s[%u,%.4f,%s]",
+                         i == 0 ? "" : ",",
+                         static_cast<unsigned>(channel.channel_id),
+                         channel.mi,
+                         channel.enable ? "true" : "false")) {
+            return false;
+        }
+    }
+    return append_text(output, output_size, &used, "]}");
 }
 
 const char* protocol_error_name(ProtocolError error) {
@@ -171,10 +230,26 @@ const char* protocol_error_name(ProtocolError error) {
             return "OK";
         case ProtocolError::EMPTY:
             return "EMPTY";
+        case ProtocolError::BAD_JSON:
+            return "BAD_JSON";
+        case ProtocolError::DUPLICATE_FIELD:
+            return "DUPLICATE_FIELD";
+        case ProtocolError::MISSING_VERSION:
+            return "MISSING_VERSION";
+        case ProtocolError::BAD_VERSION:
+            return "BAD_VERSION";
+        case ProtocolError::MISSING_TYPE:
+            return "MISSING_TYPE";
+        case ProtocolError::BAD_TYPE:
+            return "BAD_TYPE";
         case ProtocolError::MISSING_SEQ:
             return "MISSING_SEQ";
+        case ProtocolError::BAD_SEQ:
+            return "BAD_SEQ";
         case ProtocolError::MISSING_TTL:
             return "MISSING_TTL";
+        case ProtocolError::BAD_TTL:
+            return "BAD_TTL";
         case ProtocolError::MISSING_CHANNELS:
             return "MISSING_CHANNELS";
         case ProtocolError::BAD_CHANNEL_ARRAY:
