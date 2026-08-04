@@ -1,0 +1,2 @@
+source /Users/mooyoung/Developer/KuGlass_dev/ESP32_TEST/build/bootloader/gdbinit/symbols
+source /Users/mooyoung/Developer/KuGlass_dev/ESP32_TEST/build/bootloader/gdbinit/connect

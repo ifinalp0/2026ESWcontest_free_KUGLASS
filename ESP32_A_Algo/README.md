@@ -23,7 +23,9 @@ TabUI는 native USB CDC로 고수준 명령을 보내고 ESP32_A 상태를 받�
 
 ## 카메라 통합
 
-상위 firmware는 `ESP_Camera/main/camera_service.cpp`와 해당 header를 사용합니다. 독립 카메라 viewer의 `app_main.cpp`와 `serial_frame_server.cpp`는 ESP32_A firmware에 링크하지 않습니다.
+카메라 영상 입력의 검증 기준은 루트의 [`../ESP_Camera/`](../ESP_Camera/)입니다. 이 디렉터리는 독립 빌드·플래시와 구현 참고용으로 보존하며, ESP32_A 통합 작업 때 레퍼런스 내부 파일을 수정하지 않습니다.
+
+현재 `main/CMakeLists.txt`의 카메라 소스 경로는 루트 `ESP_Camera/`를 해석하지 못합니다. ESP32_A의 카메라 통합 구성은 대상 프로젝트 안에서 별도로 확정하고, `ESP_Camera/`는 편집 가능한 종속 컴포넌트로 취급하지 않습니다.
 
 카메라 driver의 exposure/gain을 실제 단위로 검증하기 전에는 `ae_metadata_valid=false`를 유지하고 정책의 AE pressure 항에서 제외합니다. 임의 값은 실측 metadata로 보고하지 않습니다.
 
@@ -35,7 +37,7 @@ TabUI는 native USB CDC로 고수준 명령을 보내고 ESP32_A 상태를 받�
 | ESP32_B TX | GPIO39 / UART1 TX | ESP32_B RX | 115200 8-N-1 |
 | ESP32_B RX | GPIO40 / UART1 RX | ESP32_B TX | 115200 8-N-1 |
 | 내부온도 | GPIO41 | DS18B20 DQ | 3.3 V, 외부 4.7 kΩ pull-up |
-| 카메라 | GPIO4~18 | OV2640 | `ESP_Camera/README.md` 준수 |
+| 카메라 | GPIO4~18 | OV2640 | [`../ESP_Camera/README.md`](../ESP_Camera/README.md) 보드 프로필 준수 |
 
 ESP32_A와 ESP32_B는 GND를 공유해야 합니다. DS18B20은 외부전원 방식만 사용하며 parasite power를 지원하지 않습니다.
 

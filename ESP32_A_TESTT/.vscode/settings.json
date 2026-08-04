@@ -1,0 +1,15 @@
+{
+  "idf.currentSetup": "/Users/mooyoung/.espressif/v6.0.2/esp-idf",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/Users/mooyoung/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/mooyoung/Developer/KuGlass_dev/ESP32_A_TESTT/build"
+  ]
+}

@@ -1,0 +1,6 @@
+"-specs=/Users/mooyoung/Developer/KuGlass_dev/ESP32_TEST/build/bootloader/specs/picolibc.specs"
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+-fno-rtti

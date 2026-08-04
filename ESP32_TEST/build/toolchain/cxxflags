@@ -1,0 +1,6 @@
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+"-specs=/Users/mooyoung/Developer/KuGlass_dev/ESP32_TEST/build/specs/picolibc.specs"
+-fno-rtti

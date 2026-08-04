@@ -28,16 +28,23 @@ PwmHandle g_pwm[KUGLASS_CHANNEL_COUNT];
 
 void SpwmGenerator::begin(const PowerStagePinmap& pinmap) {
 #ifdef ESP_PLATFORM
-    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
-        const PowerStageChannelPins& pins = pinmap.channels[i];
-        gpio_config_t output_config = {};
-        output_config.mode = GPIO_MODE_OUTPUT;
-        output_config.pin_bit_mask =
+    gpio_config_t output_config = {};
+    output_config.mode = GPIO_MODE_OUTPUT;
+    for (const PowerStageChannelPins& pins : pinmap.channels) {
+        output_config.pin_bit_mask |=
             (1ULL << pins.direction_gpio) | (1ULL << pins.enable_gpio);
-        ESP_ERROR_CHECK(gpio_config(&output_config));
+        // Preload the output latch before switching the pads to output mode.
         gpio_set_level(static_cast<gpio_num_t>(pins.enable_gpio), 0);
         gpio_set_level(static_cast<gpio_num_t>(pins.direction_gpio), 0);
+    }
+    ESP_ERROR_CHECK(gpio_config(&output_config));
+    for (const PowerStageChannelPins& pins : pinmap.channels) {
+        gpio_set_level(static_cast<gpio_num_t>(pins.enable_gpio), 0);
+        gpio_set_level(static_cast<gpio_num_t>(pins.direction_gpio), 0);
+    }
 
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        const PowerStageChannelPins& pins = pinmap.channels[i];
         const int group_id = i < 3U ? 0 : 1;
         mcpwm_timer_config_t timer_config = {};
         timer_config.group_id = group_id;

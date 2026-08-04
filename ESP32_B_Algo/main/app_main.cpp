@@ -164,15 +164,26 @@ bool begin_uart() {
 }
 
 void configure_safety_inputs() {
-    uint64_t mask = 1ULL << KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio;
+    gpio_config_t estop_config = {};
+    estop_config.pin_bit_mask =
+        1ULL << KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio;
+    estop_config.mode = GPIO_MODE_INPUT;
+    estop_config.pull_up_en = GPIO_PULLUP_DISABLE;
+    estop_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    estop_config.intr_type = GPIO_INTR_DISABLE;
+    ESP_ERROR_CHECK(gpio_config(&estop_config));
+
+    uint64_t fault_mask = 0;
     for (const PowerStageChannelPins& channel : KUGLASS_POWER_STAGE_PINMAP.channels) {
-        mask |= 1ULL << channel.fault_n_gpio;
+        fault_mask |= 1ULL << channel.fault_n_gpio;
     }
-    gpio_config_t config = {};
-    config.pin_bit_mask = mask;
-    config.mode = GPIO_MODE_INPUT;
-    config.pull_up_en = GPIO_PULLUP_ENABLE;
-    ESP_ERROR_CHECK(gpio_config(&config));
+    gpio_config_t fault_config = {};
+    fault_config.pin_bit_mask = fault_mask;
+    fault_config.mode = GPIO_MODE_INPUT;
+    fault_config.pull_up_en = GPIO_PULLUP_DISABLE;
+    fault_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    fault_config.intr_type = GPIO_INTR_DISABLE;
+    ESP_ERROR_CHECK(gpio_config(&fault_config));
 }
 #endif
 
@@ -185,9 +196,12 @@ extern "C" void app_main(void) {
 #ifdef ESP_PLATFORM
     g_state_mutex = xSemaphoreCreateMutex();
     g_uart_mutex = xSemaphoreCreateMutex();
-    if (g_state_mutex == nullptr || g_uart_mutex == nullptr || !begin_uart()) return;
-    configure_safety_inputs();
+    if (g_state_mutex == nullptr || g_uart_mutex == nullptr) return;
+
+    // Assert every software enable LOW before inputs, UART, or tasks start.
     g_spwm.begin(KUGLASS_POWER_STAGE_PINMAP);
+    configure_safety_inputs();
+    if (!begin_uart()) return;
     uart_write_line(
         "{\"type\":\"boot\",\"controller_id\":\"B\","
         "\"role\":\"four_channel_actuator\"}");

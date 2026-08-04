@@ -3,6 +3,8 @@
 ## 기준 문서
 
 - 제품 구조와 개발 범위의 기준은 루트의 `개발 계획서.md`이다.
+- **ESP32_B의 물리 GPIO, 신호 극성, 전원과 커넥터의 최우선 기준은 `hardware/Logic carrier.pdf`이다.** `hardware/README.md`는 이 회로도를 코드 개발용으로 해설한 문서다. 제품 계획과 회로가 충돌하면 하드웨어 연결은 회로도를 따르고 계획서·README·코드·테스트를 함께 정정한다.
+- 현재 분석 기준 `Logic carrier.pdf` SHA-256은 `c6e7c129e7d5cd66f2e6cc850b9797e58e25d15bd59cb817267279b90fc0fa92`이다. PDF가 바뀌면 핀맵을 추측해 이어서 개발하지 말고 회로를 다시 분석한 뒤 해시와 관련 문서를 갱신한다.
 - 작품은 1:10 차량 모형용 PDLC 4채널 시연 프로토타입이다. 실차 안전 장치나 자율주행 인지 성능 향상 장치로 표현하지 않는다.
 - 입력 센서는 카메라 1대와 DS18B20 내부온도센서 1개만 사용한다.
 - 채널 범위는 CH0~CH3이다. 코드, 프로토콜, UI, 테스트와 문서에서 이 범위를 동일하게 유지한다.
@@ -14,6 +16,7 @@
   -> ESP32_A: 입력 처리, 정책, LUT, MI servo, CH0~CH3 목표 MI
   -> UART 또는 RS-485 JSON Lines, 20 Hz full frame + 250 ms TTL
 ESP32_B: 명령 검증, 4채널 SPWM, 로컬 Fault/timeout 차단
+  -> Logic Carrier: EN_GLOBAL 하드웨어 게이팅, Fault/ADC, 전원·J7 인터페이스
   -> Power Stage PCB
   -> PDLC CH0~CH3
 ```
@@ -30,7 +33,7 @@ TabUI -> 태블릿
 
 - 자동 판단과 권위 있는 목표 MI는 ESP32_A가 소유한다.
 - ESP32_B는 목표를 다시 계산하지 않고 검증·구동·로컬 차단과 적용 상태 회신을 담당한다.
-- ESP32_B는 Power Stage PCB를 직접 제어한다. 별도의 중간 신호 분배 PCB를 전제로 하지 않는다.
+- ESP32_B는 Logic Carrier U3에 장착되어 `PWM_MAG/DIR/ENABLE`을 생성한다. Logic Carrier가 `EN_GLOBAL AND ENABLE_CHx`를 하드웨어 게이팅하고 J7을 통해 Power Stage와 `FAULT_N/ADC`를 주고받는다. 별도 제어 MCU는 없지만 **물리적으로 Logic Carrier를 생략하거나 Power Stage에 임의 직결하지 않는다.**
 - TabUI는 UI 정적 파일, API, 명령 검증, 상태 집계, replay snapshot과 장치 gateway를 담당한다. LIVE 모드에서 자동 MI를 계산하지 않는다.
 
 ## 디렉터리 역할
@@ -38,8 +41,11 @@ TabUI -> 태블릿
 - `개발 계획서.md`: 제품 구조, 개발 범위, 검증 목표의 기준 문서.
 - `TabUI/`: production 태블릿 HMI와 Docker 백엔드.
 - `ESP32_A_Algo/`: 카메라·내부온도 입력, 정책/MI master, A→B 통신 펌웨어.
-- `ESP32_A_Algo/ESP_Camera/`: OV2640 카메라 서비스와 독립 검증 도구. 통합에 필요한 카메라 코드이므로 보존한다.
-- `ESP32_B_Algo/`: CH0~CH3 SPWM, Power Stage 직접 제어, Fault와 A→B TTL 처리 펌웨어.
+- `ESP_Camera/`: KUGLASS_DEV 루트에 두는 검증 완료 카메라 영상 입력 레퍼런스. 제품 통합 코드의 기준으로만 사용하고, 별도의 명시적인 사용자 지시 없이 내부 파일을 수정하지 않는다.
+- `ESP32_B_Algo/`: ESP32_B에 빌드·플래시할 유일한 canonical 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage 제어, Fault와 A→B TTL 처리를 소유한다.
+- `ESP32_A_TESTT/`: `type=set`, `mi[]` frame을 전송하는 독립 UART 시험 프로젝트. 현재 `ESP32_B_Algo/`의 `actuator_command` 계약과 비호환이므로 B 제품 검증에 사용하지 않는다.
+- `ESP32_TEST/`: Power Stage/HV를 분리한 상태에서 ESP32_B–Logic Carrier GPIO 배선을 확인하는 독립 시험 프로젝트.
+- `hardware/`: `Logic carrier.pdf`와 `Power_stage.pdf` 회로 기준 및 `hardware/README.md`의 개발용 핀맵·검증 규칙.
 - `Simul_Twin/`: 독립 디지털 트윈 시뮬레이터. **사용자 지시에 따라 절대 수정하지 않는다.** production 하드웨어 명령 경로에도 연결하지 않는다.
 
 ## 명령과 상태 계약
@@ -72,9 +78,28 @@ TabUI -> 태블릿
 
 ## 하드웨어 경계
 
-- ESP32_A 기준 핀은 native USB CDC(GPIO19/20), ESP32_B UART1(GPIO39/40), 외부전원 DS18B20(GPIO41)이다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
+- ESP32_A 보드 기준 핀은 TabUI native USB CDC(GPIO19/20), B-link UART1 TX/RX(GPIO39/40), 외부전원 DS18B20(GPIO41)이다. 이는 아래의 ESP32_B 보드 핀과 별개다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
 - DS18B20 data에는 외부 4.7 kΩ pull-up과 공통 3.3 V/GND가 필요하다. parasite power는 사용하지 않는다.
-- ESP32_B의 CH0~CH3 Power Stage 핀맵, MCPWM 자원과 부팅 기본 off 동작은 실제 보드에서 검증한다.
+- ESP32_B/Logic Carrier의 확정 제어 핀은 아래 표와 같다. `ENABLE_CHx`는 MCU→74HC08 입력이고 J7의 `CHx_ENABLE`은 `EN_GLOBAL AND ENABLE_CHx` 결과다.
+
+| 채널 | `PWM_MAG` | `DIR` | MCU `ENABLE` | `FAULT_N` | Current ADC | Temperature ADC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| CH0 | GPIO10 | GPIO11 | GPIO12 | GPIO13 | GPIO1 | GPIO2 |
+| CH1 | GPIO14 | GPIO15 | GPIO16 | GPIO17 | GPIO4 | GPIO5 |
+| CH2 | GPIO18 | GPIO21 | GPIO38 | GPIO39 | GPIO6 | GPIO7 |
+| CH3 | GPIO40 | GPIO41 | GPIO42 | GPIO47 | GPIO8 | GPIO3 |
+
+- 공통 `EN_GLOBAL`은 GPIO19 **input-only**다. J5 NC E-Stop은 정상 시 +3.3 V를 연결하고 R18 10 kΩ이 open/E-Stop 상태를 LOW로 만든다. GPIO19를 output, USB 또는 강제 pull-up으로 구성하지 않는다. ESP32-S3의 GPIO19 power-up high glitch는 firmware 초기화 전에도 생길 수 있으므로 reset 중 U4/J7 enable 파형을 계측하고 필요하면 하드웨어 보강을 요구한다.
+- `FAULT_N_CH0~3`은 active-low이며 R19~R22 10 kΩ 외부 pull-up이 있다. LOW를 fault로 처리한다. 단선/미연결도 pull-up 때문에 HIGH로 보일 수 있으므로 커넥터 presence를 별도 검증한다.
+- J7은 2x32이다. 모든 짝수 핀은 GND이고 각 채널의 홀수 핀 8개는 순서대로 `PWM_MAG, DIR, CHx_ENABLE, FAULT_N, ADC_I_RAW, ADC_TEMP_RAW, +3.3V, +12V`다. CH0은 1~15, CH1은 17~31, CH2는 33~47, CH3은 49~63을 사용한다.
+- 여덟 ADC는 각 1 kΩ/100 nF RC filter를 통과한다(`tau=100 us`, 약 1.59 kHz). Carrier에 분압/clamp가 보이지 않으므로 ADC 허용 전압을 Power Stage에서 보장하고, attenuation/calibration/saturation/단선 처리를 코드와 HIL에 포함한다. GPIO3은 strapping pin이므로 CH3 temperature source 연결 상태의 cold boot/reset을 검증한다.
+- Logic Carrier는 `PWM_MAG/DIR`만 전달하며 complementary gate 신호나 dead time을 만들지 않는다. Power Stage가 이를 안전하게 제공하는지 확인하고, direction 전환은 PWM=0/blanking 조건에서 수행한다.
+- `PWM_MAG/DIR`에는 buffer/level shifter/절연이 보이지 않는다. 3.3 V input 호환성과 cable noise를 실측한다. 16 kHz/60 Hz는 firmware 요구이지 Carrier 회로가 보장한 값이 아니다.
+- J5 E-Stop은 U4를 통해 `CHx_ENABLE`만 차단하고 +24 V/+12 V/+5 V rail이나 PWM/DIR을 끊지 않는다. 동작 후에도 전력부를 live로 취급하고 firmware도 PWM 0을 적용한다. 이 단일 74HC08 경로를 safety-rated power disconnect로 표현하지 않는다.
+- 회로도상 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 J7에도 A↔B 통신 경로가 없다. B측 UART는 회로 개정 또는 명시적 외부 harness 없이는 확정된 것이 아니다. GPIO43/44는 DevKit USB-to-UART bridge와, GPIO19/20은 native USB/JTAG와 충돌할 수 있다.
+- GPIO39~42는 Logic Carrier 신호와 classic JTAG 핀이 겹친다. ESP32_B에서 JTAG를 이 핀에 attach하지 않는다. N8R8의 Octal PSRAM 관련 GPIO35~37도 대체 UART/GPIO로 임의 사용하지 않는다. DevKitC-1 v1.1에서는 GPIO38이 onboard RGB LED와 공유되므로 CH2 enable을 건드리는 LED/RMT 초기화를 금지한다.
+- J6 +5 V pin 공급과 USB 전원 공급을 동시에 사용하지 않는다. 전원 주입 전 J1/J2/J3/J6 극성·전압, 공통 GND와 J7 pin 1/odd-even 방향을 계측한다.
+- `ESP32_B_Algo/main/power_stage_pinmap.h`는 Logic Carrier 핀맵을 따르고, B UART는 GPIO43/44를 사용하며, native USB console은 비활성화한다. compile-time 핀 소유권 검사와 host exact-value test를 유지한다. 다만 UART 외부 harness/bridge contention, ADC 수집·보호와 Power Stage fault 차단을 HIL로 확정하기 전에는 Power Stage/PDLC/HV를 연결하지 않는다.
 - 저전압 제어부와 고전압 전력부를 분리하고 E-Stop, 퓨즈, 방전저항, HV 표시와 절연 구조를 적용한다.
 
 ## 네트워크와 기록 경계
@@ -86,7 +111,12 @@ TabUI -> 태블릿
 ## 개발 및 검증 규칙
 
 - `Simul_Twin/`은 읽기와 실행만 허용하며 파일 생성·수정·삭제·포맷을 하지 않는다.
+- `ESP_Camera/`는 검증된 레퍼런스 상태를 보존한다. 카메라 기능을 통합하거나 변경할 때는 대상 프로젝트 안에서 작업하고 루트 레퍼런스를 수정하지 않는다.
+- ESP32_B 제품 펌웨어 변경, 빌드와 플래시 작업은 유일한 canonical 경로인 `ESP32_B_Algo/`를 기준으로 한다.
 - wire schema 변경은 TabUI adapter, ESP32_A, ESP32_B, host tests와 README 예시를 함께 갱신한다.
+- ESP32_B의 핀, peripheral, UART, ADC 또는 출력 극성을 바꾸기 전에 `hardware/Logic carrier.pdf`와 `hardware/README.md`를 읽는다. 하나의 board pinmap에서 역할·방향·active level을 정의하고 exact-value, 중복 소유, 금지 핀과 safe-default를 host/static test로 검사한다.
+- ESP32_B 부팅 시 네 `ENABLE` LOW와 PWM duty 0을 가장 먼저 보장한다. 유효 명령+TTL, `EN_GLOBAL=HIGH`, 모든 `FAULT_N=HIGH` 이전에는 enable하지 않으며, 차단 시 enable LOW를 먼저 적용한다.
+- `FAULT_N`은 U4 하드웨어 AND에 포함되지 않는다. Power Stage 자체 차단이 없다면 펌웨어 polling이 유일한 추가 차단이므로 latency/jitter를 계측하고 요구 한계를 문서화한다.
 - 문서와 코드에는 현재 사용하는 구성, 센서와 채널만 기록한다.
 - 실제 하드웨어가 없어도 TabUI typecheck/build, backend unit test, ESP32_A/B host test를 실행한다.
 - HIL에서는 command ACK, manual TTL, A의 AUTO 지속, A→B timeout safe-off, stale sequence 거부, fault latch/clear, target/commanded/applied MI 차이를 확인한다.

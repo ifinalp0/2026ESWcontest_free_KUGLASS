@@ -8,7 +8,7 @@ TabUI는 KUGLASS의 태블릿 HMI와 ESP32_A USB gateway입니다.
 TabUI backend
   -> USB CDC JSON Lines
 ESP32_A: 카메라·내부온도·정책·CH0~CH3 MI
-  -> ESP32_B: 4채널 Power Stage 제어
+  -> ESP32_B_Algo firmware: Logic Carrier를 통한 4채널 Power Stage 제어
 ```
 
 TabUI는 화면 제공, 고수준 명령 검증·변환, ESP32_A telemetry 중계와 replay snapshot을 담당합니다. LIVE 자동 정책과 채널 목표 배열은 ESP32_A가 계산합니다.
