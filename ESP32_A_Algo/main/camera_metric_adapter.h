@@ -5,9 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 
-// Converts the ESP_Camera RGB565 QVGA frame into the scalar metrics
+// Converts the ESP32_A-owned RGB565 QVGA frame into the scalar metrics
 // consumed by the policy engine. RGB565 bytes are big-endian, matching the
-// validated ESP_Camera capture/encoder path.
+// validated standalone camera reference capture path.
 bool analyze_rgb565_frame(const uint8_t* data,
                           size_t data_size,
                           uint16_t width,
@@ -18,7 +18,8 @@ bool analyze_rgb565_frame(const uint8_t* data,
 class CameraMetricAdapter {
 public:
     bool begin();
-    bool sample(uint32_t now_ms, SensorSnapshot* snapshot);
+    bool sample(SensorSnapshot* snapshot);
+    void stop();
     bool available() const { return available_; }
 
 private:

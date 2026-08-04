@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 import threading
 import time
 from collections import deque
@@ -14,6 +15,44 @@ CHANNEL_NAMES = [
     "CH2 좌측 전방 도어",
     "CH3 우측 전방 도어",
 ]
+
+SAFE_TOKEN = re.compile(r"^[A-Z0-9_]{1,48}$")
+FAULT_CODES = {"NONE", "COMM_TIMEOUT", "INVALID_COMMAND", "POWER_STAGE_FAULT", "ESTOP"}
+RESET_FAILURES = {"RESET_UNSAFE", "TARGET_BOOT_MISMATCH", "CHALLENGE_MISMATCH"}
+
+
+def _default_adc_state() -> dict[str, Any]:
+    return {
+        "initialized": False,
+        "currentCalibrated": False,
+        "temperatureCalibrated": False,
+        "rawValidMask": 0,
+        "mvValidMask": 0,
+        "channels": [
+            {
+                "channel": channel,
+                "currentRaw": None,
+                "temperatureRaw": None,
+                "currentMv": None,
+                "temperatureMv": None,
+            }
+            for channel in range(4)
+        ],
+    }
+
+
+def _default_downstream_diagnostics() -> dict[str, Any]:
+    return {
+        "bootId": None,
+        "statusSeq": None,
+        "resetChallenge": None,
+        "estopActive": None,
+        "faultCode": None,
+        "diagnostic": None,
+        "operationalFault": False,
+        "controlResult": None,
+        "adc": _default_adc_state(),
+    }
 
 
 def clamp(value: Any, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -74,6 +113,7 @@ def default_state() -> dict[str, Any]:
             "frameId": 0,
             "timestamp": 0.0,
         },
+        "downstreamDiagnostics": _default_downstream_diagnostics(),
         "decisionReason": "ESP32_A 상태 텔레메트리를 기다리는 중입니다.",
         "timestamp": 0.0,
     }
@@ -110,6 +150,8 @@ class StateStore:
         self._replay: deque[dict[str, Any]] = deque(maxlen=600)
         self._time_fn = time_fn or time.time
         self.last_ack_seq: int | None = None
+        self.last_ack_command: str | None = None
+        self.last_ack_ok: bool | None = None
         self.last_device_error: str | None = None
         self.downstream_healthy: bool | None = None
         self.downstream_error: str | None = None
@@ -131,6 +173,9 @@ class StateStore:
             with self._lock:
                 if record.get("seq") is not None:
                     self.last_ack_seq = int(record["seq"])
+                command = record.get("command")
+                self.last_ack_command = command if isinstance(command, str) else None
+                self.last_ack_ok = record.get("ok") if isinstance(record.get("ok"), bool) else None
                 if record.get("ok", True) is False:
                     self.last_device_error = str(record.get("error", "ESP32_A rejected command"))
                 else:
@@ -156,8 +201,14 @@ class StateStore:
             return True
 
         if record_type in {"status", "telemetry"}:
+            controller_id = str(record.get("controller_id", record.get("controllerId", ""))).upper()
+            normalized = None
+            if controller_id == "B":
+                normalized = _normalize_downstream_status(record)
+                if normalized is None:
+                    return False
             with self._lock:
-                self._apply_status(record)
+                self._apply_status(normalized if normalized is not None else record)
                 self._record_snapshot()
             return True
 
@@ -224,9 +275,23 @@ class StateStore:
         if isinstance(channels, list):
             self._merge_channels(channels, source="downstream" if is_downstream else "master")
             if is_downstream:
-                estop = record.get("estop")
-                if isinstance(estop, bool):
-                    self.estop_active = estop
+                diagnostics = self._state["downstreamDiagnostics"]
+                boot_changed = diagnostics["bootId"] not in {None, record["bootId"]}
+                diagnostics.update({
+                    "bootId": record["bootId"],
+                    "statusSeq": record["seq"],
+                    "resetChallenge": record["resetChallenge"],
+                    "estopActive": record["estop"],
+                    "faultCode": record["faultCode"],
+                    "diagnostic": record.get("diagnostic"),
+                    "operationalFault": record["operationalFault"],
+                    "adc": record["adc"],
+                })
+                if boot_changed and record.get("controlResult") is None:
+                    diagnostics["controlResult"] = None
+                if record.get("controlResult") is not None:
+                    diagnostics["controlResult"] = record["controlResult"]
+                self.estop_active = record["estop"]
                 self._downstream_protocol_error_latched = False
                 self.downstream_healthy = True
                 self.downstream_error = "NONE"
@@ -340,3 +405,166 @@ class StateStore:
 
     def _record_snapshot(self) -> None:
         self._replay.append(copy.deepcopy(self._state))
+
+
+def _session_identifier(value: Any) -> int | None:
+    identifier = _non_negative_int(value)
+    return identifier if identifier is not None and identifier > 0 else None
+
+
+def _non_negative_int(value: Any, maximum: int = 0xFFFFFFFF) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0 or value > maximum:
+        return None
+    return value
+
+
+def _safe_token(value: Any) -> str | None:
+    return value if isinstance(value, str) and SAFE_TOKEN.fullmatch(value) else None
+
+
+def _normalize_adc(adc: Any) -> dict[str, Any] | None:
+    if not isinstance(adc, dict):
+        return None
+    bool_fields = ("initialized", "i_cali", "t_cali")
+    if any(not isinstance(adc.get(field), bool) for field in bool_fields):
+        return None
+    raw_mask = _non_negative_int(adc.get("raw_valid_mask"), 0xFF)
+    mv_mask = _non_negative_int(adc.get("mv_valid_mask"), 0xFF)
+    arrays: dict[str, list[int]] = {}
+    for field in ("i_raw", "t_raw", "i_mv", "t_mv"):
+        value = adc.get(field)
+        maximum = 4095 if field.endswith("raw") else 5000
+        if (
+            not isinstance(value, list)
+            or len(value) != 4
+            or any(
+                isinstance(item, bool)
+                or not isinstance(item, int)
+                or item < 0
+                or item > maximum
+                for item in value
+            )
+        ):
+            return None
+        arrays[field] = value
+    if raw_mask is None or mv_mask is None:
+        return None
+
+    channels = []
+    for channel in range(4):
+        current_bit = 1 << channel
+        temperature_bit = 1 << (channel + 4)
+        channels.append({
+            "channel": channel,
+            "currentRaw": arrays["i_raw"][channel] if raw_mask & current_bit else None,
+            "temperatureRaw": arrays["t_raw"][channel] if raw_mask & temperature_bit else None,
+            "currentMv": arrays["i_mv"][channel] if mv_mask & current_bit else None,
+            "temperatureMv": arrays["t_mv"][channel] if mv_mask & temperature_bit else None,
+        })
+    return {
+        "initialized": adc["initialized"],
+        "currentCalibrated": adc["i_cali"],
+        "temperatureCalibrated": adc["t_cali"],
+        "rawValidMask": raw_mask,
+        "mvValidMask": mv_mask,
+        "channels": channels,
+    }
+
+
+def _normalize_control_result(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or set(value) != {
+        "command", "seq", "source_session_id", "ok", "error"
+    }:
+        return None
+    if value.get("command") != "reset_fault" or not isinstance(value.get("ok"), bool):
+        return None
+    sequence = _non_negative_int(value.get("seq"))
+    source_session_id = _session_identifier(value.get("source_session_id"))
+    error = value.get("error")
+    if sequence is None or source_session_id is None:
+        return None
+    if not isinstance(error, str):
+        return None
+    if value["ok"] and error != "NONE":
+        return None
+    if not value["ok"] and error not in RESET_FAILURES:
+        return None
+    return {
+        "command": "reset_fault",
+        "seq": sequence,
+        "sourceSessionId": source_session_id,
+        "ok": value["ok"],
+        "error": error,
+    }
+
+
+def _normalize_downstream_status(record: dict[str, Any]) -> dict[str, Any] | None:
+    if record.get("v") != 1 or record.get("type") != "status":
+        return None
+    if str(record.get("controller_id", "")).upper() != "B":
+        return None
+    sequence = _non_negative_int(record.get("seq"))
+    boot_id = _session_identifier(record.get("boot_id"))
+    reset_challenge = _session_identifier(record.get("reset_challenge"))
+    estop = record.get("estop")
+    fault_code = _safe_token(record.get("fault_code"))
+    diagnostic_value = record.get("diagnostic")
+    diagnostic = None if diagnostic_value is None else _safe_token(diagnostic_value)
+    adc = _normalize_adc(record.get("adc"))
+    if (
+        sequence is None
+        or boot_id is None
+        or reset_challenge is None
+        or not isinstance(estop, bool)
+        or fault_code not in FAULT_CODES
+        or diagnostic_value is not None and diagnostic is None
+        or adc is None
+    ):
+        return None
+
+    incoming_channels = record.get("ch")
+    if not isinstance(incoming_channels, list) or len(incoming_channels) != 4:
+        return None
+    channels: list[dict[str, Any] | None] = [None] * 4
+    for item in incoming_channels:
+        if not isinstance(item, dict):
+            return None
+        channel = _non_negative_int(item.get("id"), 3)
+        mi = item.get("mi")
+        fault = item.get("fault")
+        if (
+            channel is None
+            or channels[channel] is not None
+            or isinstance(mi, bool)
+            or not isinstance(mi, (int, float))
+            or not math.isfinite(float(mi))
+            or not 0.0 <= float(mi) <= 1.0
+            or not isinstance(fault, bool)
+        ):
+            return None
+        channels[channel] = {"id": channel, "mi": float(mi), "fault": fault}
+    if any(channel is None for channel in channels):
+        return None
+
+    control_result = None
+    if "control_result" in record:
+        control_result = _normalize_control_result(record["control_result"])
+        if control_result is None:
+            return None
+    normalized_channels = [channel for channel in channels if channel is not None]
+    return {
+        "type": "status",
+        "controller_id": "B",
+        "seq": sequence,
+        "bootId": boot_id,
+        "resetChallenge": reset_challenge,
+        "estop": estop,
+        "faultCode": fault_code,
+        "diagnostic": diagnostic,
+        "ch": normalized_channels,
+        "adc": adc,
+        "controlResult": control_result,
+        "operationalFault": estop or fault_code != "NONE" or any(
+            bool(channel["fault"]) for channel in normalized_channels
+        ),
+    }

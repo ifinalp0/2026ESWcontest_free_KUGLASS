@@ -112,6 +112,7 @@ class ESP32AGateway:
     def link_snapshot(self) -> dict[str, Any]:
         now = time.monotonic()
         hardware_connected = self._hardware_connected(now)
+        downstream = self.state.snapshot()["downstreamDiagnostics"]
         return {
             "transport": self.transport.mode,
             "hardwareConnected": hardware_connected,
@@ -120,8 +121,19 @@ class ESP32AGateway:
             "lastTelemetryAt": None if self._last_telemetry_at is None else time.time() - (now - self._last_telemetry_at),
             "lastCommandSeq": self._last_command_seq,
             "lastAckSeq": self.state.last_ack_seq,
+            "lastAckCommand": self.state.last_ack_command,
+            "lastAckOk": self.state.last_ack_ok,
             "downstreamHealthy": self.state.downstream_healthy,
             "downstreamError": self.state.downstream_error,
+            "downstreamOperationalFault": downstream["operationalFault"],
+            "downstreamBootId": downstream["bootId"],
+            "downstreamStatusSeq": downstream["statusSeq"],
+            "downstreamResetChallenge": downstream["resetChallenge"],
+            "downstreamEstop": downstream["estopActive"],
+            "downstreamFaultCode": downstream["faultCode"],
+            "downstreamDiagnostic": downstream["diagnostic"],
+            "downstreamControlResult": downstream["controlResult"],
+            "downstreamAdc": downstream["adc"],
             "error": self.state.last_device_error or self._gateway_error or self.transport.error,
         }
 

@@ -8,6 +8,38 @@ trap 'rm -rf -- "$TEST_BUILD_DIR"' EXIT HUP INT TERM
 CXX=${CXX:-c++}
 CXXFLAGS="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I$PROJECT_DIR/main"
 
+sh "$PROJECT_DIR/host_tests/test_project_independence.sh"
+
+$CXX $CXXFLAGS \
+    -I"$PROJECT_DIR/host_tests/stubs" \
+    "$PROJECT_DIR/host_tests/test_camera_pins.cpp" \
+    -o "$TEST_BUILD_DIR/test_camera_pins"
+
+$CXX $CXXFLAGS \
+    -I"$PROJECT_DIR/host_tests/stubs" \
+    "$PROJECT_DIR/host_tests/test_camera_pin_contract.cpp" \
+    -o "$TEST_BUILD_DIR/test_camera_pin_contract"
+
+for INVALID_CAMERA_DEFINE in \
+    KUGLASS_B_UART_TX_GPIO=4 \
+    KUGLASS_B_UART_TX_GPIO=19 \
+    KUGLASS_DS18B20_GPIO=49 \
+    KUGLASS_B_UART_RX_GPIO=39
+do
+    if $CXX $CXXFLAGS -I"$PROJECT_DIR/host_tests/stubs" \
+        -D"$INVALID_CAMERA_DEFINE" \
+        "$PROJECT_DIR/host_tests/test_camera_pin_contract.cpp" \
+        -o "$TEST_BUILD_DIR/invalid_camera_contract" 2>/dev/null; then
+        echo "camera pin contract unexpectedly accepted $INVALID_CAMERA_DEFINE" >&2
+        exit 1
+    fi
+done
+
+$CXX $CXXFLAGS \
+    "$PROJECT_DIR/main/camera_recovery.cpp" \
+    "$PROJECT_DIR/host_tests/test_camera_recovery.cpp" \
+    -o "$TEST_BUILD_DIR/test_camera_recovery"
+
 $CXX $CXXFLAGS \
     "$PROJECT_DIR/main/protocol.cpp" \
     "$PROJECT_DIR/host_tests/test_protocol_parser.cpp" \
@@ -28,6 +60,7 @@ $CXX $CXXFLAGS \
 $CXX $CXXFLAGS \
     "$PROJECT_DIR/main/camera_metric_adapter.cpp" \
     "$PROJECT_DIR/main/ds18b20_sensor.cpp" \
+    "$PROJECT_DIR/main/sensor_state.cpp" \
     "$PROJECT_DIR/host_tests/test_sensor_adapters.cpp" \
     -o "$TEST_BUILD_DIR/test_sensors"
 
@@ -61,10 +94,15 @@ $CXX $CXXFLAGS \
     "$PROJECT_DIR/main/ds18b20_sensor.cpp" \
     "$PROJECT_DIR/main/esp32_b_link.cpp" \
     "$PROJECT_DIR/main/server_console.cpp" \
+    "$PROJECT_DIR/main/sensor_state.cpp" \
     "$PROJECT_DIR/main/master_telemetry.cpp" \
     "$PROJECT_DIR/host_tests/test_master_app_link.cpp" \
     -o "$TEST_BUILD_DIR/test_master_app_link"
 
+"$TEST_BUILD_DIR/test_camera_pins"
+"$TEST_BUILD_DIR/test_camera_pin_contract"
+echo "camera pin contract ok"
+"$TEST_BUILD_DIR/test_camera_recovery"
 "$TEST_BUILD_DIR/test_protocol"
 "$TEST_BUILD_DIR/test_ui_protocol"
 "$TEST_BUILD_DIR/test_policy"

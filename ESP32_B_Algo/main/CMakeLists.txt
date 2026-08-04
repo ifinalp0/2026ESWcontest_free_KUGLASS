@@ -1,22 +1,21 @@
-set(KUGLASS_SHARED_PROTOCOL_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../../ESP32_A_Algo/main"
-)
-
 idf_component_register(
     SRCS
+        "analog_monitor.cpp"
         "app_main.cpp"
         "channel_manager.cpp"
+        "control_protocol.cpp"
         "fault_manager.cpp"
+        "protocol.cpp"
         "spwm_generator.cpp"
         "status_reporter.cpp"
-        "${KUGLASS_SHARED_PROTOCOL_DIR}/protocol.cpp"
     INCLUDE_DIRS
         "."
-        "${KUGLASS_SHARED_PROTOCOL_DIR}"
     PRIV_REQUIRES
+        esp_adc
         esp_driver_gpio
         esp_driver_uart
         esp_driver_mcpwm
+        esp_system
         esp_timer
 )
 

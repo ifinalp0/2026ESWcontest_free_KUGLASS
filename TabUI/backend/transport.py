@@ -161,6 +161,11 @@ class MockTransport:
         self._state = default_state()
         self._state["downstream"] = {"controller_id": "B", "healthy": True, "error": "OK"}
         self._last_state_at = 0.0
+        self._status_seq = 0
+        self._boot_id = 1001
+        self._reset_challenge = 2001
+        self._source_session_id = 3001
+        self._pending_control_result: dict[str, Any] | None = None
         self._manual_targets: dict[int, tuple[float, float]] = {}
         self._auto_targets = [0.95] * 4
         self._state["environment"].update({
@@ -177,9 +182,20 @@ class MockTransport:
         record = json.loads(line)
         with self._lock:
             self._apply_command(record)
-            self._outgoing.append(json.dumps({"type": "ack", "seq": record.get("seq"), "ok": True}, separators=(",", ":")))
+            ack = {
+                "type": "ack",
+                "seq": record.get("seq"),
+                "command": record.get("command"),
+                "ok": True,
+            }
+            if record.get("command") == "reset_fault":
+                self._outgoing.append(self._status_line())
+                self._outgoing.append(json.dumps(ack, separators=(",", ":")))
+            else:
+                self._outgoing.append(json.dumps(ack, separators=(",", ":")))
             self._outgoing.append(self._state_line())
-            self._outgoing.append(self._status_line())
+            if record.get("command") != "reset_fault":
+                self._outgoing.append(self._status_line())
 
     def read_lines(self) -> list[str]:
         with self._lock:
@@ -233,6 +249,14 @@ class MockTransport:
             for channel in self._state["channels"]:
                 channel["fault"] = False
             self._state["decisionReason"] = "MOCK ESP32_A: fault latch 초기화를 요청했습니다."
+            self._pending_control_result = {
+                "command": "reset_fault",
+                "seq": int(record["seq"]),
+                "source_session_id": self._source_session_id,
+                "ok": True,
+                "error": "NONE",
+            }
+            self._reset_challenge = (self._reset_challenge + 1) & 0xFFFFFFFF or 1
         elif command == "set_channel_fault":
             channel_id = int(record["channel_id"])
             self._state["channels"][channel_id]["fault"] = bool(record.get("fault", True))
@@ -322,6 +346,7 @@ class MockTransport:
         return json.dumps({"type": "state", "state": copy.deepcopy(self._state)}, ensure_ascii=False, separators=(",", ":"))
 
     def _status_line(self) -> str:
+        self._status_seq = (self._status_seq + 1) & 0xFFFFFFFF
         channels = [
             {
                 "id": channel["channel"],
@@ -331,8 +356,34 @@ class MockTransport:
             }
             for channel in self._state["channels"]
         ]
+        status: dict[str, Any] = {
+            "v": 1,
+            "type": "status",
+            "controller_id": "B",
+            "seq": self._status_seq,
+            "boot_id": self._boot_id,
+            "reset_challenge": self._reset_challenge,
+            "estop": False,
+            "fault_code": "NONE",
+            "diagnostic": "MOCK",
+            "ch": channels,
+            "adc": {
+                "initialized": True,
+                "i_cali": True,
+                "t_cali": True,
+                "raw_valid_mask": 255,
+                "mv_valid_mask": 255,
+                "i_raw": [118, 121, 119, 120],
+                "t_raw": [2008, 2012, 2004, 2010],
+                "i_mv": [28, 29, 28, 29],
+                "t_mv": [1618, 1621, 1615, 1619],
+            },
+        }
+        if self._pending_control_result is not None:
+            status["control_result"] = self._pending_control_result
+            self._pending_control_result = None
         return json.dumps(
-            {"type": "status", "controller_id": "B", "ch": channels},
+            status,
             ensure_ascii=False,
             separators=(",", ":"),
         )

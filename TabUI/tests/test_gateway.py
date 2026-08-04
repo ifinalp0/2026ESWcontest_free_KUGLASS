@@ -36,6 +36,10 @@ class GatewayTests(unittest.TestCase):
         self.assertTrue(state["link"]["hardwareConnected"])
         self.assertTrue(state["link"]["downstreamHealthy"])
         self.assertEqual(state["link"]["downstreamError"], "NONE")
+        self.assertEqual(state["link"]["downstreamBootId"], 1001)
+        self.assertEqual(state["link"]["downstreamResetChallenge"], 2001)
+        self.assertFalse(state["link"]["downstreamOperationalFault"])
+        self.assertEqual(state["link"]["downstreamAdc"]["channels"][0]["currentMv"], 28)
         self.assertLess(state["channels"][3]["targetMi"], state["channels"][0]["targetMi"])
 
     def test_mock_allows_hil_only_command(self) -> None:
@@ -72,13 +76,44 @@ class LiveBoundaryTests(unittest.TestCase):
         with self.assertRaises(CommandError):
             gateway.submit({"type": "returnAuto"})
 
-        transport.incoming.append('{"type":"status","ch":[]}')
+        transport.incoming.append('{"type":"state","channels":[]}')
         gateway._read_transport()
         self.assertEqual(len(gateway.submit({"type": "returnAuto"})), 1)
 
         time.sleep(0.04)
         with self.assertRaises(CommandError):
             gateway.submit({"type": "returnAuto"})
+
+    def test_malformed_b_status_does_not_refresh_hardware_connection(self) -> None:
+        transport = RecordingTransport(mode="serial")
+        gateway = ESP32AGateway(transport=transport)
+        transport.incoming.append(
+            '{"v":1,"type":"status","controller_id":"B","seq":1,"ch":[]}'
+        )
+        gateway._read_transport()
+        self.assertFalse(gateway.link_snapshot()["hardwareConnected"])
+
+    def test_mock_reset_exposes_correlated_b_result_and_final_ack(self) -> None:
+        gateway = ESP32AGateway(transport=MockTransport(), sequence_seed=700)
+        gateway.start()
+        try:
+            [sequence] = gateway.submit({"type": "resetFault"})
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                link = gateway.link_snapshot()
+                result = link["downstreamControlResult"]
+                if result is not None and link["lastAckSeq"] == sequence:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("correlated reset result was not observed")
+            self.assertEqual(result["seq"], sequence)
+            self.assertEqual(result["command"], "reset_fault")
+            self.assertTrue(result["ok"])
+            self.assertEqual(link["lastAckCommand"], "reset_fault")
+            self.assertTrue(link["lastAckOk"])
+        finally:
+            gateway.close()
 
 
 class RecordingTransport:

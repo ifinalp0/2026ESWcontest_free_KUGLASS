@@ -15,7 +15,21 @@
 
 static constexpr uint8_t KUGLASS_CHANNEL_COUNT = 4;
 static constexpr uint32_t KUGLASS_DEFAULT_TTL_MS = 250;
+static constexpr uint32_t KUGLASS_OUTPUT_UPDATE_MS = 1;
+static constexpr uint32_t KUGLASS_DIRECTION_BLANKING_MS = 1;
+static constexpr uint32_t KUGLASS_SAFETY_WATCHDOG_MS = 100;
+static constexpr uint32_t KUGLASS_ANALOG_SCAN_PERIOD_MS = 5;
 static constexpr float KUGLASS_CARRIER_HZ = 16000.0f;
 static constexpr float KUGLASS_FUNDAMENTAL_HZ = 60.0f;
+// The IRS2104 high-side supplies on the referenced Power Stage are
+// bootstrapped. Keep at least 5% of every carrier period available for
+// refresh until the production stage is characterized on the bench.
+static constexpr float KUGLASS_MAX_MODULATION_INDEX = 0.95f;
 static constexpr float KUGLASS_MI_ATTACK_PER_S = 2.4f;
 static constexpr float KUGLASS_MI_RELEASE_PER_S = 0.7f;
+
+static_assert(KUGLASS_MAX_MODULATION_INDEX > 0.0f &&
+                  KUGLASS_MAX_MODULATION_INDEX < 1.0f,
+              "Bootstrap PWM requires a non-zero carrier off-time.");
+static_assert(KUGLASS_DIRECTION_BLANKING_MS >= KUGLASS_OUTPUT_UPDATE_MS,
+              "Direction changes require at least one safe output update.");

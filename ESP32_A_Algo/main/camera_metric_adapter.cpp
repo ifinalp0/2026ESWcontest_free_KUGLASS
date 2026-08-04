@@ -105,6 +105,7 @@ bool analyze_rgb565_frame(const uint8_t* data,
 
 bool CameraMetricAdapter::begin() {
 #if defined(ESP_PLATFORM) && KUGLASS_ONBOARD_CAMERA
+    if (available_) return true;
     available_ = camera_service_start() == ESP_OK;
 #else
     available_ = false;
@@ -112,7 +113,14 @@ bool CameraMetricAdapter::begin() {
     return available_;
 }
 
-bool CameraMetricAdapter::sample(uint32_t now_ms, SensorSnapshot* snapshot) {
+void CameraMetricAdapter::stop() {
+#if defined(ESP_PLATFORM) && KUGLASS_ONBOARD_CAMERA
+    camera_service_stop();
+#endif
+    available_ = false;
+}
+
+bool CameraMetricAdapter::sample(SensorSnapshot* snapshot) {
     if (!available_ || snapshot == nullptr) {
         return false;
     }
@@ -121,6 +129,9 @@ bool CameraMetricAdapter::sample(uint32_t now_ms, SensorSnapshot* snapshot) {
     if (frame == nullptr) {
         return false;
     }
+    const uint64_t capture_timestamp_ms =
+        static_cast<uint64_t>(frame->timestamp.tv_sec) * 1000ULL +
+        static_cast<uint64_t>(frame->timestamp.tv_usec) / 1000ULL;
     CameraRoiMetrics left;
     CameraRoiMetrics right;
     const bool valid = frame->format == PIXFORMAT_RGB565 &&
@@ -139,10 +150,9 @@ bool CameraMetricAdapter::sample(uint32_t now_ms, SensorSnapshot* snapshot) {
     snapshot->front_right = right;
     snapshot->camera_valid = true;
     snapshot->camera_frame_id = ++frame_id_;
-    snapshot->camera_timestamp_ms = now_ms;
+    snapshot->camera_timestamp_ms = static_cast<uint32_t>(capture_timestamp_ms);
     return true;
 #else
-    (void)now_ms;
     return false;
 #endif
 }

@@ -11,9 +11,12 @@ SemaphoreHandle_t g_console_mutex = nullptr;
 }
 #endif
 
-void server_console_begin() {
+bool server_console_begin() {
 #ifdef ESP_PLATFORM
     g_console_mutex = xSemaphoreCreateMutex();
+    return g_console_mutex != nullptr;
+#else
+    return true;
 #endif
 }
 void server_console_send_line(const char* line) {

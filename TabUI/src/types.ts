@@ -32,6 +32,43 @@ export interface CameraMetrics {
   timestamp: number;
 }
 
+export interface DownstreamAdcChannel {
+  channel: number;
+  currentRaw: number | null;
+  temperatureRaw: number | null;
+  currentMv: number | null;
+  temperatureMv: number | null;
+}
+
+export interface DownstreamAdc {
+  initialized: boolean;
+  currentCalibrated: boolean;
+  temperatureCalibrated: boolean;
+  rawValidMask: number;
+  mvValidMask: number;
+  channels: DownstreamAdcChannel[];
+}
+
+export interface DownstreamControlResult {
+  command: 'reset_fault';
+  seq: number;
+  sourceSessionId: number;
+  ok: boolean;
+  error: string;
+}
+
+export interface DownstreamDiagnostics {
+  bootId: number | null;
+  statusSeq: number | null;
+  resetChallenge: number | null;
+  estopActive: boolean | null;
+  faultCode: string | null;
+  diagnostic: string | null;
+  operationalFault: boolean;
+  controlResult: DownstreamControlResult | null;
+  adc: DownstreamAdc;
+}
+
 export interface ControllerLink {
   transport: 'serial' | 'mock';
   hardwareConnected: boolean;
@@ -40,8 +77,19 @@ export interface ControllerLink {
   lastTelemetryAt: number | null;
   lastCommandSeq: number;
   lastAckSeq: number | null;
+  lastAckCommand: string | null;
+  lastAckOk: boolean | null;
   downstreamHealthy: boolean | null;
   downstreamError: string | null;
+  downstreamOperationalFault: boolean;
+  downstreamBootId: number | null;
+  downstreamStatusSeq: number | null;
+  downstreamResetChallenge: number | null;
+  downstreamEstop: boolean | null;
+  downstreamFaultCode: string | null;
+  downstreamDiagnostic: string | null;
+  downstreamControlResult: DownstreamControlResult | null;
+  downstreamAdc: DownstreamAdc;
   error: string | null;
 }
 
@@ -52,6 +100,7 @@ export interface SimulationState {
   environment: EnvironmentInput;
   channels: ChannelState[];
   cameraMetrics: CameraMetrics;
+  downstreamDiagnostics: DownstreamDiagnostics;
   decisionReason: string;
   timestamp: number;
   link: ControllerLink;

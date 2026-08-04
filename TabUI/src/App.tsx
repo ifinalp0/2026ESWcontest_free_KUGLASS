@@ -59,7 +59,12 @@ export default function App() {
           controlsEnabled={controllerAvailable}
           diagnosticsEnabled={diagnosticsEnabled}
         />
-        <ChannelTable channels={state.channels} selectedChannel={selectedChannel} onSelectChannel={setSelectedChannel} />
+        <ChannelTable
+          channels={state.channels}
+          adc={state.downstreamDiagnostics.adc}
+          selectedChannel={selectedChannel}
+          onSelectChannel={setSelectedChannel}
+        />
       </section>
     </main>
   );

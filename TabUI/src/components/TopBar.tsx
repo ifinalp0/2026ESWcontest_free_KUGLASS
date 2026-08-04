@@ -35,15 +35,39 @@ function downstreamStatus(connected: boolean, healthy: boolean | null, error: st
 
 export function TopBar({ state, connected, onToggleTheme, onResetFault, onSaveReplay }: Props) {
   const hasFault = state.channels.some((channel) => channel.fault);
+  const diagnostics = state.downstreamDiagnostics;
+  const hasOperationalFault = diagnostics.operationalFault || hasFault;
   const isMock = state.link.transport === 'mock';
   const deviceConnected = connected && state.link.hardwareConnected;
   const hasDeviceError = connected && Boolean(state.link.error);
-  const downstream = state.link.downstreamHealthy === true && hasFault
+  const downstream = state.link.downstreamHealthy === true && hasOperationalFault
     ? 'fault'
     : downstreamStatus(deviceConnected, state.link.downstreamHealthy, state.link.downstreamError);
   const downstreamFault = downstream === 'fault';
   const systemError = hasDeviceError || downstreamFault;
   const deviceLabel = !connected ? 'OFFLINE' : systemError ? 'ERROR' : isMock ? 'MOCK' : deviceConnected ? 'LIVE' : 'OFFLINE';
+  const downstreamLabel = diagnostics.estopActive
+    ? 'E-STOP'
+    : downstream === 'ok'
+      ? 'LINK OK'
+      : downstream === 'stale'
+        ? 'STALE'
+        : downstream === 'fault'
+          ? 'FAULT'
+          : 'WAITING';
+  const diagnosticTitle = [
+    state.link.downstreamError,
+    diagnostics.faultCode ? `fault=${diagnostics.faultCode}` : null,
+    diagnostics.diagnostic ? `diagnostic=${diagnostics.diagnostic}` : null,
+    diagnostics.bootId !== null ? `boot=${diagnostics.bootId}` : null,
+    diagnostics.statusSeq !== null ? `status seq=${diagnostics.statusSeq}` : null,
+  ].filter(Boolean).join(' · ') || 'ESP32_A → ESP32_B link';
+  const resetResult = diagnostics.controlResult;
+  const visibleDiagnostic = diagnostics.diagnostic
+    && !(resetResult && diagnostics.diagnostic.startsWith('RESET_'))
+    ? diagnostics.diagnostic
+    : null;
+  const diagnosticOk = visibleDiagnostic === 'BOOT' || visibleDiagnostic === 'MOCK';
 
   const onTitleKeyDown = (event: KeyboardEvent<HTMLHeadingElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -82,15 +106,31 @@ export function TopBar({ state, connected, onToggleTheme, onResetFault, onSaveRe
         </div>
         <div
           className={`status-block compact ${downstream === 'ok' ? 'ok' : 'warn'}`}
-          title={state.link.downstreamError ?? 'ESP32_A → ESP32_B link'}
+          title={diagnosticTitle}
         >
           <Cable size={17} />
-          <span>ESP32_B<strong>{downstream === 'ok' ? 'LINK OK' : downstream === 'stale' ? 'STALE' : downstream === 'fault' ? 'FAULT' : 'WAITING'}</strong></span>
+          <span>ESP32_B<strong>{downstreamLabel}</strong></span>
         </div>
+        {resetResult ? (
+          <span
+            className={`reset-result ${resetResult.ok ? 'ok' : 'warn'}`}
+            title={`reset_fault seq=${resetResult.seq} · ${resetResult.error ?? 'NONE'}`}
+          >
+            RESET {resetResult.ok ? 'OK' : 'FAIL'}
+          </span>
+        ) : null}
+        {visibleDiagnostic ? (
+          <span
+            className={`reset-result ${diagnosticOk ? 'ok' : 'warn'}`}
+            title={`ESP32_B diagnostic: ${visibleDiagnostic}`}
+          >
+            {visibleDiagnostic.replace(/_/g, ' ')}
+          </span>
+        ) : null}
         <button className="topbar-action icon-only" type="button" onClick={onSaveReplay} title="리플레이 저장" aria-label="리플레이 저장">
           <Download size={17} />
         </button>
-        {hasFault ? (
+        {hasOperationalFault ? (
           <button className="topbar-action danger icon-only" type="button" disabled={!deviceConnected} onClick={onResetFault} title="고장 상태 초기화" aria-label="고장 상태 초기화">
             <AlertTriangle size={17} />
           </button>

@@ -1,12 +1,14 @@
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_IDF_TARGET_ESP32S3=y
 
-# ESP32-S3-DevKitC-1U-N8R8 profile required by the ESP_Camera pins.
+# ESP32-S3-DevKitC-1U-N8R8 profile required by the integrated camera pins.
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESPTOOLPY_OCT_FLASH=n
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP=y
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_TYPE_AUTO=y
@@ -20,8 +22,8 @@ CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
 CONFIG_CAMERA_PSRAM_DMA=y
 
-# Reuse only ESP_Camera's OV2640 capture service. Its serial frame server and
-# standalone app_main are deliberately not linked into ESP32_A.
+# ESP32_A owns only the OV2640 RGB565 capture service. The standalone camera
+# viewer, serial frame server and app_main are deliberately not included.
 CONFIG_OV7670_SUPPORT=n
 CONFIG_OV7725_SUPPORT=n
 CONFIG_NT99141_SUPPORT=n

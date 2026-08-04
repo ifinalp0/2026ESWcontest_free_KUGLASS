@@ -27,5 +27,5 @@ struct SensorSnapshot {
 };
 
 inline bool timestamp_fresh(uint32_t now_ms, uint32_t timestamp_ms, uint32_t max_age_ms) {
-    return timestamp_ms != 0 && static_cast<uint32_t>(now_ms - timestamp_ms) <= max_age_ms;
+    return static_cast<uint32_t>(now_ms - timestamp_ms) <= max_age_ms;
 }

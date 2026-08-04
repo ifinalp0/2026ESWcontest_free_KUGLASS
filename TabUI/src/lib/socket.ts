@@ -11,14 +11,36 @@ export interface TabUIClient {
   sendCommand: (command: ControlCommand) => void;
 }
 
+function isFourChannelSnapshot(value: unknown): value is SimulationState['channels'] {
+  return Array.isArray(value)
+    && value.length === 4
+    && value.every((channel, index) => (
+      typeof channel === 'object'
+      && channel !== null
+      && (channel as { channel?: unknown }).channel === index
+    ));
+}
+
 function mergeSnapshot(current: SimulationState, snapshot: Partial<SimulationState>): SimulationState {
+  const diagnostics = snapshot.downstreamDiagnostics;
   return {
     ...current,
     ...snapshot,
     environment: { ...current.environment, ...snapshot.environment },
     cameraMetrics: { ...current.cameraMetrics, ...snapshot.cameraMetrics },
+    downstreamDiagnostics: {
+      ...current.downstreamDiagnostics,
+      ...diagnostics,
+      adc: {
+        ...current.downstreamDiagnostics.adc,
+        ...diagnostics?.adc,
+        channels: Array.isArray(diagnostics?.adc?.channels) && diagnostics.adc.channels.length === 4
+          ? diagnostics.adc.channels
+          : current.downstreamDiagnostics.adc.channels
+      }
+    },
     link: { ...current.link, ...snapshot.link },
-    channels: Array.isArray(snapshot.channels) && snapshot.channels.length === 8
+    channels: isFourChannelSnapshot(snapshot.channels)
       ? snapshot.channels
       : current.channels
   };

@@ -4,10 +4,10 @@ ESP32-S3에 장착된 ESP32_B와 Logic Carrier 사이의 GPIO 연결을 디지�
 
 ## 먼저 지킬 안전 조건
 
-- Power Stage, PDLC, +12 V, +24 V 및 고전압 경로를 모두 분리한 상태에서 저전압 GPIO만 측정합니다.
+- CH0~CH3의 단일 채널 Power Stage PCB 네 장, PDLC, +12 V, +24 V 및 고전압 경로를 모두 분리한 상태에서 저전압 GPIO만 측정합니다.
 - Logic Carrier의 J6 +5 V와 DevKit USB 전원을 동시에 공급하지 않습니다.
 - 멀티미터를 DC 전압 모드로 놓고 COM probe를 GND에 연결합니다. J7에서는 모든 짝수 핀이 GND지만, 커넥터 방향과 pin 1 실크를 먼저 확인하십시오.
-- 이 펌웨어는 `ENABLE_CHx`도 시험을 위해 HIGH로 만듭니다. Power Stage가 연결되어 있으면 실제 출력 허가가 될 수 있으므로 반드시 분리해야 합니다.
+- 이 펌웨어는 `ENABLE_CHx`도 시험을 위해 HIGH로 만듭니다. Power Stage PCB가 한 장이라도 연결되어 있으면 해당 채널의 실제 출력 허가가 될 수 있으므로 네 장 모두 반드시 분리해야 합니다.
 - GPIO 출력 HIGH의 예상값은 약 3.3 V, LOW는 약 0 V입니다. 보드 전원과 계측 조건에 따라 실제값은 조금 달라질 수 있습니다.
 
 ## 시험 동작

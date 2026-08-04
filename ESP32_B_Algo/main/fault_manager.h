@@ -5,6 +5,7 @@
 enum class FaultCode : uint8_t {
     NONE = 0,
     COMM_TIMEOUT,
+    INVALID_COMMAND,
     ESTOP,
     POWER_STAGE_FAULT,
 };
@@ -13,6 +14,7 @@ class FaultManager {
 public:
     void begin();
     void note_command(uint32_t now_ms, uint32_t ttl_ms);
+    void reject_command();
     void update(uint32_t now_ms, bool estop_ok, bool power_stages_ok);
     bool clear_if_safe(bool estop_ok, bool power_stages_ok);
     bool faulted() const { return faulted_; }

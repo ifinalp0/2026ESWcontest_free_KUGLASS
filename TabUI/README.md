@@ -8,7 +8,7 @@ TabUI는 KUGLASS의 태블릿 HMI와 ESP32_A USB gateway입니다.
 TabUI backend
   -> USB CDC JSON Lines
 ESP32_A: 카메라·내부온도·정책·CH0~CH3 MI
-  -> ESP32_B_Algo firmware: Logic Carrier를 통한 4채널 Power Stage 제어
+  -> ESP32_B_Algo firmware: Logic Carrier를 통해 단일 채널 Power Stage PCB 4장 제어
 ```
 
 TabUI는 화면 제공, 고수준 명령 검증·변환, ESP32_A telemetry 중계와 replay snapshot을 담당합니다. LIVE 자동 정책과 채널 목표 배열은 ESP32_A가 계산합니다.
@@ -52,6 +52,17 @@ HIL 환경 입력은 내부온도와 카메라 좌/우 포화도·Edge Density�
 - `type=protocol_error`: A 또는 B link 오류
 
 `appliedMi`는 유효한 ESP32_B 상태에서만 갱신합니다. A의 목표값을 실제 적용값으로 대신 표시하지 않습니다.
+
+ESP32_B status는 `v`, `seq`, `boot_id`, `reset_challenge`, `estop`,
+`fault_code`, 정확히 네 채널과 ADC block을 함께 검증합니다. 잘못된 B status는
+UI 상태나 장치 연결 freshness를 갱신하지 않습니다. B UART 통신 상태와 E-Stop/Fault
+같은 operational 상태는 서로 분리해 표시합니다.
+
+ADC의 current/temperature 항목은 Power Stage의 sense 입력입니다. calibration이
+유효하면 mV, 그렇지 않으면 유효 mask가 설정된 raw 값만 표시합니다. 회로의 전류
+환산계수와 NTC 곡선이 확정되기 전에는 이를 A 또는 °C 값으로 변환하지 않습니다.
+`reset_fault` 결과는 B의 `control_result.seq`와 A가 중계한 최종 ACK sequence로
+상관되며, 요청을 UART에 쓴 것만으로 성공으로 표시하지 않습니다.
 
 ## 로컬 개발
 

@@ -1,5 +1,22 @@
-import type { SimulationState } from '../types';
+import type { DownstreamAdc, SimulationState } from '../types';
 import { channelLabels } from './labels';
+
+function defaultDownstreamAdc(): DownstreamAdc {
+  return {
+    initialized: false,
+    currentCalibrated: false,
+    temperatureCalibrated: false,
+    rawValidMask: 0,
+    mvValidMask: 0,
+    channels: channelLabels.map((_, channel) => ({
+      channel,
+      currentRaw: null,
+      temperatureRaw: null,
+      currentMv: null,
+      temperatureMv: null
+    }))
+  };
+}
 
 export const defaultState: SimulationState = {
   schemaVersion: 1,
@@ -31,6 +48,17 @@ export const defaultState: SimulationState = {
     frameId: 0,
     timestamp: 0
   },
+  downstreamDiagnostics: {
+    bootId: null,
+    statusSeq: null,
+    resetChallenge: null,
+    estopActive: null,
+    faultCode: null,
+    diagnostic: null,
+    operationalFault: false,
+    controlResult: null,
+    adc: defaultDownstreamAdc()
+  },
   decisionReason: 'TabUI 백엔드와 ESP32_A 텔레메트리를 기다리는 중입니다.',
   timestamp: 0,
   link: {
@@ -41,8 +69,19 @@ export const defaultState: SimulationState = {
     lastTelemetryAt: null,
     lastCommandSeq: 0,
     lastAckSeq: null,
+    lastAckCommand: null,
+    lastAckOk: null,
     downstreamHealthy: null,
     downstreamError: null,
+    downstreamOperationalFault: false,
+    downstreamBootId: null,
+    downstreamStatusSeq: null,
+    downstreamResetChallenge: null,
+    downstreamEstop: null,
+    downstreamFaultCode: null,
+    downstreamDiagnostic: null,
+    downstreamControlResult: null,
+    downstreamAdc: defaultDownstreamAdc(),
     error: null
   }
 };

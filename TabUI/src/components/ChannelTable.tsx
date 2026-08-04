@@ -1,13 +1,21 @@
 import { channelDisplayName, opticalStateLabels } from '../lib/labels';
-import type { ChannelState } from '../types';
+import type { ChannelState, DownstreamAdc } from '../types';
 
 interface Props {
   channels: ChannelState[];
+  adc: DownstreamAdc;
   selectedChannel: number;
   onSelectChannel: (channel: number) => void;
 }
 
-export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Props) {
+function senseValue(mv: number | null, raw: number | null, calibrated: boolean): string {
+  if (calibrated && mv !== null) {
+    return `${mv} mV`;
+  }
+  return raw === null ? '—' : `RAW ${raw}`;
+}
+
+export function ChannelTable({ channels, adc, selectedChannel, onSelectChannel }: Props) {
   return (
     <section className="panel channel-panel">
       <div className="panel-heading">
@@ -17,6 +25,9 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
             <h2>4채널 상태</h2>
           </div>
         </div>
+        <span className={`panel-state ${adc.initialized ? 'ok' : 'manual'}`}>
+          ADC {adc.initialized ? 'ONLINE' : 'WAIT'}
+        </span>
       </div>
       <div className="channel-table">
         {channels.map((channel) => {
@@ -27,6 +38,13 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
               ? opticalStateLabels[channel.opticalState]
               : 'ESP32_B 상태 대기';
           const displayName = channelDisplayName(channel.name);
+          const sense = adc.channels[channel.channel];
+          const currentSense = sense
+            ? senseValue(sense.currentMv, sense.currentRaw, adc.currentCalibrated)
+            : '—';
+          const temperatureSense = sense
+            ? senseValue(sense.temperatureMv, sense.temperatureRaw, adc.temperatureCalibrated)
+            : '—';
 
           return (
             <button
@@ -34,7 +52,7 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
               type="button"
               className={`channel-row${channel.channel === selectedChannel ? ' selected' : ''}${channel.fault ? ' fault' : ''}`}
               aria-pressed={channel.channel === selectedChannel}
-              aria-label={`CH${channel.channel}, ${displayName}, ${stateLabel}, 적용 MI ${appliedMi === null ? '상태 대기' : `${appliedMi}%`}`}
+              aria-label={`CH${channel.channel}, ${displayName}, ${stateLabel}, 적용 MI ${appliedMi === null ? '상태 대기' : `${appliedMi}%`}, 전류 sense ${currentSense}, 온도 sense ${temperatureSense}`}
               title={`${displayName} · ${stateLabel}`}
               onClick={() => onSelectChannel(channel.channel)}
             >
@@ -46,6 +64,10 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
               <strong className="channel-mi-value">{appliedMi === null ? '—' : <>{appliedMi}<small>%</small></>}</strong>
               <span className="channel-mi-track" aria-hidden="true">
                 <i style={{ width: `${appliedMi ?? 0}%` }} />
+              </span>
+              <span className="channel-sense" aria-label="Power Stage ADC sense 전압 또는 원시값">
+                <small>I SENSE<strong>{currentSense}</strong></small>
+                <small>T SENSE<strong>{temperatureSense}</strong></small>
               </span>
             </button>
           );

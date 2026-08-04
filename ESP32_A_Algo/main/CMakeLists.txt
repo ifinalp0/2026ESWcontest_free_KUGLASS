@@ -1,10 +1,8 @@
-set(KUGLASS_CAMERA_SERVICE_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../ESP_Camera/main"
-)
-
 idf_component_register(
     SRCS
         "app_main.cpp"
+        "camera_recovery.cpp"
+        "camera_service.cpp"
         "protocol.cpp"
         "ui_protocol.cpp"
         "policy_engine.cpp"
@@ -13,15 +11,15 @@ idf_component_register(
         "ds18b20_sensor.cpp"
         "esp32_b_link.cpp"
         "server_console.cpp"
+        "sensor_state.cpp"
         "master_telemetry.cpp"
-        "${KUGLASS_CAMERA_SERVICE_DIR}/camera_service.cpp"
     INCLUDE_DIRS
         "."
-        "${KUGLASS_CAMERA_SERVICE_DIR}"
     PRIV_REQUIRES
         esp_driver_gpio
         esp_driver_uart
         esp_psram
+        esp_system
         esp_timer
 )
 
