@@ -115,12 +115,6 @@ ESP32_A 없이 화면만 개발할 때 명시적으로 MOCK을 선택합니다.
 python3 server.py --transport mock
 ```
 
-Docker는 LIVE 하드웨어 경로가 아니며 선택적인 MOCK 실행에만 남아 있습니다.
-
-```bash
-docker compose up --build
-```
-
 | 변수 | 기본값 | 설명 |
 |---|---:|---|
 | `TABUI_TRANSPORT` | `usb` | MacBook LIVE의 `usb` 또는 명시적 `mock` |

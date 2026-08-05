@@ -45,7 +45,7 @@ flowchart LR
 | 경로 | 역할 |
 | --- | --- |
 | `개발 계획서.md` | 현재 제품 구조와 개발·검증 범위의 기준 |
-| `TabUI/` | 브라우저 HMI, MacBook 로컬 API와 ESP32_A DevKit USB gateway. Docker는 MOCK 전용 선택 사항 |
+| `TabUI/` | 브라우저 HMI, MacBook 로컬 API와 ESP32_A DevKit USB gateway |
 | `ESP32_A_Algo/` | 카메라·내부온도 처리, 정책/MI master, ESP32_B 통신 펌웨어 |
 | `ESP_Camera/` (선택) | standalone 카메라 시험을 보존할 때만 사용하는 레퍼런스. ESP32_A의 빌드·플래시에는 필요하지 않으며 보관이 불필요하면 삭제 가능 |
 | `ESP32_B_Algo/` | ESP32_B에 빌드·플래시할 유일한 기준 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage, TTL/Fault 처리 |
@@ -112,7 +112,7 @@ ADC의 raw/mV 수집·filter·calibration validity telemetry는 구현되었지�
 
 Node.js 22+와 Python 3.11+를 권장합니다.
 
-현재 LIVE 구성은 Docker 외부의 MacBook 백엔드입니다. MacBook과 ESP32_A 사이에는 별도 UART TX/RX 배선을 사용하지 않습니다. 데이터 통신이 가능한 micro-USB 케이블을 ESP32_A DevKit의 USB 단자에 연결하면 macOS에 `/dev/cu.usbmodem*` 장치가 생성되고, TabUI가 단일 장치를 자동 탐색합니다.
+현재 LIVE 구성은 MacBook에서 직접 실행하는 백엔드입니다. MacBook과 ESP32_A 사이에는 별도 UART TX/RX 배선을 사용하지 않습니다. 데이터 통신이 가능한 micro-USB 케이블을 ESP32_A DevKit의 USB 단자에 연결하면 macOS에 `/dev/cu.usbmodem*` 장치가 생성되고, TabUI가 단일 장치를 자동 탐색합니다.
 
 ```bash
 cd TabUI
@@ -142,7 +142,7 @@ cd TabUI
 python3 server.py --transport mock
 ```
 
-Docker는 LIVE USB 연결에 사용하지 않으며, 필요한 경우 하드웨어가 없는 MOCK 화면 개발에만 선택적으로 사용합니다. 현재 서버는 plain HTTP와 인증 없는 시연용 구성이므로 MacBook localhost 또는 신뢰된 격리 LAN의 태블릿에서만 사용하고, 그 밖의 네트워크에 직접 노출하지 않습니다.
+현재 서버는 plain HTTP와 인증 없는 시연용 구성이므로 MacBook localhost 또는 신뢰된 격리 LAN의 태블릿에서만 사용하고, 그 밖의 네트워크에 직접 노출하지 않습니다.
 
 ## ESP32_A 빌드
 
