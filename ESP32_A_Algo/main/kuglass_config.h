@@ -36,10 +36,29 @@ static constexpr uint8_t KUGLASS_TOTAL_CHANNELS = 4;
 static constexpr uint32_t KUGLASS_DEFAULT_TTL_MS = 200;
 static constexpr uint32_t KUGLASS_DOWNSTREAM_TTL_MS = 250;
 static constexpr uint32_t KUGLASS_CONTROL_PERIOD_MS = 50;
+// FreeRTOS priorities are part of the safety/performance contract: target MI
+// calculation and ESP32_B heartbeat always preempt optional camera work.
+static constexpr uint8_t KUGLASS_CONTROL_TASK_PRIORITY = 8;
+static constexpr uint8_t KUGLASS_UI_TASK_PRIORITY = 7;
+static constexpr uint8_t KUGLASS_SENSOR_TASK_PRIORITY = 6;
+static constexpr uint8_t KUGLASS_LINK_TASK_PRIORITY = 5;
+static constexpr uint8_t KUGLASS_CAMERA_TASK_PRIORITY = 4;
+static constexpr uint8_t KUGLASS_CAMERA_TX_TASK_PRIORITY = 3;
+static_assert(KUGLASS_CONTROL_TASK_PRIORITY > KUGLASS_CAMERA_TASK_PRIORITY);
+static_assert(KUGLASS_CAMERA_TASK_PRIORITY > KUGLASS_CAMERA_TX_TASK_PRIORITY);
 static constexpr uint32_t KUGLASS_CAMERA_STALE_MS = 1000;
 static constexpr uint32_t KUGLASS_CAMERA_RETRY_MS = 2000;
 static constexpr uint32_t KUGLASS_CAMERA_RETRY_MAX_MS = 30000;
 static constexpr uint8_t KUGLASS_CAMERA_FAILURES_BEFORE_RESTART = 2;
+static constexpr uint16_t KUGLASS_CAMERA_CAPTURE_WIDTH = 640;
+static constexpr uint16_t KUGLASS_CAMERA_CAPTURE_HEIGHT = 480;
+static constexpr uint32_t KUGLASS_CAMERA_STREAM_INTERVAL_MS = 200;
+static constexpr uint32_t KUGLASS_CAMERA_STREAM_LEASE_MS = 15000;
+static constexpr uint8_t KUGLASS_CAMERA_JPEG_QUALITY = 90;
+// esp32-camera 2.1.7 frame2jpg() has a fixed 128 KiB destination, which can
+// truncate a detailed VGA image. The callback encoder uses this bounded PSRAM
+// allocation instead.
+static constexpr uint32_t KUGLASS_CAMERA_JPEG_MAX_BYTES = 384U * 1024U;
 static constexpr uint32_t KUGLASS_TEMPERATURE_STALE_MS = 5000;
 static constexpr uint32_t KUGLASS_B_STATUS_TIMEOUT_MS = 1000;
 static constexpr uint32_t KUGLASS_B_RESET_TIMEOUT_MS = 1500;

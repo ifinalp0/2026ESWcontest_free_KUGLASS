@@ -28,6 +28,13 @@ int main() {
     assert(command.demo_mode == DemoMode::CAMERA_SATURATION);
 
     assert(parse_ui_command_line(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":121,\"command\":\"camera_stream\","
+        "\"enable\":true,\"ttl_ms\":15000}", &command, &error));
+    assert(command.type == UiCommandType::CAMERA_STREAM);
+    assert(command.enable);
+    assert(command.ttl_ms == 15000U);
+
+    assert(parse_ui_command_line(
         "{\"v\":1,\"type\":\"ui_command\",\"seq\":13,\"command\":\"set_environment\","
         "\"environment\":{\"internal_temp_c\":37.2,\"front_left_saturation\":0.8,"
         "\"edge_density\":null}}", &command, &error));

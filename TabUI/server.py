@@ -9,7 +9,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from backend.gateway import ESP32AGateway
 from backend.protocol import CommandError
@@ -58,7 +58,8 @@ class TabUIHandler(BaseHTTPRequestHandler):
     server: TabUIServer
 
     def do_GET(self) -> None:  # noqa: N802
-        route = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        route = parsed.path
         if route == "/health":
             link = self.server.gateway.link_snapshot()
             self._send_json({
@@ -71,11 +72,38 @@ class TabUIHandler(BaseHTTPRequestHandler):
         if route == "/api/state":
             self._send_json(self.server.gateway.snapshot())
             return
+        if route == "/api/camera/status":
+            self._send_json(self.server.gateway.camera_status())
+            return
+        if route == "/api/camera/frame":
+            after_values = parse_qs(parsed.query).get("after", ["-1"])
+            try:
+                after = int(after_values[0])
+            except ValueError:
+                after = -1
+            frame = self.server.gateway.camera_snapshot()
+            if frame is None or frame.sequence == after:
+                self.send_response(204)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(frame.payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Width", str(frame.width))
+            self.send_header("X-Frame-Height", str(frame.height))
+            self.send_header("X-Frame-Sequence", str(frame.sequence))
+            self.end_headers()
+            self.wfile.write(frame.payload)
+            return
         self._serve_static(route)
 
     def do_HEAD(self) -> None:  # noqa: N802
         route = urlsplit(self.path).path
-        if route in {"/health", "/api/state"}:
+        if route in {"/health", "/api/state", "/api/camera/status"}:
             self._send_json({}, head_only=True)
             return
         self._serve_static(route, head_only=True)

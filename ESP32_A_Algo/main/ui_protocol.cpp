@@ -154,6 +154,8 @@ bool parse_command_name(const char* value, UiCommandType* type) {
         *type = UiCommandType::SET_ENVIRONMENT;
     } else if (std::strcmp(value, "set_channel_fault") == 0) {
         *type = UiCommandType::SET_CHANNEL_FAULT;
+    } else if (std::strcmp(value, "camera_stream") == 0) {
+        *type = UiCommandType::CAMERA_STREAM;
     } else return false;
     return true;
 }
@@ -337,6 +339,9 @@ bool parse_ui_command_line(const char* line, UiCommand* out, UiProtocolError* er
         case UiCommandType::SET_CHANNEL_FAULT:
             if (!require_fields(seen, FIELD_CHANNEL | FIELD_FAULT, error)) return false;
             break;
+        case UiCommandType::CAMERA_STREAM:
+            if (!require_fields(seen, FIELD_ENABLE, error)) return false;
+            break;
         default:
             *error = UiProtocolError::UNSUPPORTED_COMMAND;
             return false;
@@ -368,6 +373,7 @@ const char* ui_command_type_name(UiCommandType type) {
         case UiCommandType::RESET_FAULT: return "reset_fault";
         case UiCommandType::SET_ENVIRONMENT: return "set_environment";
         case UiCommandType::SET_CHANNEL_FAULT: return "set_channel_fault";
+        case UiCommandType::CAMERA_STREAM: return "camera_stream";
         default: return "unknown";
     }
 }

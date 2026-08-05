@@ -46,6 +46,16 @@ class GatewayTests(unittest.TestCase):
         self.gateway.submit({"type": "setEnvironment", "environment": {"internalTemp": 40}})
         self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 40)
 
+    def test_camera_stream_request_is_tracked_without_changing_policy(self) -> None:
+        before = [channel["targetMi"] for channel in self.gateway.snapshot()["channels"]]
+        [sequence] = self.gateway.submit({"type": "setCameraStream", "enabled": True})
+        self.wait_for(lambda: self.gateway.link_snapshot()["lastAckSeq"] == sequence)
+        self.assertTrue(self.gateway.camera_status()["requested"])
+        self.assertEqual(
+            [channel["targetMi"] for channel in self.gateway.snapshot()["channels"]],
+            before,
+        )
+
 
 class DisconnectedTransport:
     mode = "usb"

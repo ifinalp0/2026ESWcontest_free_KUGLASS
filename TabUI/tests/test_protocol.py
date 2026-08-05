@@ -58,6 +58,24 @@ class ProtocolTests(unittest.TestCase):
                 diagnostics_enabled=False,
             )
 
+    def test_camera_stream_command_has_a_bounded_lease(self) -> None:
+        [message] = translate_ui_command(
+            {"type": "setCameraStream", "enabled": True},
+            Sequence().next,
+            diagnostics_enabled=False,
+        )
+        self.assertEqual(message["command"], "camera_stream")
+        self.assertTrue(message["enable"])
+        self.assertEqual(message["ttl_ms"], 15000)
+
+    def test_camera_stream_requires_boolean_enabled(self) -> None:
+        with self.assertRaises(CommandError):
+            translate_ui_command(
+                {"type": "setCameraStream", "enabled": "yes"},
+                Sequence().next,
+                diagnostics_enabled=False,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,236 @@
   text-rendering: optimizeLegibility;
 }
 
+/* On-demand ESP32_A camera viewer. Kept outside the dashboard layout so the
+   existing control panels and responsive grid retain their current geometry. */
+.camera-view-button {
+  position: absolute;
+  z-index: 6;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hyundai-blue-deep) 88%, transparent);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.2);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 800;
+  backdrop-filter: blur(7px);
+}
+
+.camera-view-button:hover:not(:disabled) {
+  background: var(--hyundai-blue);
+}
+
+.camera-view-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.camera-viewer-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(3, 12, 21, 0.74);
+  backdrop-filter: blur(8px);
+}
+
+.camera-viewer-dialog {
+  width: min(820px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background: #0b1219;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  color: #ffffff;
+}
+
+.camera-viewer-heading {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 15px 13px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--hyundai-blue-deep) 78%, #101820);
+}
+
+.camera-viewer-heading h2 {
+  margin-top: 4px;
+  color: #ffffff;
+  font-size: 1.12rem;
+}
+
+.camera-viewer-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9fb6c8;
+  font-family: var(--font-data);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.camera-viewer-heading button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.camera-viewer-heading button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.camera-viewer-stage {
+  position: relative;
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    #05080b;
+  background-size: 22px 22px;
+}
+
+.camera-viewer-stage canvas {
+  display: block;
+  width: min(100%, 640px);
+  aspect-ratio: 4 / 3;
+  background: #020304;
+  image-rendering: auto;
+}
+
+.camera-viewer-waiting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  padding: 30px;
+  background: rgba(5, 8, 11, 0.86);
+  color: #c7d5df;
+  text-align: center;
+}
+
+.camera-viewer-waiting svg {
+  color: var(--ku-green-bright);
+}
+
+.camera-viewer-waiting strong {
+  max-width: 540px;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.camera-viewer-waiting span {
+  color: #8396a5;
+  font-size: 0.68rem;
+}
+
+.camera-viewer-footer {
+  display: flex;
+  min-height: 55px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 17px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0f1820;
+}
+
+.camera-viewer-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #aebdca;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.camera-viewer-footer > span i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d4a653;
+  box-shadow: 0 0 0 4px rgba(212, 166, 83, 0.12);
+}
+
+.camera-viewer-footer > span.live {
+  color: #73d999;
+}
+
+.camera-viewer-footer > span.live i {
+  background: #65d58a;
+  box-shadow: 0 0 0 4px rgba(101, 213, 138, 0.13);
+}
+
+.camera-viewer-footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 13px;
+}
+
+.camera-viewer-footer b {
+  color: #c4d0d9;
+  font-family: var(--font-data);
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+
+.spin {
+  animation: camera-spin 1s linear infinite;
+}
+
+@keyframes camera-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .camera-viewer-backdrop {
+    padding: 10px;
+  }
+
+  .camera-viewer-dialog {
+    border-radius: 13px;
+  }
+
+  .camera-viewer-stage {
+    min-height: 250px;
+  }
+
+  .camera-viewer-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .camera-viewer-footer > div {
+    justify-content: flex-start;
+  }
+}
+
 :root[data-theme="konkuk"] {
   --hyundai-blue: #07532f;
   --hyundai-blue-deep: #043b22;

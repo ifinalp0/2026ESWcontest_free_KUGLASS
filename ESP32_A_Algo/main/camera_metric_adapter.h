@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
-// Converts the ESP32_A-owned RGB565 QVGA frame into the scalar metrics
+// Converts the ESP32_A-owned RGB565 VGA frame into the scalar metrics
 // consumed by the policy engine. RGB565 bytes are big-endian, matching the
 // validated standalone camera reference capture path.
 bool analyze_rgb565_frame(const uint8_t* data,
@@ -15,10 +15,21 @@ bool analyze_rgb565_frame(const uint8_t* data,
                           CameraRoiMetrics* left,
                           CameraRoiMetrics* right);
 
+struct CameraJpegFrame {
+    uint8_t* data = nullptr;
+    size_t size = 0;
+    uint16_t width = 0;
+    uint16_t height = 0;
+};
+
+void release_camera_jpeg_frame(CameraJpegFrame* frame);
+
 class CameraMetricAdapter {
 public:
     bool begin();
-    bool sample(SensorSnapshot* snapshot);
+    // jpeg_frame is optional. Scalar metrics are still produced if JPEG
+    // encoding fails, so video viewing cannot stop the control policy input.
+    bool sample(SensorSnapshot* snapshot, CameraJpegFrame* jpeg_frame = nullptr);
     void stop();
     bool available() const { return available_; }
 

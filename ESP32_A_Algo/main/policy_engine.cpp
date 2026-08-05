@@ -190,6 +190,11 @@ PolicyApplyResult PolicyEngine::apply_command(const UiCommand& command, uint32_t
                     static_cast<uint8_t>(~(1U << command.channel_id));
             }
             return {true, nullptr};
+        case UiCommandType::CAMERA_STREAM:
+            // Streaming is an auxiliary TabUI concern. Accept its sequence
+            // here so the global UI command ordering remains authoritative,
+            // but do not alter policy, channel targets, or sensor overrides.
+            return {true, nullptr};
         default:
             return {false, "UNSUPPORTED_COMMAND"};
     }

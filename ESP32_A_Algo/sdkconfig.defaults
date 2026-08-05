@@ -22,7 +22,7 @@ CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
 CONFIG_CAMERA_PSRAM_DMA=y
 
-# ESP32_A owns only the OV2640 RGB565 capture service. The standalone camera
+# ESP32_A owns only the OV2640 VGA RGB565 capture service. The standalone camera
 # viewer, serial frame server and app_main are deliberately not included.
 CONFIG_OV7670_SUPPORT=n
 CONFIG_OV7725_SUPPORT=n

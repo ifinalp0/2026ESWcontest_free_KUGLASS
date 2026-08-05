@@ -7,7 +7,8 @@ TabUI는 MacBook에서 직접 실행되는 KUGLASS 백엔드와 브라우저 HMI
   -> HTTP /api/command
 MacBook TabUI backend
   -> micro-USB cable
-  -> ESP32_A DevKit USB connector / USB Serial-JTAG CDC / JSON Lines
+  -> ESP32_A DevKit USB connector / USB Serial-JTAG CDC
+     JSON Lines + on-demand KUGLCAM1/JPEG frame multiplexing
 ESP32_A: 카메라·내부온도·정책·CH0~CH3 MI
   -> ESP32_B_Algo firmware: Logic Carrier를 통해 단일 채널 Power Stage PCB 4장 제어
 ```
@@ -20,12 +21,36 @@ TabUI는 화면 제공, 고수준 명령 검증·변환, ESP32_A telemetry 중�
 - 기본, 열부하, 차박, 주차, 카메라 역광 시나리오
 - 채널별 30초 수동 MI와 AUTO 복귀
 - 카메라 좌/우 ROI 포화도, Edge Density와 내부온도 표시
+- `영상 보기` 버튼으로 ESP32_A OV2640 실시간 영상 열기/닫기
 - ESP32_A `targetMi`/`commandedMi`와 ESP32_B `appliedMi` 분리
 - SERVER, ESP32_A와 ESP32_B 연결·stale·Fault 상태 구분
 
 `LIVE` 연결이 끊기면 마지막 실제 값을 유지하고 명령을 막습니다. 브라우저 상태를 MOCK으로 자동 전환하지 않습니다. `MOCK`은 명시적으로 mock transport를 선택했을 때만 사용합니다.
 
 포화 감소율은 원본 카메라 자극과 적용 후 값을 함께 제공하는 MOCK에서만 계산합니다. LIVE는 별도의 baseline capture가 없으면 현재 ROI 포화도만 표시합니다.
+
+## 카메라 영상 보기
+
+정책 근거 패널의 `영상 보기` 버튼을 누르면 ESP32_A가 VGA(640×480) RGB565
+프레임을 품질 90 JPEG로 변환해 최대 약 5 fps로 전송합니다. `ESP_Camera/`에서 검증한
+`KUGLCAM1` 28바이트 header, JPEG marker와 FNV-1a 검사를 참고했지만,
+제품 구현은 `ESP32_A_Algo/`와 TabUI 안에서 완결되며 standalone 프로젝트를
+빌드 입력이나 별도 프로세스로 사용하지 않습니다.
+
+영상과 JSON 텔레메트리는 기존 DevKit USB Serial/JTAG 연결 하나에서 다중화됩니다.
+따라서 외부 UART, 두 번째 USB 케이블 또는 별도 카메라 viewer를 추가하지 않습니다.
+TabUI 수신기는 JSON record와 JPEG frame을 분리하고, 검사가 끝난 최신 JPEG만
+동일 출처 HTTP API로 브라우저에 제공합니다. ESP32_A에서는 JPEG USB 송출을
+별도의 저우선순위 task가 맡아 다음 카메라 분석과 겹쳐 처리하며, 전송 queue가
+차 있으면 추가 JPEG 생성을 건너뜁니다. 목표 MI 계산과 ESP32_B heartbeat가 항상
+영상 처리보다 높은 우선순위입니다.
+
+영상 전송은 버튼을 연 동안에만 요청됩니다. 요청은 15초 lease이며 열린 뷰어가
+10초마다 갱신합니다. 뷰어 종료, 브라우저 이탈 또는 갱신 중단 시 `camera_stream`
+off 명령 또는 lease 만료로 중지됩니다. 영상 인코딩 실패는 카메라 ROI 분석,
+20 Hz 제어 정책 또는 ESP32_B heartbeat를 중단시키지 않습니다.
+
+MOCK에는 실제 카메라 프레임이 없으므로 뷰어의 대기 상태만 확인할 수 있습니다.
 
 ## ESP32_A 명령
 
@@ -36,6 +61,7 @@ TabUI backend는 `v=1`, `type=ui_command`, 단조 증가 `seq`를 갖는 compact
 {"v":1,"type":"ui_command","seq":2,"command":"set_demo","demo_mode":"camping"}
 {"v":1,"type":"ui_command","seq":3,"command":"manual_channel","channel_id":0,"target_mi":0.42,"ttl_ms":30000,"enable":true}
 {"v":1,"type":"ui_command","seq":4,"command":"return_auto","channel_id":0}
+{"v":1,"type":"ui_command","seq":5,"command":"camera_stream","enable":true,"ttl_ms":15000}
 ```
 
 채널은 0~3만 허용합니다. 자동 모드에서는 저수준 `ch` 배열을 생성하지 않습니다.
@@ -134,6 +160,8 @@ python3 server.py --transport mock
 
 - `GET /health`: 서버와 ESP32_A link 상태
 - `GET /api/state`: 전체 UI 상태와 A/B link 상태
+- `GET /api/camera/status`: 영상 요청·최신 프레임·FPS·검사 오류 상태
+- `GET /api/camera/frame?after=<seq>`: 새 프레임이 있을 때만 반환하는 JPEG
 - `POST /api/command`: 고수준 UI 명령
 - `GET /demo`: 태블릿 UI
 

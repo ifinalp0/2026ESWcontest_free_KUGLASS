@@ -25,6 +25,7 @@ enum class UiCommandType : uint8_t {
     RESET_FAULT,
     SET_ENVIRONMENT,
     SET_CHANNEL_FAULT,
+    CAMERA_STREAM,
 };
 
 enum EnvironmentField : uint32_t {

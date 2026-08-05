@@ -6,13 +6,13 @@
 - **ESP32_B의 물리 GPIO, 신호 극성, 전원과 커넥터의 최우선 기준은 `hardware/Logic carrier.pdf`이다.** `hardware/README.md`는 이 회로도를 코드 개발용으로 해설한 문서다. 제품 계획과 회로가 충돌하면 하드웨어 연결은 회로도를 따르고 계획서·README·코드·테스트를 함께 정정한다.
 - 현재 분석 기준 `Logic carrier.pdf` SHA-256은 `c6e7c129e7d5cd66f2e6cc850b9797e58e25d15bd59cb817267279b90fc0fa92`이다. PDF가 바뀌면 핀맵을 추측해 이어서 개발하지 말고 회로를 다시 분석한 뒤 해시와 관련 문서를 갱신한다.
 - 작품은 1:10 차량 모형용 PDLC 4채널 시연 프로토타입이다. 실차 안전 장치나 자율주행 인지 성능 향상 장치로 표현하지 않는다.
-- 입력 센서는 카메라 1대와 DS18B20 내부온도센서 1개만 사용한다.
+- 입력 센서는 카메라 1대와 YwRobot SEN050007 DS18B20 내부온도센서 모듈 1개만 사용한다.
 - 채널 범위는 CH0~CH3이다. 코드, 프로토콜, UI, 테스트와 문서에서 이 범위를 동일하게 유지한다.
 
 ## 런타임 구조
 
 ```text
-카메라 + DS18B20 내부온도센서
+카메라 + YwRobot SEN050007 DS18B20 내부온도센서
   -> ESP32_A: 입력 처리, 정책, LUT, MI servo, CH0~CH3 목표 MI
   -> UART 또는 RS-485 JSON Lines, 20 Hz full frame + 250 ms TTL
 ESP32_B: 명령 검증, 4채널 SPWM, 로컬 Fault/timeout 차단
@@ -65,7 +65,7 @@ MacBook TabUI -> 브라우저
 
 ## 센서와 진단 경계
 
-- production 입력은 카메라 ROI/AE metadata와 DS18B20 내부온도뿐이다.
+- production 입력은 카메라 ROI/AE metadata와 YwRobot SEN050007의 DS18B20 내부온도뿐이다.
 - LIVE에서 태블릿 값으로 카메라, 온도 또는 latched fault를 덮어쓰지 않는다.
 - `set_environment`와 `set_channel_fault`는 TabUI의 명시적 MOCK 또는 양쪽에서 허용된 HIL 빌드에서만 사용한다.
 - 카메라 AE exposure/gain의 단위가 검증되지 않았으면 `ae_metadata_valid=false`로 보고하고 정책 계산에서 해당 항을 제외한다.
@@ -84,8 +84,8 @@ MacBook TabUI -> 브라우저
 ## 하드웨어 경계
 
 - ESP32_A와 TabUI의 production 물리 경로는 `MacBook -> 데이터 micro-USB cable -> ESP32_A DevKit USB connector -> ESP32-S3 USB Serial/JTAG(GPIO19/20)`이다. MacBook과 A 사이에 외부 GPIO UART TX/RX 배선을 추가하지 않는다. macOS에서는 `/dev/cu.usbmodem*` CDC/ACM 장치로 열며 TabUI `usb` transport가 단일 장치를 자동 탐색한다.
-- ESP32_A 보드 기준 핀은 TabUI USB Serial/JTAG(GPIO19/20), B-link UART1 TX/RX(GPIO39/40), 외부전원 DS18B20(GPIO41)이다. TabUI USB 링크와 A↔B UART 링크를 혼동하지 않는다. 이는 아래의 ESP32_B 보드 핀과 별개다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
-- DS18B20 data에는 외부 4.7 kΩ pull-up과 공통 3.3 V/GND가 필요하다. parasite power는 사용하지 않는다.
+- ESP32_A 보드 기준 핀은 TabUI USB Serial/JTAG(GPIO19/20), B-link UART1 TX/RX(GPIO39/40), YwRobot SEN050007 DAT(GPIO41)이다. TabUI USB 링크와 A↔B UART 링크를 혼동하지 않는다. 이는 아래의 ESP32_B 보드 핀과 별개다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
+- YwRobot SEN050007은 3.3 V 외부전원과 공통 GND로 연결하며 parasite power는 사용하지 않는다.
 - ESP32_B/Logic Carrier의 확정 제어 핀은 아래 표와 같다. `ENABLE_CHx`는 MCU→74HC08 입력이고 J7의 `CHx_ENABLE`은 `EN_GLOBAL AND ENABLE_CHx` 결과다.
 
 | 채널 | `PWM_MAG` | `DIR` | MCU `ENABLE` | `FAULT_N` | Current ADC | Temperature ADC |

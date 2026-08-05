@@ -24,6 +24,8 @@ export interface EnvironmentInput {
 }
 
 export interface CameraMetrics {
+  valid?: boolean | null;
+  aeMetadataValid?: boolean | null;
   frontLeftSaturation: number;
   frontRightSaturation: number;
   edgeDensity: number;
@@ -120,6 +122,7 @@ export type ControlCommand =
   | { type: 'setScenario'; demoMode: DemoMode }
   | { type: 'setEnvironment'; environment: Partial<EnvironmentInput> }
   | { type: 'setChannelFault'; channel: number; fault: boolean }
+  | { type: 'setCameraStream'; enabled: boolean }
   | { type: 'resetFault' }
   | { type: 'saveReplay'; name?: string }
   | { type: 'loadReplay'; name: string };

@@ -3,7 +3,7 @@
 ESP32_A는 KUGLASS의 카메라·내부온도 입력과 4채널 목표 MI를 소유하는 ESP-IDF firmware입니다.
 
 ```text
-OV2640 카메라 + DS18B20 내부온도
+OV2640 카메라 + YwRobot SEN050007 DS18B20 내부온도
   -> ESP32_A: ROI 지표·정책·LUT·MI servo
   -> UART1 20 Hz JSON Lines, CH0~CH3 full frame + 250 ms TTL
 ESP32_B
@@ -14,20 +14,45 @@ MacBook에서 직접 실행되는 TabUI backend는 micro-USB 케이블로 ESP32_
 ## 책임
 
 - 카메라 좌/우 ROI 평균 밝기, 포화 비율, highlight 면적과 Edge Density 계산
-- DS18B20 내부온도 측정, CRC·범위·stale 검사
+- YwRobot SEN050007의 DS18B20 내부온도 측정, CRC·범위·stale 검사
 - 상황 모드, privacy, thermal, camera glare 정책
 - LUT와 rate-limited MI servo를 이용한 CH0~CH3 목표 생성
 - 채널별 수동 override TTL과 AUTO 복귀
 - ESP32_B에 20 Hz full-frame heartbeat 전송
 - 카메라·온도 품질, 목표/명령 MI와 ESP32_B 상태를 TabUI로 중계
+- TabUI가 요청한 동안 VGA(640×480) 카메라 프레임을 JPEG로 보조 전송
 
 ## 카메라 통합
 
 ESP32_A가 사용하는 카메라 서비스와 핀 계약은 `main/camera_service.*`, `main/camera_pins.h`가 직접 소유합니다. 카메라 드라이버는 `main/idf_component.yml`과 `dependencies.lock`으로 고정하므로 sibling 프로젝트나 저장소 루트의 파일 없이 이 폴더만으로 구성·빌드·플래시할 수 있습니다.
 
+카메라의 물리 장착 방향은 OV2640 초기화 직후 센서의 horizontal mirror와
+vertical flip을 함께 설정해 180° 보정합니다. 따라서 센서에서 받은 RGB565 원본이
+이미 정방향이며, 좌·우 ROI 계산과 TabUI JPEG 영상 전송은 같은 보정 프레임을
+사용합니다. 방향 설정에 실패하면 잘못된 영상으로 계산하지 않고 카메라 시작을
+실패 처리한 뒤 기존 복구 backoff로 재초기화합니다.
+
 깨끗한 개발 환경의 최초 빌드에는 ESP-IDF 6.0.2와 Espressif Component Registry 접속 또는 이미 채워진 component cache가 필요합니다. 생성되는 `managed_components/`는 로컬 빌드 산출물이며 `ESP_Camera/`를 대체하거나 참조하지 않습니다.
 
 선택적인 standalone 카메라 시험 프로젝트는 ESP32_A firmware의 일부가 아닙니다. 해당 프로젝트의 `app_main`, serial frame server, viewer, partition 설정이나 빌드 캐시는 사용하지 않으며 그 폴더가 삭제되어도 ESP32_A에는 영향이 없습니다.
+
+TabUI 영상 보기는 standalone `ESP_Camera`에서 검증된 RGB565 byte order와
+`KUGLCAM1` 28바이트 header/FNV-1a 검사 계약을 참고해 ESP32_A 내부에 독립적으로
+구현합니다. 캡처는 VGA(640×480), 소프트웨어 JPEG 품질은 90입니다. 드라이버의
+고정 128 KiB `frame2jpg()` 버퍼 대신 최대 384 KiB의 bounded callback encoder를
+사용해 디테일이 많은 VGA 프레임의 잘림을 방지합니다. JSON Lines와 JPEG는 DevKit
+USB Serial/JTAG 링크에서 다중화하며 GPIO43/44 UART나 별도 viewer process를
+사용하지 않습니다. 영상은 200 ms 간격의 on-demand 보조 경로이고, 15초 lease가
+만료되면 자동 중지됩니다. JPEG 전송은 길이 1의 전용 queue와 낮은 우선순위의
+`camera_tx` task가 처리하므로 카메라 분석과 USB 송출을 겹쳐 실행합니다. 이전
+프레임이 아직 대기 중이면 새 JPEG 인코딩을 시작하지 않아 선택적인 영상이 CPU와
+PSRAM을 계속 소비하지 않게 합니다. JPEG queue 할당이나 송출 task 생성이
+실패해도 영상만 비활성화하고 scalar camera metric과 20 Hz control task는 계속
+실행됩니다.
+
+FreeRTOS 우선순위는 `policy_20hz=8`, `tabui_rx=7`, 센서=6, B 수신/telemetry=5,
+`camera=4`, `camera_tx=3` 순서입니다. 따라서 목표 MI 계산과 ESP32_B 20 Hz
+heartbeat가 VGA JPEG 인코딩 및 USB 송출을 항상 선점합니다.
 
 카메라와 DS18B20은 별도 FreeRTOS task에서 실행됩니다. 따라서 카메라 프레임 대기가 지연되어도 온도 수집과 20 Hz 제어 heartbeat는 계속 실행됩니다. 카메라는 두 번 연속 capture에 실패하면 deinit하며, 2초부터 최대 30초까지 증가하는 backoff로 자동 재초기화합니다. 프레임 시각은 드라이버가 기록한 실제 capture timestamp를 사용하고 1초가 지나면 invalid로 전환합니다.
 
@@ -40,10 +65,10 @@ ESP32_A가 사용하는 카메라 서비스와 핀 계약은 `main/camera_servic
 | MacBook TabUI backend | DevKit USB 단자 / USB Serial/JTAG GPIO19/20 | micro-USB cable, macOS `/dev/cu.usbmodem*` | JSON Lines |
 | ESP32_B TX | GPIO39 / UART1 TX | ESP32_B RX | 115200 8-N-1 |
 | ESP32_B RX | GPIO40 / UART1 RX | ESP32_B TX | 115200 8-N-1 |
-| 내부온도 | GPIO41 | DS18B20 DQ | 3.3 V, 외부 4.7 kΩ pull-up |
+| 내부온도 | GPIO41 | YwRobot SEN050007 DAT | 3.3 V 전원, 공통 GND |
 | 카메라 | GPIO4~18 | OV2640 | `main/camera_pins.h` 내부 핀 계약 준수 |
 
-ESP32_A와 ESP32_B는 GND를 공유해야 합니다. DS18B20은 외부전원 방식만 사용하며 parasite power를 지원하지 않습니다.
+ESP32_A와 ESP32_B는 GND를 공유해야 합니다. YwRobot SEN050007은 3.3 V 외부전원 방식으로 연결하며 parasite power를 지원하지 않습니다.
 
 카메라 상세 핀은 ESP32_A 내부 compile-time 계약으로 검사합니다.
 
@@ -103,6 +128,7 @@ ESP32_A와 ESP32_B는 GND를 공유해야 합니다. DS18B20은 외부전원 방
 {"v":1,"type":"ui_command","seq":102,"command":"set_demo","demo_mode":"hot_summer"}
 {"v":1,"type":"ui_command","seq":103,"command":"manual_channel","channel_id":2,"target_mi":0.42,"ttl_ms":30000,"enable":true}
 {"v":1,"type":"ui_command","seq":104,"command":"return_auto","channel_id":2}
+{"v":1,"type":"ui_command","seq":105,"command":"camera_stream","enable":true,"ttl_ms":15000}
 ```
 
 지원 명령:
@@ -114,6 +140,7 @@ ESP32_A와 ESP32_B는 GND를 공유해야 합니다. DS18B20은 외부전원 방
 - `reset_fault`: 최신 B `boot_id`/`reset_challenge`를 사용해 전달하며, B가 같은
   boot/source/sequence를 포함한 `control_result`를 보낸 뒤에만 최종 ACK
 - `set_environment`, `set_channel_fault`: 명시적 HIL firmware 전용
+- `camera_stream`: `enable`과 최대 15초 lease로 TabUI JPEG 영상 전송 시작/중지
 
 HIL 환경 입력은 `internal_temp_c`, `front_left_saturation`, `front_right_saturation`, `edge_density`만 허용합니다. production 기본값인 `KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=0`에서는 환경·fault 주입을 거부합니다.
 
@@ -194,7 +221,10 @@ idf.py -D KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1 build
 sh host_tests/run_tests.sh
 ```
 
-Host test는 카메라/A USB console/A↔B UART/DS18B20 핀 충돌, 카메라 복구 backoff, timestamp wrap/stale 경계, 센서별 상태 병합, 4채널 protocol, UI command parser, policy, RGB565 byte order와 ROI, DS18B20 CRC, B status, JSON line accumulator와 master telemetry를 검사합니다.
+Host test는 카메라/A USB console/A↔B UART/DS18B20 핀 충돌, OV2640 입력의 180°
+방향 설정, 카메라 복구 backoff, timestamp wrap/stale 경계, 센서별 상태 병합,
+4채널 protocol, UI command parser, policy, RGB565 byte order와 ROI, DS18B20 CRC,
+B status, JSON line accumulator와 master telemetry를 검사합니다.
 
 또한 프로젝트 독립성 검사는 빌드 입력의 sibling 경로 참조, 외부 symlink, 내부 카메라 서비스 누락과 카메라 드라이버 version pin 누락을 거부합니다.
 
@@ -203,6 +233,9 @@ HIL에서는 다음을 확인합니다.
 - 카메라 응답을 끊어도 DS18B20 timestamp와 A→B 20 Hz heartbeat가 계속 갱신되는지
 - 마지막 정상 frame 이후 1초 안에 `camera_valid=false`가 되는지
 - 카메라 재연결 후 ESP32_A 재부팅 없이 frame과 telemetry가 복구되는지
+- 실제 촬영 대상의 위·아래와 좌·우가 ROI telemetry와 TabUI 영상에서 모두
+  180° 보정된 같은 방향으로 보이는지
 - DevKit USB Serial/JTAG CDC, A↔B UART, 수동 TTL, stale sequence와 A→B timeout
 - `target_mi`, `commanded_mi`, ESP32_B의 `applied_mi`가 구분되는지
+- 영상 보기를 연 상태에서도 A→B heartbeat가 20 Hz를 유지하고 timeout이 없는지
 - 각 task의 stack high-water와 20 Hz control jitter가 안전한 범위인지

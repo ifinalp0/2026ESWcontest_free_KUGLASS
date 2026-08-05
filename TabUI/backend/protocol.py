@@ -114,6 +114,15 @@ def translate_ui_command(
             "channel_id": _channel(payload.get("channel")),
             "fault": bool(payload.get("fault", True)),
         }]
+    elif command_type == "setCameraStream":
+        enabled = payload.get("enabled")
+        if not isinstance(enabled, bool):
+            raise CommandError("enabled must be a boolean")
+        commands = [{
+            "command": "camera_stream",
+            "enable": enabled,
+            "ttl_ms": 15000,
+        }]
     elif command_type in {"saveReplay", "loadReplay"}:
         raise CommandError(f"{command_type} is handled by the TabUI backend", 500)
     else:

@@ -6,6 +6,7 @@ import threading
 import time
 from typing import Any
 
+from .camera import CameraFrame, CameraFrameStore
 from .protocol import CommandError, translate_ui_command
 from .state import StateStore
 from .transport import AUTO_USB_PORT, MockTransport, Transport, UsbCdcTransport
@@ -26,6 +27,7 @@ class ESP32AGateway:
         self.telemetry_timeout_seconds = telemetry_timeout_seconds
         self.manual_command_interval_seconds = max(0.05, float(manual_command_interval_seconds))
         self.state = StateStore()
+        self.camera = CameraFrameStore()
         self._outbox: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=128)
         seed = int(time.time() * 1000.0) if sequence_seed is None else int(sequence_seed)
         self._seq = seed & 0xFFFFFFFF or 1
@@ -38,6 +40,8 @@ class ESP32AGateway:
         self._last_telemetry_at: float | None = None
         self._last_command_seq = 0
         self._gateway_error: str | None = None
+        self._camera_stream_requested = False
+        self._camera_lock = threading.Lock()
 
     @classmethod
     def create(
@@ -101,6 +105,12 @@ class ESP32AGateway:
                             self._pending_manual.pop(int(channel_id), None)
                     self._outbox.put_nowait(message)
                 self._last_command_seq = int(message["seq"])
+        if payload.get("type") == "setCameraStream":
+            enabled = bool(payload.get("enabled"))
+            with self._camera_lock:
+                self._camera_stream_requested = enabled
+            if enabled:
+                self.camera.clear()
         return [int(message["seq"]) for message in messages]
 
     def snapshot(self) -> dict[str, Any]:
@@ -135,6 +145,18 @@ class ESP32AGateway:
             "downstreamAdc": downstream["adc"],
             "error": self.state.last_device_error or self._gateway_error or self.transport.error,
         }
+
+    def camera_snapshot(self) -> CameraFrame | None:
+        return self.camera.snapshot()
+
+    def camera_status(self) -> dict[str, object]:
+        with self._camera_lock:
+            requested = self._camera_stream_requested
+        bad_frames = int(getattr(self.transport, "bad_camera_frames", 0))
+        status = self.camera.status(requested=requested, bad_frames=bad_frames)
+        status["hardwareConnected"] = self._hardware_connected()
+        status["transport"] = self.transport.mode
+        return status
 
     def _next_seq(self) -> int:
         with self._seq_lock:
@@ -194,6 +216,10 @@ class ESP32AGateway:
                 if record.get("type") in {"state", "status", "telemetry", "sensor", "sensors", "camera"}:
                     self._last_telemetry_at = time.monotonic()
                 self._gateway_error = None
+        read_camera_frames = getattr(self.transport, "read_camera_frames", None)
+        if callable(read_camera_frames):
+            for frame in read_camera_frames():
+                self.camera.update(frame)
 
     def _hardware_connected(self, now: float | None = None) -> bool:
         if not self.transport.connected:

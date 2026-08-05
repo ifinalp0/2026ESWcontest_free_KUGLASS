@@ -34,6 +34,7 @@ PolicyEngine g_policy;
 
 #ifdef ESP_PLATFORM
 QueueHandle_t g_command_queue = nullptr;
+QueueHandle_t g_camera_tx_queue = nullptr;
 SemaphoreHandle_t g_state_mutex = nullptr;
 EventGroupHandle_t g_task_start_event = nullptr;
 SensorSnapshot g_physical_sensors;
@@ -42,10 +43,17 @@ PolicyDecision g_last_decision;
 bool g_decision_valid = false;
 bool g_camera_available = false;
 bool g_temperature_available = false;
+bool g_camera_stream_enabled = false;
+uint32_t g_camera_stream_expires_ms = 0;
 char g_telemetry_line[4096];
 uint32_t g_source_session_id = 0;
 
 constexpr EventBits_t kTaskStartBit = BIT0;
+
+struct CameraTxItem {
+    uint32_t sequence = 0;
+    CameraJpegFrame jpeg;
+};
 
 uint32_t millis_now() {
     return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
@@ -83,6 +91,14 @@ void release_startup_objects() {
         vQueueDelete(g_command_queue);
         g_command_queue = nullptr;
     }
+    if (g_camera_tx_queue != nullptr) {
+        CameraTxItem pending;
+        while (xQueueReceive(g_camera_tx_queue, &pending, 0) == pdTRUE) {
+            release_camera_jpeg_frame(&pending.jpeg);
+        }
+        vQueueDelete(g_camera_tx_queue);
+        g_camera_tx_queue = nullptr;
+    }
 }
 
 SensorSnapshot copy_physical_sensors(uint32_t now_ms) {
@@ -107,6 +123,51 @@ void invalidate_camera_sample() {
     xSemaphoreTake(g_state_mutex, portMAX_DELAY);
     invalidate_camera_sample_state(&g_physical_sensors);
     xSemaphoreGive(g_state_mutex);
+}
+
+void discard_pending_camera_frame() {
+    if (g_camera_tx_queue == nullptr) return;
+    CameraTxItem pending;
+    while (xQueueReceive(g_camera_tx_queue, &pending, 0) == pdTRUE) {
+        release_camera_jpeg_frame(&pending.jpeg);
+    }
+}
+
+bool camera_tx_queue_has_capacity() {
+    return g_camera_tx_queue != nullptr &&
+           uxQueueSpacesAvailable(g_camera_tx_queue) > 0U;
+}
+
+bool queue_camera_frame(uint32_t sequence, CameraJpegFrame* jpeg) {
+    if (g_camera_tx_queue == nullptr || jpeg == nullptr || jpeg->data == nullptr) {
+        return false;
+    }
+    CameraTxItem item;
+    item.sequence = sequence;
+    item.jpeg = *jpeg;
+    if (xQueueSend(g_camera_tx_queue, &item, 0) != pdTRUE) return false;
+    *jpeg = CameraJpegFrame{};
+    return true;
+}
+
+void set_camera_stream(bool enabled, uint32_t now_ms, uint32_t ttl_ms) {
+    xSemaphoreTake(g_state_mutex, portMAX_DELAY);
+    g_camera_stream_enabled = enabled;
+    g_camera_stream_expires_ms = enabled ? now_ms + ttl_ms : 0U;
+    xSemaphoreGive(g_state_mutex);
+    if (!enabled) discard_pending_camera_frame();
+}
+
+bool camera_stream_active(uint32_t now_ms) {
+    xSemaphoreTake(g_state_mutex, portMAX_DELAY);
+    if (g_camera_stream_enabled &&
+        static_cast<int32_t>(now_ms - g_camera_stream_expires_ms) >= 0) {
+        g_camera_stream_enabled = false;
+        g_camera_stream_expires_ms = 0U;
+    }
+    const bool active = g_camera_stream_enabled;
+    xSemaphoreGive(g_state_mutex);
+    return active;
 }
 
 void publish_temperature_sample(float temperature_c, uint32_t timestamp_ms) {
@@ -182,6 +243,26 @@ void ui_rx_task(void*) {
     }
 }
 
+void camera_tx_task(void*) {
+    wait_for_task_start();
+    while (true) {
+        CameraTxItem item;
+        if (xQueueReceive(g_camera_tx_queue, &item, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+        // Video is optional. Expired/closed stream frames are discarded, and
+        // this low-priority task can never preempt MI calculation or B output.
+        if (camera_stream_active(millis_now())) {
+            (void)server_console_send_camera_frame(item.sequence,
+                                                   item.jpeg.width,
+                                                   item.jpeg.height,
+                                                   item.jpeg.data,
+                                                   item.jpeg.size);
+        }
+        release_camera_jpeg_frame(&item.jpeg);
+    }
+}
+
 void camera_task(void*) {
     wait_for_task_start();
     CameraRecoveryState recovery(KUGLASS_CAMERA_RETRY_MS,
@@ -189,6 +270,7 @@ void camera_task(void*) {
                                  KUGLASS_CAMERA_FAILURES_BEFORE_RESTART);
     bool availability_reported = false;
     bool last_reported_availability = false;
+    uint32_t last_stream_ms = 0;
     const auto report_if_changed = [&](bool available) {
         if (!availability_reported || available != last_reported_availability) {
             report_sensor_availability(true, available);
@@ -211,17 +293,26 @@ void camera_task(void*) {
             continue;
         }
 
+        const bool stream_due = camera_stream_active(now_ms) &&
+            camera_tx_queue_has_capacity() &&
+            (last_stream_ms == 0U ||
+             static_cast<uint32_t>(now_ms - last_stream_ms) >=
+                 KUGLASS_CAMERA_STREAM_INTERVAL_MS);
         SensorSnapshot sample;
-        const bool captured = g_camera.sample(&sample);
+        CameraJpegFrame jpeg;
+        const bool captured = g_camera.sample(&sample, stream_due ? &jpeg : nullptr);
         const uint32_t completed_ms = millis_now();
         const bool fresh_capture = captured &&
             timestamp_fresh(completed_ms, sample.camera_timestamp_ms,
                             KUGLASS_CAMERA_STALE_MS);
+        if (stream_due) last_stream_ms = completed_ms;
         if (fresh_capture) {
             publish_camera_sample(sample);
+            (void)queue_camera_frame(sample.camera_frame_id, &jpeg);
         } else {
             invalidate_camera_sample();
         }
+        release_camera_jpeg_frame(&jpeg);
         if (recovery.note_capture_result(captured, completed_ms)) {
             g_camera.stop();
             report_if_changed(false);
@@ -274,6 +365,12 @@ void control_task(void*) {
         while (xQueueReceive(g_command_queue, &command, 0) == pdTRUE) {
             PolicyApplyResult result = g_policy.apply_command(command, now_ms);
             bool defer_ack = false;
+            if (result.accepted && command.type == UiCommandType::CAMERA_STREAM) {
+                const uint32_t lease_ms = command.ttl_ms == 0U
+                                              ? KUGLASS_CAMERA_STREAM_LEASE_MS
+                                              : command.ttl_ms;
+                set_camera_stream(command.enable, now_ms, lease_ms);
+            }
             if (result.accepted && command.type == UiCommandType::RESET_FAULT) {
 #if KUGLASS_B_SUPPORTS_RESET_FAULT
                 ResetFaultRequest request;
@@ -388,6 +485,7 @@ extern "C" void app_main(void) {
         return;
     }
     g_command_queue = xQueueCreate(16, sizeof(UiCommand));
+    g_camera_tx_queue = xQueueCreate(1, sizeof(CameraTxItem));
     g_state_mutex = xSemaphoreCreateMutex();
     g_task_start_event = xEventGroupCreate();
     if (g_command_queue == nullptr || g_state_mutex == nullptr ||
@@ -397,7 +495,11 @@ extern "C" void app_main(void) {
         return;
     }
 
-    TaskHandle_t task_handles[6] = {};
+    if (g_camera_tx_queue == nullptr) {
+        ESP_LOGW("kuglass_a", "Camera video disabled: TX queue allocation failed");
+    }
+
+    TaskHandle_t task_handles[7] = {};
     size_t task_count = 0;
     const auto create_task = [&](TaskFunction_t function,
                                  const char* name,
@@ -413,12 +515,18 @@ extern "C" void app_main(void) {
     };
 
     const bool tasks_created =
-        create_task(control_task, "policy_20hz", 6144, 8) &&
-        create_task(ui_rx_task, "tabui_rx", 6144, 7) &&
-        create_task(downstream_rx_task, "esp32_b_rx", 4096, 5) &&
-        create_task(telemetry_task, "state_tx", 6144, 5) &&
-        create_task(temperature_task, "temperature", 4096, 6) &&
-        create_task(camera_task, "camera", 8192, 6);
+        create_task(control_task, "policy_20hz", 6144,
+                    KUGLASS_CONTROL_TASK_PRIORITY) &&
+        create_task(ui_rx_task, "tabui_rx", 6144,
+                    KUGLASS_UI_TASK_PRIORITY) &&
+        create_task(downstream_rx_task, "esp32_b_rx", 4096,
+                    KUGLASS_LINK_TASK_PRIORITY) &&
+        create_task(telemetry_task, "state_tx", 6144,
+                    KUGLASS_LINK_TASK_PRIORITY) &&
+        create_task(temperature_task, "temperature", 4096,
+                    KUGLASS_SENSOR_TASK_PRIORITY) &&
+        create_task(camera_task, "camera", 8192,
+                    KUGLASS_CAMERA_TASK_PRIORITY);
     if (!tasks_created) {
         server_console_send_protocol_error("esp32_a", "TASK_CREATION_FAILED");
         for (size_t i = 0; i < task_count; ++i) {
@@ -426,6 +534,15 @@ extern "C" void app_main(void) {
         }
         release_startup_objects();
         return;
+    }
+    if (g_camera_tx_queue != nullptr &&
+        !create_task(camera_tx_task, "camera_tx", 4096,
+                     KUGLASS_CAMERA_TX_TASK_PRIORITY)) {
+        // Optional video must never prevent the MI/control application from
+        // starting. The camera task will continue scalar metric sampling.
+        vQueueDelete(g_camera_tx_queue);
+        g_camera_tx_queue = nullptr;
+        ESP_LOGW("kuglass_a", "Camera video disabled: TX task creation failed");
     }
 
     g_source_session_id = nonzero_random_id();

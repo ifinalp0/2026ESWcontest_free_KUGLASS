@@ -41,6 +41,8 @@ export const defaultState: SimulationState = {
     manualUntil: null
   })),
   cameraMetrics: {
+    valid: null,
+    aeMetadataValid: null,
     frontLeftSaturation: 0.08,
     frontRightSaturation: 0.07,
     edgeDensity: 0.86,

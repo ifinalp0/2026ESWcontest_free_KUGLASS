@@ -20,6 +20,10 @@ $CXX $CXXFLAGS \
     "$PROJECT_DIR/host_tests/test_camera_pin_contract.cpp" \
     -o "$TEST_BUILD_DIR/test_camera_pin_contract"
 
+$CXX $CXXFLAGS \
+    "$PROJECT_DIR/host_tests/test_camera_orientation.cpp" \
+    -o "$TEST_BUILD_DIR/test_camera_orientation"
+
 for INVALID_CAMERA_DEFINE in \
     KUGLASS_B_UART_TX_GPIO=4 \
     KUGLASS_B_UART_TX_GPIO=19 \
@@ -39,6 +43,10 @@ $CXX $CXXFLAGS \
     "$PROJECT_DIR/main/camera_recovery.cpp" \
     "$PROJECT_DIR/host_tests/test_camera_recovery.cpp" \
     -o "$TEST_BUILD_DIR/test_camera_recovery"
+
+$CXX $CXXFLAGS \
+    "$PROJECT_DIR/host_tests/test_task_priorities.cpp" \
+    -o "$TEST_BUILD_DIR/test_task_priorities"
 
 $CXX $CXXFLAGS \
     "$PROJECT_DIR/main/protocol.cpp" \
@@ -102,7 +110,9 @@ $CXX $CXXFLAGS \
 "$TEST_BUILD_DIR/test_camera_pins"
 "$TEST_BUILD_DIR/test_camera_pin_contract"
 echo "camera pin contract ok"
+"$TEST_BUILD_DIR/test_camera_orientation"
 "$TEST_BUILD_DIR/test_camera_recovery"
+"$TEST_BUILD_DIR/test_task_priorities"
 "$TEST_BUILD_DIR/test_protocol"
 "$TEST_BUILD_DIR/test_ui_protocol"
 "$TEST_BUILD_DIR/test_policy"

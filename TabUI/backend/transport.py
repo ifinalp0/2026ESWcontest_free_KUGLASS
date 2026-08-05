@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import copy
 import json
+import struct
 import threading
 import time
 from collections import deque
 from typing import Any, Iterable, Protocol
 
+from .camera import (
+    CAMERA_FORMAT_JPEG,
+    CAMERA_MAGIC,
+    CAMERA_MAX_PAYLOAD,
+    CameraFrame,
+    fnv1a,
+)
 from .state import clamp, default_state, estimated_transmittance, optical_state
 
 
@@ -25,6 +33,7 @@ class Transport(Protocol):
 
 AUTO_USB_PORT = "auto"
 USB_CDC_LINE_CODING_BAUD = 115200
+CAMERA_HEADER = struct.Struct("<8sIHHB3xII")
 
 
 def discover_esp32_usb_ports(port_infos: Iterable[Any] | None = None) -> list[str]:
@@ -80,6 +89,8 @@ class UsbCdcTransport:
         self._lock = threading.RLock()
         self._rx_buffer = bytearray()
         self._discarding_oversize_line = False
+        self._camera_frames: deque[CameraFrame] = deque(maxlen=2)
+        self._bad_camera_frames = 0
 
     def write_line(self, line: str) -> None:
         with self._lock:
@@ -117,6 +128,18 @@ class UsbCdcTransport:
             self.connected = False
             self._rx_buffer.clear()
             self._discarding_oversize_line = False
+            self._camera_frames.clear()
+
+    def read_camera_frames(self) -> list[CameraFrame]:
+        with self._lock:
+            frames = list(self._camera_frames)
+            self._camera_frames.clear()
+            return frames
+
+    @property
+    def bad_camera_frames(self) -> int:
+        with self._lock:
+            return self._bad_camera_frames
 
     def _ensure_open(self) -> bool:
         if self._serial is not None and getattr(self._serial, "is_open", False):
@@ -174,11 +197,63 @@ class UsbCdcTransport:
         self.error = error
         self._rx_buffer.clear()
         self._discarding_oversize_line = False
+        self._camera_frames.clear()
 
     def _extract_complete_lines(self) -> list[str]:
         lines: list[str] = []
         while True:
+            marker = self._rx_buffer.find(CAMERA_MAGIC)
             newline = self._rx_buffer.find(b"\n")
+
+            if marker == 0:
+                if len(self._rx_buffer) < CAMERA_HEADER.size:
+                    return lines
+                (
+                    _magic,
+                    sequence,
+                    width,
+                    height,
+                    pixel_format,
+                    payload_size,
+                    expected_hash,
+                ) = CAMERA_HEADER.unpack_from(self._rx_buffer)
+                valid_header = (
+                    1 <= width <= 1024
+                    and 1 <= height <= 1024
+                    and pixel_format == CAMERA_FORMAT_JPEG
+                    and 4 <= payload_size <= CAMERA_MAX_PAYLOAD
+                )
+                if not valid_header:
+                    del self._rx_buffer[0]
+                    self._bad_camera_frames += 1
+                    continue
+                frame_size = CAMERA_HEADER.size + payload_size
+                if len(self._rx_buffer) < frame_size:
+                    return lines
+                payload = bytes(self._rx_buffer[CAMERA_HEADER.size:frame_size])
+                valid_jpeg = payload.startswith(b"\xff\xd8") and payload.endswith(b"\xff\xd9")
+                if not valid_jpeg or fnv1a(payload) != expected_hash:
+                    del self._rx_buffer[0]
+                    self._bad_camera_frames += 1
+                    continue
+                del self._rx_buffer[:frame_size]
+                self._camera_frames.append(CameraFrame(
+                    sequence=sequence,
+                    width=width,
+                    height=height,
+                    payload=payload,
+                    received_at=time.monotonic(),
+                ))
+                self._discarding_oversize_line = False
+                continue
+
+            if marker > 0 and (newline < 0 or marker < newline):
+                # ROM/log noise can appear around resets. A complete camera
+                # marker is an unambiguous resynchronization point.
+                del self._rx_buffer[:marker]
+                self._discarding_oversize_line = False
+                continue
+
             if newline < 0:
                 if len(self._rx_buffer) > self.max_line_bytes:
                     self._rx_buffer.clear()
@@ -269,6 +344,13 @@ class MockTransport:
     def close(self) -> None:
         return
 
+    def read_camera_frames(self) -> list[CameraFrame]:
+        return []
+
+    @property
+    def bad_camera_frames(self) -> int:
+        return 0
+
     def _apply_command(self, record: dict[str, Any]) -> None:
         command = record.get("command")
         if command == "set_mode":
@@ -327,6 +409,10 @@ class MockTransport:
                 if key in aliases:
                     self._state["environment"][aliases[key]] = value
             self._state["decisionReason"] = "MOCK/HIL 환경 override를 ESP32_A 입력으로 적용했습니다."
+        elif command == "camera_stream":
+            # MOCK has no physical image source. It still acknowledges the
+            # command so the viewer can exercise its waiting/error UI.
+            return
 
     def _set_scenario(self, demo_mode: str) -> None:
         self._state["demoMode"] = demo_mode

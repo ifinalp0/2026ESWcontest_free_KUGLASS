@@ -1,6 +1,8 @@
 #include "camera_service.h"
 
+#include "camera_orientation.h"
 #include "camera_pins.h"
+#include "kuglass_config.h"
 
 #include "esp_camera.h"
 #include "esp_log.h"
@@ -14,6 +16,20 @@ constexpr unsigned kInitialCaptureAttempts = 5;
 constexpr TickType_t kInitialCaptureSettleDelay = pdMS_TO_TICKS(500);
 constexpr TickType_t kInitialCaptureRetryDelay = pdMS_TO_TICKS(250);
 bool g_started = false;
+
+const char* orientation_error_name(CameraOrientationResult result) {
+    switch (result) {
+        case CameraOrientationResult::OK:
+            return "OK";
+        case CameraOrientationResult::UNSUPPORTED:
+            return "UNSUPPORTED";
+        case CameraOrientationResult::HORIZONTAL_MIRROR_FAILED:
+            return "HORIZONTAL_MIRROR_FAILED";
+        case CameraOrientationResult::VERTICAL_FLIP_FAILED:
+            return "VERTICAL_FLIP_FAILED";
+    }
+    return "UNKNOWN";
+}
 
 camera_config_t make_camera_config() {
     camera_config_t config = {};
@@ -35,7 +51,7 @@ camera_config_t make_camera_config() {
     config.pin_pclk = camera_pins::kPclk;
     config.xclk_freq_hz = camera_pins::kXclkFrequencyHz;
     config.pixel_format = PIXFORMAT_RGB565;
-    config.frame_size = FRAMESIZE_QVGA;
+    config.frame_size = FRAMESIZE_VGA;
     config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_PSRAM;
     config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -74,6 +90,19 @@ esp_err_t camera_service_start() {
         return err;
     }
 
+    // Correct the physical mounting orientation inside the OV2640. Every
+    // captured RGB565 frame is therefore upright before ROI analysis or the
+    // RGB565-to-JPEG path used by TabUI sees it.
+    const CameraOrientationResult orientation =
+        apply_camera_capture_orientation(sensor);
+    if (orientation != CameraOrientationResult::OK) {
+        ESP_LOGE(kTag, "Failed to rotate camera capture by 180 degrees: %s",
+                 orientation_error_name(orientation));
+        esp_camera_deinit();
+        return ESP_FAIL;
+    }
+    ESP_LOGI(kTag, "Capture orientation corrected by 180 degrees in OV2640");
+
     vTaskDelay(kInitialCaptureSettleDelay);
     camera_fb_t* frame = nullptr;
     for (unsigned attempt = 1; attempt <= kInitialCaptureAttempts; ++attempt) {
@@ -91,15 +120,17 @@ esp_err_t camera_service_start() {
     }
 
     const bool expected_frame = frame->format == PIXFORMAT_RGB565 &&
-                                frame->width == 320U && frame->height == 240U &&
-                                frame->len == 320U * 240U * 2U;
+        frame->width == KUGLASS_CAMERA_CAPTURE_WIDTH &&
+        frame->height == KUGLASS_CAMERA_CAPTURE_HEIGHT &&
+        frame->len == static_cast<size_t>(KUGLASS_CAMERA_CAPTURE_WIDTH) *
+                          KUGLASS_CAMERA_CAPTURE_HEIGHT * 2U;
     ESP_LOGI(kTag, "Initial RGB565 frame: %ux%u, %u bytes",
              static_cast<unsigned>(frame->width),
              static_cast<unsigned>(frame->height),
              static_cast<unsigned>(frame->len));
     esp_camera_fb_return(frame);
     if (!expected_frame) {
-        ESP_LOGE(kTag, "Initial frame does not match the QVGA RGB565 contract");
+        ESP_LOGE(kTag, "Initial frame does not match the VGA RGB565 contract");
         esp_camera_deinit();
         return ESP_ERR_INVALID_SIZE;
     }

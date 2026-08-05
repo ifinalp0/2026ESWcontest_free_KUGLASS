@@ -4,7 +4,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from backend.transport import UsbCdcTransport, discover_esp32_usb_ports
+from backend.camera import CAMERA_FORMAT_JPEG, CAMERA_MAGIC, fnv1a
+from backend.transport import CAMERA_HEADER, UsbCdcTransport, discover_esp32_usb_ports
 
 
 class FakeSerial:
@@ -47,6 +48,45 @@ class UsbCdcTransportBufferTests(unittest.TestCase):
         self.assertEqual(self.transport.read_lines(), [])
         self.serial.feed(b"discard-rest\n{\"type\":\"status\"}\n")
         self.assertEqual(self.transport.read_lines(), ['{"type":"status"}'])
+
+    def test_json_lines_and_camera_frames_share_the_usb_stream(self) -> None:
+        jpeg = b"\xff\xd8camera-payload\x0a-with-newline\xff\xd9"
+        header = CAMERA_HEADER.pack(
+            CAMERA_MAGIC,
+            42,
+            640,
+            480,
+            CAMERA_FORMAT_JPEG,
+            len(jpeg),
+            fnv1a(jpeg),
+        )
+        self.serial.feed(b'{"type":"state","seq":1}\n' + header[:12])
+        self.assertEqual(self.transport.read_lines(), ['{"type":"state","seq":1}'])
+        self.assertEqual(self.transport.read_camera_frames(), [])
+
+        self.serial.feed(header[12:] + jpeg + b'{"type":"ack","seq":2}\n')
+        self.assertEqual(self.transport.read_lines(), ['{"type":"ack","seq":2}'])
+        [frame] = self.transport.read_camera_frames()
+        self.assertEqual(frame.sequence, 42)
+        self.assertEqual((frame.width, frame.height), (640, 480))
+        self.assertEqual(frame.payload, jpeg)
+
+    def test_bad_camera_checksum_is_counted_and_parser_resynchronizes(self) -> None:
+        jpeg = b"\xff\xd8broken\xff\xd9"
+        header = CAMERA_HEADER.pack(
+            CAMERA_MAGIC,
+            7,
+            640,
+            480,
+            CAMERA_FORMAT_JPEG,
+            len(jpeg),
+            fnv1a(jpeg) ^ 0x1,
+        )
+        self.serial.feed(header + jpeg + b'\n{"type":"state","seq":8}\n')
+        lines = self.transport.read_lines()
+        self.assertIn('{"type":"state","seq":8}', lines)
+        self.assertEqual(self.transport.read_camera_frames(), [])
+        self.assertGreaterEqual(self.transport.bad_camera_frames, 1)
 
 
 class UsbPortDiscoveryTests(unittest.TestCase):

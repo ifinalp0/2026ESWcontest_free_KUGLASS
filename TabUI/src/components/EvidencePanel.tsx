@@ -1,6 +1,8 @@
-import { Activity, Camera, SunMedium } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Activity, Camera, SunMedium, Video } from 'lucide-react';
 import { pct } from '../lib/labels';
 import type { SimulationState } from '../types';
+import { CameraViewer } from './CameraViewer';
 
 interface Props {
   state: SimulationState;
@@ -8,6 +10,8 @@ interface Props {
 }
 
 export function EvidencePanel({ state, connected }: Props) {
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const closeViewer = useCallback(() => setViewerOpen(false), []);
   const { cameraMetrics, environment } = state;
   const beforeSat = Math.max(environment.frontLeftSaturation, environment.frontRightSaturation);
   const afterSat = Math.max(cameraMetrics.frontLeftSaturation, cameraMetrics.frontRightSaturation);
@@ -37,6 +41,16 @@ export function EvidencePanel({ state, connected }: Props) {
           <div className="roi left">L {pct(cameraMetrics.frontLeftSaturation)}</div>
           <div className="roi right">R {pct(cameraMetrics.frontRightSaturation)}</div>
           <div className="glare-spot" style={{ opacity: Math.min(0.92, cameraMetrics.glare + 0.05) }} />
+          <button
+            className="camera-view-button"
+            type="button"
+            disabled={!connected}
+            onClick={() => setViewerOpen(true)}
+            title={connected ? 'ESP32_A 카메라 영상 보기' : 'ESP32_A 연결 후 사용할 수 있습니다'}
+          >
+            <Video size={15} />
+            영상 보기
+          </button>
         </div>
       </div>
       <div className="metric-grid">
@@ -66,6 +80,7 @@ export function EvidencePanel({ state, connected }: Props) {
         <strong>{comparativeEvidence ? <>{pct(beforeSat)} <i>→</i> {pct(afterSat)}</> : pct(afterSat)}</strong>
         <b>{comparativeEvidence ? `-${pct(reduction)}` : connected ? 'LIVE' : 'WAIT'}</b>
       </div>
+      {viewerOpen ? <CameraViewer onClose={closeViewer} /> : null}
     </section>
   );
 }

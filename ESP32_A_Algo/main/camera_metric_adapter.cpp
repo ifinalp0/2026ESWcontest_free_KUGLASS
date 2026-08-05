@@ -3,6 +3,8 @@
 #include "kuglass_config.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #if defined(ESP_PLATFORM) && KUGLASS_ONBOARD_CAMERA
 #include "camera_service.h"
@@ -49,6 +51,59 @@ CameraRoiMetrics finish(const RoiAccumulator& accumulator) {
     return result;
 }
 
+#if defined(ESP_PLATFORM) && KUGLASS_ONBOARD_CAMERA
+struct BoundedJpegBuffer {
+    uint8_t* data = nullptr;
+    size_t capacity = 0;
+    size_t size = 0;
+    bool overflow = false;
+};
+
+size_t append_jpeg_bytes(void* argument,
+                         size_t index,
+                         const void* data,
+                         size_t size) {
+    auto* output = static_cast<BoundedJpegBuffer*>(argument);
+    // jpge signals end-of-image with a null, zero-length callback.
+    if (output != nullptr && index == output->size && data == nullptr && size == 0U) {
+        return 0;
+    }
+    if (output == nullptr || output->data == nullptr || index != output->size ||
+        data == nullptr || output->size > output->capacity ||
+        size > output->capacity - output->size) {
+        if (output != nullptr) output->overflow = true;
+        return 0;
+    }
+    std::memcpy(output->data + output->size, data, size);
+    output->size += size;
+    return size;
+}
+
+bool encode_camera_jpeg(camera_fb_t* frame, CameraJpegFrame* jpeg_frame) {
+    BoundedJpegBuffer output;
+    output.capacity = KUGLASS_CAMERA_JPEG_MAX_BYTES;
+    output.data = static_cast<uint8_t*>(std::malloc(output.capacity));
+    if (output.data == nullptr) return false;
+
+    const bool encoded = frame2jpg_cb(
+        frame, KUGLASS_CAMERA_JPEG_QUALITY, append_jpeg_bytes, &output);
+    const bool valid = encoded && !output.overflow && output.size >= 4U &&
+                       output.data[0] == 0xffU && output.data[1] == 0xd8U &&
+                       output.data[output.size - 2U] == 0xffU &&
+                       output.data[output.size - 1U] == 0xd9U;
+    if (!valid) {
+        std::free(output.data);
+        return false;
+    }
+
+    jpeg_frame->data = output.data;
+    jpeg_frame->size = output.size;
+    jpeg_frame->width = static_cast<uint16_t>(frame->width);
+    jpeg_frame->height = static_cast<uint16_t>(frame->height);
+    return true;
+}
+#endif
+
 }  // namespace
 
 bool analyze_rgb565_frame(const uint8_t* data,
@@ -65,8 +120,15 @@ bool analyze_rgb565_frame(const uint8_t* data,
         return false;
     }
 
+    // VGA has four times as many pixels as the former QVGA path. Cache one
+    // luma row so each pixel is converted only once while preserving the exact
+    // horizontal and vertical edge tests used by the policy metrics.
+    auto* previous_row = static_cast<uint8_t*>(std::malloc(width));
+    if (previous_row == nullptr) return false;
+
     RoiAccumulator accumulators[2];
     for (uint16_t y = 0; y < height; ++y) {
+        uint8_t previous_horizontal = 0;
         for (uint16_t x = 0; x < width; ++x) {
             const size_t offset = (static_cast<size_t>(y) * width + x) * 2U;
             const uint8_t luma = rgb565_luma(data + offset);
@@ -81,25 +143,27 @@ bool analyze_rgb565_frame(const uint8_t* data,
             }
 
             if (x > 0 && x != width / 2U) {
-                const uint8_t previous = rgb565_luma(data + offset - 2U);
                 ++accumulator.edge_tests;
-                if (std::abs(static_cast<int>(luma) - static_cast<int>(previous)) >= 22) {
+                if (std::abs(static_cast<int>(luma) -
+                             static_cast<int>(previous_horizontal)) >= 22) {
                     ++accumulator.edges;
                 }
             }
             if (y > 0) {
-                const uint8_t previous =
-                    rgb565_luma(data + offset - static_cast<size_t>(width) * 2U);
                 ++accumulator.edge_tests;
-                if (std::abs(static_cast<int>(luma) - static_cast<int>(previous)) >= 22) {
+                if (std::abs(static_cast<int>(luma) -
+                             static_cast<int>(previous_row[x])) >= 22) {
                     ++accumulator.edges;
                 }
             }
+            previous_row[x] = luma;
+            previous_horizontal = luma;
         }
     }
 
     *left = finish(accumulators[0]);
     *right = finish(accumulators[1]);
+    std::free(previous_row);
     return true;
 }
 
@@ -107,6 +171,11 @@ bool CameraMetricAdapter::begin() {
 #if defined(ESP_PLATFORM) && KUGLASS_ONBOARD_CAMERA
     if (available_) return true;
     available_ = camera_service_start() == ESP_OK;
+    if (available_) {
+        // Match the validated ESP_Camera RGB565 -> JPEG conversion contract.
+        jpgSetChroma(CHROMA_420);
+        jpgSetRgb565BE(true);
+    }
 #else
     available_ = false;
 #endif
@@ -120,7 +189,16 @@ void CameraMetricAdapter::stop() {
     available_ = false;
 }
 
-bool CameraMetricAdapter::sample(SensorSnapshot* snapshot) {
+void release_camera_jpeg_frame(CameraJpegFrame* frame) {
+    if (frame == nullptr) return;
+    std::free(frame->data);
+    *frame = CameraJpegFrame{};
+}
+
+bool CameraMetricAdapter::sample(SensorSnapshot* snapshot, CameraJpegFrame* jpeg_frame) {
+    if (jpeg_frame != nullptr) {
+        release_camera_jpeg_frame(jpeg_frame);
+    }
     if (!available_ || snapshot == nullptr) {
         return false;
     }
@@ -142,6 +220,9 @@ bool CameraMetricAdapter::sample(SensorSnapshot* snapshot) {
                                             static_cast<uint16_t>(frame->height),
                                             &left,
                                             &right);
+    if (valid && jpeg_frame != nullptr) {
+        (void)encode_camera_jpeg(frame, jpeg_frame);
+    }
     esp_camera_fb_return(frame);
     if (!valid) {
         return false;

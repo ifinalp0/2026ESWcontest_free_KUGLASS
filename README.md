@@ -9,7 +9,7 @@ KUGLASS는 카메라와 내부온도에 따라 1:10 차량 모형의 PDLC 4채�
 ```mermaid
 flowchart LR
     CAM[카메라] --> A[ESP32_A<br/>입력 처리·정책·LUT·MI servo]
-    TEMP[DS18B20<br/>내부온도] --> A
+    TEMP[YwRobot SEN050007<br/>DS18B20 내부온도] --> A
     A -->|20 Hz CH0~CH3 full frame<br/>JSON Lines + 250 ms TTL| B[ESP32_B<br/>4채널 SPWM·Fault]
     B -->|PWM_MAG·DIR·ENABLE| CARRIER[Logic Carrier<br/>E-Stop AND gate·Fault·ADC·J7]
     CARRIER --> POWER[단일 채널 Power Stage PCB ×4<br/>CH0~CH3 각 1장]
@@ -27,16 +27,17 @@ flowchart LR
 카메라·내부온도센서 → ESP32_A → ESP32_B(on Logic Carrier) → 단일 채널 Power Stage PCB ×4 → PDLC CH0~CH3
 ```
 
-- ESP32_A: 카메라 ROI 지표, DS18B20 내부온도, 상황 모드와 수동 TTL을 처리하여 CH0~CH3 목표 MI를 계산합니다.
+- ESP32_A: 카메라 ROI 지표, YwRobot SEN050007의 DS18B20 내부온도, 상황 모드와 수동 TTL을 처리하여 CH0~CH3 목표 MI를 계산합니다.
 - ESP32_B: A의 full-frame 명령을 검증하고 Logic Carrier 핀맵으로 4채널 16 kHz `PWM_MAG`, `DIR`, 개별 `ENABLE`을 생성합니다. E-Stop, Fault 또는 A→B timeout 때 로컬 safe-off를 수행합니다.
 - Logic Carrier: ESP32_B DevKit을 탑재하고 `EN_GLOBAL AND ENABLE_CHx` 하드웨어 게이팅, active-low Fault 입력, 전류·온도 ADC 필터, +3.3 V/+12 V와 J7 Power Stage 인터페이스를 제공합니다.
 - TabUI: MacBook에서 직접 실행되어 화면 제공, 사용자 명령 검증, 상태 중계와 replay snapshot을 담당합니다. ESP32_A DevKit USB 단자와 micro-USB 케이블로 연결하며 LIVE 자동 정책은 계산하지 않습니다.
+- 카메라 영상: TabUI의 `영상 보기` 버튼을 연 동안 ESP32_A가 VGA(640×480) RGB565를 품질 90 JPEG로 변환하여 기존 USB Serial/JTAG 링크로 보조 전송합니다. 송출은 낮은 우선순위의 비동기 단일 queue로 처리하며 자동 MI 계산과 ESP32_B 20 Hz heartbeat가 항상 영상보다 우선합니다.
 - Power Stage PCB ×4: 동일한 단일 채널 PCB를 CH0~CH3에 한 장씩 연결합니다. 각 보드는 J7의 해당 채널 블록에서 신호를 받아 H-Bridge와 LC Filter로 PDLC 한 채널을 구동하고 `FAULT_N`과 ADC raw를 되돌려줍니다. 통합 4채널 Power Stage PCB를 사용하는 구성이 아닙니다.
 
 ## 채널과 입력 범위
 
 - 제어 채널: CH0~CH3
-- 입력 센서: 카메라 1대, DS18B20 내부온도센서 1개
+- 입력 센서: 카메라 1대, YwRobot SEN050007 DS18B20 내부온도센서 모듈 1개
 - 카메라 지표: 좌/우 ROI 포화 비율, 평균 밝기, highlight 면적, Edge Density와 검증된 경우의 AE metadata
 - 출력 의미: MI 1.0에 가까울수록 CLEAR, MI 0.0 또는 disable은 전원 차단·강산란 방향
 
@@ -66,6 +67,7 @@ TabUI는 자동 MI 배열을 만들지 않고 고수준 명령만 전송합니�
 {"v":1,"type":"ui_command","seq":102,"command":"set_demo","demo_mode":"hot_summer"}
 {"v":1,"type":"ui_command","seq":103,"command":"manual_channel","channel_id":2,"target_mi":0.42,"ttl_ms":30000,"enable":true}
 {"v":1,"type":"ui_command","seq":104,"command":"return_auto","channel_id":2}
+{"v":1,"type":"ui_command","seq":105,"command":"camera_stream","enable":true,"ttl_ms":15000}
 ```
 
 `seq`는 단조 증가해야 하며 수동 채널은 0~3, MI는 0.0~1.0, TTL은 유한 범위여야 합니다.
@@ -125,7 +127,9 @@ npm run build
 npm start
 ```
 
-브라우저에서 `http://localhost:8080/demo`을 엽니다.
+브라우저에서 `http://localhost:8080/demo`을 엽니다. 정책 근거 패널의
+`영상 보기` 버튼은 새 ESP32_A firmware가 연결된 LIVE 모드에서 실제 OV2640
+영상을 표시합니다. MOCK에서는 실제 프레임 대신 대기 안내를 표시합니다.
 
 USB 장치가 여러 개이면 ESP32_A 장치를 명시합니다.
 
@@ -159,9 +163,9 @@ ESP32_A 기본 연결은 다음과 같습니다.
 | 기능 | ESP32_A 자원 | 주의 |
 | --- | --- | --- |
 | OV2640 | 카메라 서비스의 GPIO4~18 | `ESP32_A_Algo/main/camera_pins.h`의 내부 핀 계약 준수 |
-| TabUI | DevKit USB 단자 → ESP32-S3 USB Serial/JTAG(GPIO19/20) | MacBook micro-USB 직결, JSON Lines console; 외부 UART 배선 아님 |
+| TabUI | DevKit USB 단자 → ESP32-S3 USB Serial/JTAG(GPIO19/20) | MacBook micro-USB 직결, JSON Lines + on-demand JPEG; 외부 UART 배선 아님 |
 | ESP32_B | UART1 TX/RX GPIO39/40 | 두 보드 공통 GND, 실제 header 재검증 |
-| DS18B20 | GPIO41 | 외부전원, data-3.3 V 사이 4.7 kΩ pull-up |
+| YwRobot SEN050007 | GPIO41 | DS18B20 DAT, 3.3 V 전원, 공통 GND |
 
 카메라 AE exposure/gain 단위가 검증되기 전에는 `ae_metadata_valid=false`로 유지합니다. 카메라나 온도 입력이 stale이면 결측으로 처리합니다.
 
