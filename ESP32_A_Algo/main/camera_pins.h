@@ -70,7 +70,7 @@ constexpr bool assigned_pins_are_unique() {
 }
 
 constexpr bool is_devkit_reserved_pin(int pin) {
-    // Boot straps: 0, 3, 45, 46; native USB: 19, 20; module-internal: 26..34;
+    // Boot straps: 0, 3, 45, 46; DevKit USB Serial/JTAG: 19, 20; module-internal: 26..34;
     // unavailable with Octal PSRAM: 35..37; RGB LED: 38/48;
     // USB-to-UART bridge: 43, 44.
     return pin == 0 || pin == 3 || pin == 19 || pin == 20 ||

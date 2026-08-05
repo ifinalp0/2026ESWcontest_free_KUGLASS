@@ -22,13 +22,14 @@ ESP32_B: 명령 검증, 4채널 SPWM, 로컬 Fault/timeout 차단
 ```
 
 ```text
-태블릿 브라우저
-  -> 격리 LAN의 동일 출처 HTTP
-Docker TabUI frontend + backend
-  -> USB CDC JSON Lines
+브라우저(MacBook 또는 신뢰된 격리 LAN의 태블릿)
+  -> MacBook TabUI의 동일 출처 HTTP
+MacBook에서 직접 실행하는 TabUI frontend + backend
+  -> micro-USB cable -> ESP32_A DevKit USB 단자
+  -> USB Serial/JTAG CDC JSON Lines
 ESP32_A
   -> 상태·ACK·ESP32_B 적용 MI/Fault
-TabUI -> 태블릿
+MacBook TabUI -> 브라우저
 ```
 
 - 자동 판단과 권위 있는 목표 MI는 ESP32_A가 소유한다.
@@ -39,7 +40,7 @@ TabUI -> 태블릿
 ## 디렉터리 역할
 
 - `개발 계획서.md`: 제품 구조, 개발 범위, 검증 목표의 기준 문서.
-- `TabUI/`: production 태블릿 HMI와 Docker 백엔드.
+- `TabUI/`: MacBook에서 직접 실행하는 production 백엔드, 브라우저 HMI와 ESP32_A USB gateway. Docker는 하드웨어 없는 MOCK 전용 선택 사항이다.
 - `ESP32_A_Algo/`: 카메라·내부온도 입력, 정책/MI master, A→B 통신 펌웨어.
 - `ESP_Camera/`(선택): 독립 카메라 시험을 보존할 때만 두는 standalone 레퍼런스. `ESP32_A_Algo/`가 제품 카메라 서비스·핀 계약·드라이버 의존성을 자체 소유하므로 이 폴더는 저장소에 없어도 되며 A의 빌드·플래시에 사용하지 않는다. 폴더가 남아 있다면 별도의 명시적인 사용자 지시 없이 내부 기능 코드를 수정하지 않는다.
 - `ESP32_B_Algo/`: ESP32_B에 빌드·플래시할 유일한 canonical 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage 제어, Fault와 A→B TTL 처리를 소유한다.
@@ -77,12 +78,13 @@ TabUI -> 태블릿
 - ESP32_B는 부팅, 잘못된 frame, heartbeat timeout, E-Stop과 Fault에서 출력을 차단한다.
 - Fault clear는 ESP32_B가 reset request의 target B boot, one-time challenge와 실제 안전 조건을 확인한 뒤에만 수행한다. 안전 조건이 충족되지 않은 matching request도 challenge를 소비하여 나중에 replay로 clear되지 않게 한다.
 - LIVE 연결이 끊기면 마지막 실제 상태를 `STALE/OFFLINE`으로 표시하고 명령을 막는다. MOCK으로 자동 전환하지 않는다.
-- MOCK/REPLAY는 serial 장치를 열거나 ESP32_B 출력 명령을 만들면 안 된다.
+- MOCK/REPLAY는 ESP32_A USB 장치를 열거나 ESP32_B 출력 명령을 만들면 안 된다.
 - UI는 runtime mode, A/B online·stale, last seen, control source, manual TTL, target/commanded/applied MI, 카메라·온도 품질, E-Stop/Fault를 구분한다.
 
 ## 하드웨어 경계
 
-- ESP32_A 보드 기준 핀은 TabUI native USB CDC(GPIO19/20), B-link UART1 TX/RX(GPIO39/40), 외부전원 DS18B20(GPIO41)이다. 이는 아래의 ESP32_B 보드 핀과 별개다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
+- ESP32_A와 TabUI의 production 물리 경로는 `MacBook -> 데이터 micro-USB cable -> ESP32_A DevKit USB connector -> ESP32-S3 USB Serial/JTAG(GPIO19/20)`이다. MacBook과 A 사이에 외부 GPIO UART TX/RX 배선을 추가하지 않는다. macOS에서는 `/dev/cu.usbmodem*` CDC/ACM 장치로 열며 TabUI `usb` transport가 단일 장치를 자동 탐색한다.
+- ESP32_A 보드 기준 핀은 TabUI USB Serial/JTAG(GPIO19/20), B-link UART1 TX/RX(GPIO39/40), 외부전원 DS18B20(GPIO41)이다. TabUI USB 링크와 A↔B UART 링크를 혼동하지 않는다. 이는 아래의 ESP32_B 보드 핀과 별개다. 실제 DevKit header와 카메라 GPIO 충돌을 HIL 전에 다시 확인한다.
 - DS18B20 data에는 외부 4.7 kΩ pull-up과 공통 3.3 V/GND가 필요하다. parasite power는 사용하지 않는다.
 - ESP32_B/Logic Carrier의 확정 제어 핀은 아래 표와 같다. `ENABLE_CHx`는 MCU→74HC08 입력이고 J7의 `CHx_ENABLE`은 `EN_GLOBAL AND ENABLE_CHx` 결과다.
 
@@ -109,7 +111,7 @@ TabUI -> 태블릿
 
 ## 네트워크와 기록 경계
 
-- 현재 TabUI 서버는 plain HTTP와 인증 없는 시연용 구성이다. 신뢰된 격리 LAN/MOCK/HIL 밖에 직접 노출하지 않는다.
+- 현재 TabUI 서버는 MacBook에서 직접 실행하는 plain HTTP와 인증 없는 시연용 구성이다. 기본 사용은 localhost이며 신뢰된 격리 LAN/MOCK/HIL 밖에 직접 노출하지 않는다.
 - 외부 네트워크에서는 reverse proxy TLS, 인증 또는 부스 PIN, Origin/CSRF 검사와 request/rate limit을 먼저 적용한다.
 - replay는 최근 상태 snapshot 기록이다. command/ACK/fault 감사 로그나 완료된 제어 증거로 간주하지 않는다.
 
@@ -123,6 +125,7 @@ TabUI -> 태블릿
 - ESP32_B 부팅 시 네 `ENABLE` LOW와 PWM duty 0을 가장 먼저 보장한다. 유효 명령+TTL, `EN_GLOBAL=HIGH`, 모든 `FAULT_N=HIGH` 이전에는 enable하지 않으며, 차단 시 enable LOW를 먼저 적용한다.
 - `FAULT_N`은 U4 하드웨어 AND에 포함되지 않는다. Power Stage 자체 차단이 없다면 펌웨어 polling이 유일한 추가 차단이므로 latency/jitter를 계측하고 요구 한계를 문서화한다.
 - 문서와 코드에는 현재 사용하는 구성, 센서와 채널만 기록한다.
+- TabUI LIVE 기본값은 `transport=usb`, `usb-port=auto`로 유지한다. Docker hardware passthrough, `/dev/ttyUSB0`, `TABUI_SERIAL_*` 또는 MacBook↔A 외부 UART를 production 경로로 다시 도입하지 않는다. Docker 구성은 MOCK만 허용한다.
 - 실제 하드웨어가 없어도 TabUI typecheck/build, backend unit test, ESP32_A/B host test를 실행한다.
 - HIL에서는 command ACK, manual TTL, A의 AUTO 지속, A→B timeout safe-off, stale sequence 거부, target/commanded/applied MI 차이를 확인한다.
 - Fault reset HIL은 B reboot의 `boot_id` 교체와 status sequence rebase, A reboot의 `source_session_id` 교체, challenge one-time 소비, stale/replayed request 거부, exact `control_result` correlation, timeout ACK을 모두 포함한다.

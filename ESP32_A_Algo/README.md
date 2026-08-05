@@ -9,7 +9,7 @@ OV2640 카메라 + DS18B20 내부온도
 ESP32_B
 ```
 
-TabUI는 native USB CDC로 고수준 명령을 보내고 ESP32_A 상태를 받습니다. ESP32_A는 전력 출력을 직접 생성하지 않습니다.
+MacBook에서 직접 실행되는 TabUI backend는 micro-USB 케이블로 ESP32_A DevKit USB 단자에 연결하고, 내장 USB Serial/JTAG CDC를 통해 고수준 명령을 보내고 상태를 받습니다. 이 TabUI 링크에는 별도 UART TX/RX 배선을 사용하지 않습니다. ESP32_A는 전력 출력을 직접 생성하지 않습니다.
 
 ## 책임
 
@@ -37,7 +37,7 @@ ESP32_A가 사용하는 카메라 서비스와 핀 계약은 `main/camera_servic
 
 | 링크/센서 | ESP32_A | 상대편 | 설정 |
 |---|---:|---|---|
-| TabUI backend | native USB GPIO19/20 | Docker host USB device | JSON Lines |
+| MacBook TabUI backend | DevKit USB 단자 / USB Serial/JTAG GPIO19/20 | micro-USB cable, macOS `/dev/cu.usbmodem*` | JSON Lines |
 | ESP32_B TX | GPIO39 / UART1 TX | ESP32_B RX | 115200 8-N-1 |
 | ESP32_B RX | GPIO40 / UART1 RX | ESP32_B TX | 115200 8-N-1 |
 | 내부온도 | GPIO41 | DS18B20 DQ | 3.3 V, 외부 4.7 kΩ pull-up |
@@ -55,7 +55,7 @@ ESP32_A와 ESP32_B는 GND를 공유해야 합니다. DS18B20은 외부전원 방
 | RESET | 17 | PWDN | 18 |
 | XCLK | 미사용 | 모듈 자체 발진기 | 12 MHz |
 
-카메라, native USB, B UART와 DS18B20의 핀 중복 및 DevKit 예약 핀 사용은 firmware와 host compile test에서 모두 거부합니다.
+카메라, 내장 USB Serial/JTAG, B UART와 DS18B20의 핀 중복 및 DevKit 예약 핀 사용은 firmware와 host compile test에서 모두 거부합니다. TabUI용 DevKit USB 연결과 GPIO39/40의 A↔B UART는 서로 다른 링크입니다.
 
 ### 카메라 헤더와 실기 배선
 
@@ -170,7 +170,7 @@ ESP32_A의 `type=state`에는 다음 정보가 포함됩니다.
 ```bash
 idf.py set-target esp32s3
 idf.py build
-ESP32_A_PORT=/dev/ttyUSB0  # 실제 ESP32_A 포트로 변경
+ESP32_A_PORT=/dev/cu.usbmodem1101  # MacBook에서 확인한 ESP32_A DevKit USB 장치
 idf.py -p "$ESP32_A_PORT" flash
 ```
 
@@ -194,7 +194,7 @@ idf.py -D KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1 build
 sh host_tests/run_tests.sh
 ```
 
-Host test는 카메라/A UART/DS18B20 핀 충돌, 카메라 복구 backoff, timestamp wrap/stale 경계, 센서별 상태 병합, 4채널 protocol, UI command parser, policy, RGB565 byte order와 ROI, DS18B20 CRC, B status, JSON line accumulator와 master telemetry를 검사합니다.
+Host test는 카메라/A USB console/A↔B UART/DS18B20 핀 충돌, 카메라 복구 backoff, timestamp wrap/stale 경계, 센서별 상태 병합, 4채널 protocol, UI command parser, policy, RGB565 byte order와 ROI, DS18B20 CRC, B status, JSON line accumulator와 master telemetry를 검사합니다.
 
 또한 프로젝트 독립성 검사는 빌드 입력의 sibling 경로 참조, 외부 symlink, 내부 카메라 서비스 누락과 카메라 드라이버 version pin 누락을 거부합니다.
 
@@ -203,6 +203,6 @@ HIL에서는 다음을 확인합니다.
 - 카메라 응답을 끊어도 DS18B20 timestamp와 A→B 20 Hz heartbeat가 계속 갱신되는지
 - 마지막 정상 frame 이후 1초 안에 `camera_valid=false`가 되는지
 - 카메라 재연결 후 ESP32_A 재부팅 없이 frame과 telemetry가 복구되는지
-- USB CDC, A↔B UART, 수동 TTL, stale sequence와 A→B timeout
+- DevKit USB Serial/JTAG CDC, A↔B UART, 수동 TTL, stale sequence와 A→B timeout
 - `target_mi`, `commanded_mi`, ESP32_B의 `applied_mi`가 구분되는지
 - 각 task의 stack high-water와 20 Hz control jitter가 안전한 범위인지

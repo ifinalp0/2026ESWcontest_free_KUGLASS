@@ -17,8 +17,8 @@ flowchart LR
     CARRIER -->|FAULT_N·filtered ADC| B
     POWER --> PDLC[PDLC CH0~CH3]
     B -->|applied MI·Fault·ADC·reset result| A
-    TABLET[태블릿 브라우저] <-->|HTTP| TAB[Docker TabUI<br/>React HMI + API + replay]
-    TAB <-->|USB CDC<br/>고수준 명령·상태| A
+    UI[브라우저<br/>MacBook 또는 태블릿] <-->|HTTP| TAB[MacBook TabUI backend<br/>React HMI + API + replay]
+    TAB <-->|micro-USB cable<br/>DevKit USB Serial/JTAG CDC| A
 ```
 
 핵심 제어 흐름은 다음과 같습니다.
@@ -30,7 +30,7 @@ flowchart LR
 - ESP32_A: 카메라 ROI 지표, DS18B20 내부온도, 상황 모드와 수동 TTL을 처리하여 CH0~CH3 목표 MI를 계산합니다.
 - ESP32_B: A의 full-frame 명령을 검증하고 Logic Carrier 핀맵으로 4채널 16 kHz `PWM_MAG`, `DIR`, 개별 `ENABLE`을 생성합니다. E-Stop, Fault 또는 A→B timeout 때 로컬 safe-off를 수행합니다.
 - Logic Carrier: ESP32_B DevKit을 탑재하고 `EN_GLOBAL AND ENABLE_CHx` 하드웨어 게이팅, active-low Fault 입력, 전류·온도 ADC 필터, +3.3 V/+12 V와 J7 Power Stage 인터페이스를 제공합니다.
-- TabUI: 화면 제공, 사용자 명령 검증, 상태 중계와 replay snapshot을 담당합니다. LIVE 자동 정책은 계산하지 않습니다.
+- TabUI: MacBook에서 직접 실행되어 화면 제공, 사용자 명령 검증, 상태 중계와 replay snapshot을 담당합니다. ESP32_A DevKit USB 단자와 micro-USB 케이블로 연결하며 LIVE 자동 정책은 계산하지 않습니다.
 - Power Stage PCB ×4: 동일한 단일 채널 PCB를 CH0~CH3에 한 장씩 연결합니다. 각 보드는 J7의 해당 채널 블록에서 신호를 받아 H-Bridge와 LC Filter로 PDLC 한 채널을 구동하고 `FAULT_N`과 ADC raw를 되돌려줍니다. 통합 4채널 Power Stage PCB를 사용하는 구성이 아닙니다.
 
 ## 채널과 입력 범위
@@ -45,7 +45,7 @@ flowchart LR
 | 경로 | 역할 |
 | --- | --- |
 | `개발 계획서.md` | 현재 제품 구조와 개발·검증 범위의 기준 |
-| `TabUI/` | 태블릿 HMI, API, ESP32_A USB gateway와 Docker 실행 구성 |
+| `TabUI/` | 브라우저 HMI, MacBook 로컬 API와 ESP32_A DevKit USB gateway. Docker는 MOCK 전용 선택 사항 |
 | `ESP32_A_Algo/` | 카메라·내부온도 처리, 정책/MI master, ESP32_B 통신 펌웨어 |
 | `ESP_Camera/` (선택) | standalone 카메라 시험을 보존할 때만 사용하는 레퍼런스. ESP32_A의 빌드·플래시에는 필요하지 않으며 보관이 불필요하면 삭제 가능 |
 | `ESP32_B_Algo/` | ESP32_B에 빌드·플래시할 유일한 기준 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage, TTL/Fault 처리 |
@@ -112,33 +112,37 @@ ADC의 raw/mV 수집·filter·calibration validity telemetry는 구현되었지�
 
 Node.js 22+와 Python 3.11+를 권장합니다.
 
+현재 LIVE 구성은 Docker 외부의 MacBook 백엔드입니다. MacBook과 ESP32_A 사이에는 별도 UART TX/RX 배선을 사용하지 않습니다. 데이터 통신이 가능한 micro-USB 케이블을 ESP32_A DevKit의 USB 단자에 연결하면 macOS에 `/dev/cu.usbmodem*` 장치가 생성되고, TabUI가 단일 장치를 자동 탐색합니다.
+
 ```bash
 cd TabUI
+python3 -m venv .venv
+source .venv/bin/activate
 npm ci
 python3 -m pip install -r requirements.txt
 npm run check
 npm run build
-python3 server.py --host 0.0.0.0 --port 8080 --transport mock
+npm start
 ```
 
 브라우저에서 `http://localhost:8080/demo`을 엽니다.
 
-Docker MOCK 환경은 물리 serial 장치를 열지 않습니다.
+USB 장치가 여러 개이면 ESP32_A 장치를 명시합니다.
 
 ```bash
 cd TabUI
-docker compose up --build
+python3 -m serial.tools.list_ports -v
+python3 server.py --transport usb --usb-port /dev/cu.usbmodem1101
 ```
 
-Linux 실기 호스트에서는 ESP32_A 장치 하나만 컨테이너에 전달합니다.
+ESP32_A 없이 화면만 확인하는 MOCK은 명시적으로 실행합니다.
 
 ```bash
 cd TabUI
-TABUI_SERIAL_DEVICE=/dev/serial/by-id/<esp32-a-device> \
-docker compose -f docker-compose.yml -f docker-compose.hardware.yml up --build -d
+python3 server.py --transport mock
 ```
 
-`--privileged`는 사용하지 않습니다. 현재 서버는 plain HTTP와 인증 없는 시연용 구성이므로 신뢰된 격리 LAN에서만 직접 사용합니다.
+Docker는 LIVE USB 연결에 사용하지 않으며, 필요한 경우 하드웨어가 없는 MOCK 화면 개발에만 선택적으로 사용합니다. 현재 서버는 plain HTTP와 인증 없는 시연용 구성이므로 MacBook localhost 또는 신뢰된 격리 LAN의 태블릿에서만 사용하고, 그 밖의 네트워크에 직접 노출하지 않습니다.
 
 ## ESP32_A 빌드
 
@@ -155,7 +159,7 @@ ESP32_A 기본 연결은 다음과 같습니다.
 | 기능 | ESP32_A 자원 | 주의 |
 | --- | --- | --- |
 | OV2640 | 카메라 서비스의 GPIO4~18 | `ESP32_A_Algo/main/camera_pins.h`의 내부 핀 계약 준수 |
-| TabUI | native USB CDC GPIO19/20 | JSON Lines console |
+| TabUI | DevKit USB 단자 → ESP32-S3 USB Serial/JTAG(GPIO19/20) | MacBook micro-USB 직결, JSON Lines console; 외부 UART 배선 아님 |
 | ESP32_B | UART1 TX/RX GPIO39/40 | 두 보드 공통 GND, 실제 header 재검증 |
 | DS18B20 | GPIO41 | 외부전원, data-3.3 V 사이 4.7 kΩ pull-up |
 
@@ -201,7 +205,7 @@ E-Stop > latched Fault > Manual(TTL) > Demo/Auto
 - 각 `FAULT_N`은 외부 10 kΩ pull-up의 active-low 입력입니다. Fault는 Logic Carrier U4의 enable AND에는 포함되지 않으므로 CH0~CH3에 연결한 단일 채널 Power Stage PCB 네 장 각각의 `FAULT_N/RUN_OK` 하드웨어 차단과 펌웨어 polling latency를 실측합니다.
 - 수동 제어는 기본 30초 후 ESP32_A에서 AUTO로 복귀합니다.
 - LIVE telemetry가 stale이면 UI는 마지막 실제 값을 유지하고 명령을 막습니다. MOCK으로 자동 전환하지 않습니다.
-- MOCK/REPLAY는 serial 장치나 Power Stage 출력을 사용하지 않습니다.
+- MOCK/REPLAY는 ESP32_A USB 장치나 Power Stage 출력을 사용하지 않습니다.
 - Fault clear는 ESP32_B가 reset의 `target_boot_id`/one-time `reset_challenge`와 실제 E-Stop/Fault 조건을 확인한 뒤에만 수행하며, A는 일치하는 `control_result`를 받거나 timeout이 발생할 때까지 성공 ACK을 보류합니다.
 
 ## 검증

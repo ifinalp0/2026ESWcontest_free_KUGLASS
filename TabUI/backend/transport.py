@@ -5,7 +5,7 @@ import json
 import threading
 import time
 from collections import deque
-from typing import Any, Protocol
+from typing import Any, Iterable, Protocol
 
 from .state import clamp, default_state, estimated_transmittance, optical_state
 
@@ -23,18 +23,54 @@ class Transport(Protocol):
     def close(self) -> None: ...
 
 
-class SerialTransport:
-    mode = "serial"
+AUTO_USB_PORT = "auto"
+USB_CDC_LINE_CODING_BAUD = 115200
+
+
+def discover_esp32_usb_ports(port_infos: Iterable[Any] | None = None) -> list[str]:
+    """Return macOS USB CDC device nodes suitable for the ESP32_A DevKit USB port."""
+
+    if port_infos is None:
+        from serial.tools import list_ports  # type: ignore
+
+        port_infos = list_ports.comports()
+
+    mac_usbmodem: list[str] = []
+    described_esp32: list[str] = []
+    for info in port_infos:
+        device = str(getattr(info, "device", ""))
+        if not device:
+            continue
+        if device.startswith("/dev/cu.usbmodem"):
+            mac_usbmodem.append(device)
+            continue
+        description = " ".join(
+            str(getattr(info, field, "") or "")
+            for field in ("description", "product", "manufacturer", "interface")
+        ).lower()
+        if device.startswith("/dev/cu.") and (
+            "esp32" in description or "usb jtag" in description
+        ):
+            described_esp32.append(device)
+
+    # macOS exposes both dial-in and call-out nodes for some CDC devices. TabUI
+    # deliberately uses only /dev/cu.* so one physical USB device is not counted twice.
+    return sorted(set(mac_usbmodem or described_esp32))
+
+
+class UsbCdcTransport:
+    """MacBook-to-ESP32_A link through the DevKit's physical USB connector."""
+
+    mode = "usb"
 
     def __init__(
         self,
-        port: str,
-        baudrate: int = 115200,
+        port: str = AUTO_USB_PORT,
         reconnect_seconds: float = 1.0,
         max_line_bytes: int = 16384,
     ) -> None:
-        self.port = port
-        self.baudrate = baudrate
+        self.requested_port = port
+        self.port: str | None = None if port == AUTO_USB_PORT else port
         self.reconnect_seconds = reconnect_seconds
         self.max_line_bytes = max(256, int(max_line_bytes))
         self.connected = False
@@ -48,7 +84,7 @@ class SerialTransport:
     def write_line(self, line: str) -> None:
         with self._lock:
             if not self._ensure_open():
-                raise OSError(self.error or f"ESP32_A serial unavailable: {self.port}")
+                raise OSError(self.error or f"ESP32_A USB unavailable: {self.port or AUTO_USB_PORT}")
             try:
                 self._serial.write((line.rstrip("\n") + "\n").encode("utf-8"))
             except Exception as exc:  # pyserial raises several platform-specific errors
@@ -93,18 +129,37 @@ class SerialTransport:
         try:
             import serial  # type: ignore
 
+            port = self._resolve_port()
             self._serial = serial.Serial(
-                self.port,
-                baudrate=self.baudrate,
+                port,
+                # USB Serial/JTAG presents a CDC/ACM device. pyserial requires
+                # line coding, but this is not an external GPIO UART link.
+                baudrate=USB_CDC_LINE_CODING_BAUD,
                 timeout=0.0,
                 write_timeout=0.25,
             )
+            self.port = port
             self.connected = True
             self.error = None
             return True
         except Exception as exc:
             self._disconnect(str(exc))
             return False
+
+    def _resolve_port(self) -> str:
+        if self.requested_port != AUTO_USB_PORT:
+            return self.requested_port
+        candidates = discover_esp32_usb_ports()
+        if not candidates:
+            raise OSError(
+                "ESP32_A USB device not found; connect the DevKit USB port with the micro-USB cable"
+            )
+        if len(candidates) > 1:
+            joined = ", ".join(candidates)
+            raise OSError(
+                f"multiple ESP32 USB devices found ({joined}); select one with --usb-port"
+            )
+        return candidates[0]
 
     def _disconnect(self, error: str) -> None:
         if self._serial is not None:
@@ -113,6 +168,8 @@ class SerialTransport:
             except Exception:
                 pass
         self._serial = None
+        if self.requested_port == AUTO_USB_PORT:
+            self.port = None
         self.connected = False
         self.error = error
         self._rx_buffer.clear()

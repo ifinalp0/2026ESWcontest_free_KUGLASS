@@ -70,7 +70,7 @@ export interface DownstreamDiagnostics {
 }
 
 export interface ControllerLink {
-  transport: 'serial' | 'mock';
+  transport: 'usb' | 'mock';
   hardwareConnected: boolean;
   hilEnabled: boolean;
   port: string | null;

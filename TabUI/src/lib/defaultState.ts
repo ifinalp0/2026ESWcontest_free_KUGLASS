@@ -62,7 +62,7 @@ export const defaultState: SimulationState = {
   decisionReason: 'TabUI 백엔드와 ESP32_A 텔레메트리를 기다리는 중입니다.',
   timestamp: 0,
   link: {
-    transport: 'serial',
+    transport: 'usb',
     hardwareConnected: false,
     hilEnabled: false,
     port: null,

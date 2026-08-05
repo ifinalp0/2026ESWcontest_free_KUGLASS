@@ -8,7 +8,7 @@ from typing import Any
 
 from .protocol import CommandError, translate_ui_command
 from .state import StateStore
-from .transport import MockTransport, SerialTransport, Transport
+from .transport import AUTO_USB_PORT, MockTransport, Transport, UsbCdcTransport
 
 
 class ESP32AGateway:
@@ -44,16 +44,15 @@ class ESP32AGateway:
         cls,
         *,
         mode: str,
-        serial_port: str,
-        baudrate: int,
+        usb_port: str = AUTO_USB_PORT,
         hil_enabled: bool,
     ) -> "ESP32AGateway":
-        if mode == "serial":
-            transport: Transport = SerialTransport(serial_port, baudrate)
+        if mode == "usb":
+            transport: Transport = UsbCdcTransport(usb_port)
         elif mode == "mock":
             transport = MockTransport()
         else:
-            raise ValueError("transport mode must be 'serial' or 'mock'")
+            raise ValueError("transport mode must be 'usb' or 'mock'")
         return cls(transport=transport, hil_enabled=hil_enabled)
 
     @property
@@ -79,7 +78,7 @@ class ESP32AGateway:
             self._next_seq,
             diagnostics_enabled=self.diagnostics_enabled,
         )
-        if self.transport.mode == "serial" and not self._hardware_connected():
+        if self.transport.mode != "mock" and not self._hardware_connected():
             raise CommandError("ESP32_A telemetry is not fresh; command was not queued", 503)
         with self._submit_lock:
             regular_count = sum(message.get("command") != "manual_channel" for message in messages)

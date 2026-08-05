@@ -6,7 +6,8 @@
   "description": "KUGLASS tablet UI and ESP32_A gateway.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "dev:api": "python3 server.py --host 0.0.0.0 --port 8080",
+    "dev:api": "python3 server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
+    "start": "python3 server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
     "build": "tsc --noEmit --incremental false && vite build",
     "typecheck": "tsc --noEmit --incremental false",
     "check:python": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",

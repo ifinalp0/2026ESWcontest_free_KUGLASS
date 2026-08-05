@@ -7,9 +7,8 @@ services:
     ports:
       - "${TABUI_HTTP_PORT:-8080}:8080"
     environment:
-      TABUI_TRANSPORT: "${TABUI_TRANSPORT:-mock}"
-      TABUI_SERIAL_PORT: "${TABUI_SERIAL_PORT:-/dev/ttyUSB0}"
-      TABUI_SERIAL_BAUD: "${TABUI_SERIAL_BAUD:-115200}"
+      # Docker is retained only for an explicit hardware-free MOCK session.
+      TABUI_TRANSPORT: mock
       TABUI_HIL_ENABLED: "${TABUI_HIL_ENABLED:-0}"
     volumes:
       - tabui-data:/data

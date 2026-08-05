@@ -192,9 +192,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve KUGLASS TabUI and gateway commands to ESP32_A.")
     parser.add_argument("--host", default=os.environ.get("TABUI_HOST", "0.0.0.0"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("TABUI_PORT", "8080")))
-    parser.add_argument("--transport", choices=("mock", "serial"), default=os.environ.get("TABUI_TRANSPORT", "mock"))
-    parser.add_argument("--serial-port", default=os.environ.get("TABUI_SERIAL_PORT", "/dev/ttyUSB0"))
-    parser.add_argument("--baudrate", type=int, default=int(os.environ.get("TABUI_SERIAL_BAUD", "115200")))
+    parser.add_argument("--transport", choices=("usb", "mock"), default=os.environ.get("TABUI_TRANSPORT", "usb"))
+    parser.add_argument("--usb-port", default=os.environ.get("TABUI_USB_PORT", "auto"))
     parser.add_argument("--hil", action="store_true", default=os.environ.get("TABUI_HIL_ENABLED", "0") == "1")
     parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("TABUI_DATA_DIR", str(ROOT / "data"))))
     return parser.parse_args()
@@ -204,14 +203,13 @@ def main() -> None:
     args = parse_args()
     gateway = ESP32AGateway.create(
         mode=args.transport,
-        serial_port=args.serial_port,
-        baudrate=args.baudrate,
+        usb_port=args.usb_port,
         hil_enabled=args.hil,
     )
     gateway.start()
     server = TabUIServer((args.host, args.port), gateway, data_dir=args.data_dir)
     print(f"KUGLASS TabUI listening on http://{args.host}:{args.port}/demo")
-    print(f"ESP32_A transport={args.transport} port={args.serial_port if args.transport == 'serial' else '-'} HIL={gateway.diagnostics_enabled}")
+    print(f"ESP32_A transport={args.transport} port={args.usb_port if args.transport == 'usb' else '-'} HIL={gateway.diagnostics_enabled}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

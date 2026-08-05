@@ -46,8 +46,14 @@ if ! grep -Eq 'set\(IDF_TARGET[[:space:]]+"esp32s3"' \
    ! grep -Eq '^CONFIG_PARTITION_TABLE_SINGLE_APP=y$' \
     "$PROJECT_DIR/sdkconfig.defaults" ||
    ! grep -Eq '^CONFIG_PARTITION_TABLE_OFFSET=0x8000$' \
+    "$PROJECT_DIR/sdkconfig.defaults" ||
+   ! grep -Eq '^CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y$' \
+    "$PROJECT_DIR/sdkconfig.defaults" ||
+   ! grep -Eq '^CONFIG_ESP_CONSOLE_USB_CDC=n$' \
+    "$PROJECT_DIR/sdkconfig.defaults" ||
+   ! grep -Eq '^CONFIG_ESP_CONSOLE_UART_DEFAULT=n$' \
     "$PROJECT_DIR/sdkconfig.defaults"; then
-    echo "ESP32-S3 target and flash partition defaults must remain project-owned" >&2
+    echo "ESP32-S3 target, partition and DevKit USB console defaults must remain project-owned" >&2
     exit 1
 fi
 

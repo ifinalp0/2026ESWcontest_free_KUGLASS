@@ -48,7 +48,7 @@ class GatewayTests(unittest.TestCase):
 
 
 class DisconnectedTransport:
-    mode = "serial"
+    mode = "usb"
     port = "/dev/missing"
     connected = False
     error = "missing"
@@ -70,8 +70,8 @@ class LiveBoundaryTests(unittest.TestCase):
             gateway.submit({"type": "setScenario", "demoMode": "none"})
         self.assertEqual(raised.exception.status, 503)
 
-    def test_open_serial_requires_fresh_telemetry(self) -> None:
-        transport = RecordingTransport(mode="serial")
+    def test_open_usb_requires_fresh_telemetry(self) -> None:
+        transport = RecordingTransport(mode="usb")
         gateway = ESP32AGateway(transport=transport, telemetry_timeout_seconds=0.03)
         with self.assertRaises(CommandError):
             gateway.submit({"type": "returnAuto"})
@@ -85,7 +85,7 @@ class LiveBoundaryTests(unittest.TestCase):
             gateway.submit({"type": "returnAuto"})
 
     def test_malformed_b_status_does_not_refresh_hardware_connection(self) -> None:
-        transport = RecordingTransport(mode="serial")
+        transport = RecordingTransport(mode="usb")
         gateway = ESP32AGateway(transport=transport)
         transport.incoming.append(
             '{"v":1,"type":"status","controller_id":"B","seq":1,"ch":[]}'

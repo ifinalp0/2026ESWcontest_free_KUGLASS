@@ -40,9 +40,12 @@ CONFIG_HM1055_SUPPORT=n
 CONFIG_HM0360_SUPPORT=n
 CONFIG_MEGA_CCM_SUPPORT=n
 
-# Native USB CDC is the line-oriented TabUI backend link. UART1 remains
+# The DevKit's ESP32-S3 USB connector exposes the built-in USB Serial/JTAG
+# CDC/ACM port. Make it the primary bidirectional stdio console so TabUI can
+# both send JSON Lines on stdin and receive telemetry on stdout. UART1 remains
 # dedicated to ESP32_B and does not share camera GPIO or console output.
-CONFIG_ESP_CONSOLE_USB_CDC=y
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_USB_CDC=n
 CONFIG_ESP_CONSOLE_UART_DEFAULT=n
 CONFIG_FREERTOS_HZ=1000
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
