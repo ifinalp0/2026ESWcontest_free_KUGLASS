@@ -84,10 +84,8 @@ Node.js 22+와 Python 3.11+를 권장합니다.
 
 ```bash
 cd TabUI
-python3 -m venv .venv
-source .venv/bin/activate
 npm ci
-python3 -m pip install -r requirements.txt
+npm run setup:python
 npm run check
 npm run build
 npm start
@@ -101,7 +99,7 @@ ESP32_A 없이 UI만 실행하려면 MOCK을 명시합니다.
 
 ```bash
 cd TabUI
-python3 server.py --transport mock
+.venv/bin/python server.py --transport mock
 ```
 
 현재 서버는 인증 없는 plain HTTP 시연 구성입니다. localhost 또는 신뢰된 격리

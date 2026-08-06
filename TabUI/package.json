@@ -5,12 +5,14 @@
   "type": "module",
   "description": "KUGLASS tablet UI and ESP32_A gateway.",
   "scripts": {
+    "setup:python": "python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt",
     "dev": "vite --host 0.0.0.0",
-    "dev:api": "python3 server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
-    "start": "python3 server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
+    "dev:api": ".venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
+    "start": ".venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
+    "start:open": "sh -c '(sleep 1; open http://127.0.0.1:8080/demo) & exec .venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto'",
     "build": "tsc --noEmit --incremental false && vite build",
     "typecheck": "tsc --noEmit --incremental false",
-    "check:python": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+    "check:python": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -v",
     "check": "npm run typecheck && npm run check:python"
   },
   "dependencies": {

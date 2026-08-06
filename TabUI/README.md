@@ -46,22 +46,38 @@ LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습
 Node.js 22+와 Python 3.11+를 권장합니다.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
 npm ci
-python3 -m pip install -r requirements.txt
+npm run setup:python
 npm run build
 npm start
 ```
 
 브라우저에서 `http://localhost:8080/demo`을 엽니다. `npm start`의 기본값은
 `--transport usb --usb-port auto`이며 단일 `/dev/cu.usbmodem*`를 자동 선택합니다.
+`npm start`, `npm run dev:api`, `npm run check:python`은 활성 shell과 무관하게
+항상 `.venv/bin/python`을 사용하므로 `pyserial`을 시스템 Python에 설치하지
+않습니다.
+
+### 백엔드·화면·ESP32_A 통합 실행
+
+ESP32_A DevKit의 USB 단자와 MacBook을 데이터 micro-USB 케이블로 연결한 뒤
+다음 명령을 실행합니다.
+
+```bash
+npm run start:open
+```
+
+이 명령은 `.venv`의 Python으로 LIVE 백엔드를 시작하고, macOS의 단일
+`/dev/cu.usbmodem*` ESP32_A를 USB gateway에 연결한 다음 기본 브라우저에서
+`http://127.0.0.1:8080/demo`을 엽니다. 최초 실행이거나 `.venv`가 없으면 먼저
+`npm run setup:python`을 실행합니다. 종료할 때는 명령을 실행한 터미널에서
+`Ctrl+C`를 누릅니다.
 
 USB modem이 여러 개면 ESP32_A 장치를 지정합니다.
 
 ```bash
-python3 -m serial.tools.list_ports -v
-python3 server.py --transport usb --usb-port /dev/cu.usbmodem1101
+.venv/bin/python -m serial.tools.list_ports -v
+.venv/bin/python server.py --transport usb --usb-port /dev/cu.usbmodem1101
 ```
 
 `/dev/cu.SLAB_USBtoUART` 같은 USB-UART bridge는 자동 선택하지 않습니다.
@@ -86,7 +102,7 @@ npm run dev
 ESP32_A 없이 화면만 개발할 때 MOCK을 명시합니다.
 
 ```bash
-python3 server.py --transport mock
+.venv/bin/python server.py --transport mock
 ```
 
 | 환경 변수 | 기본값 | 의미 |
