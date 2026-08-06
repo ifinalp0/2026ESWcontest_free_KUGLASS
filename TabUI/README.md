@@ -1,103 +1,42 @@
 # KUGLASS TabUI
 
-TabUI는 MacBook에서 직접 실행되는 KUGLASS 백엔드와 브라우저 HMI, ESP32_A USB gateway입니다.
+TabUI는 MacBook에서 직접 실행되는 로컬 백엔드, 브라우저 HMI와 ESP32_A USB
+gateway입니다. 화면과 고수준 명령, 상태 중계, replay snapshot을 담당하며
+LIVE 자동 정책이나 CH0~CH3 목표 배열은 계산하지 않습니다.
+
+## 구성
 
 ```text
 브라우저(MacBook 또는 신뢰된 격리 LAN의 태블릿)
-  -> HTTP /api/command
-MacBook TabUI backend
-  -> micro-USB cable
-  -> ESP32_A DevKit USB connector / USB Serial-JTAG CDC
-     JSON Lines + on-demand KUGLCAM1/JPEG frame multiplexing
-ESP32_A: 카메라·내부온도·정책·CH0~CH3 MI
-  -> ESP32_B_Algo firmware: Logic Carrier를 통해 단일 채널 Power Stage PCB 4장 제어
+  -> HTTP
+MacBook TabUI frontend/backend
+  -> 데이터 micro-USB
+ESP32_A DevKit USB Serial/JTAG CDC
+  -> 센서·정책·목표 MI / ESP32_B 상태
 ```
 
-TabUI는 화면 제공, 고수준 명령 검증·변환, ESP32_A telemetry 중계와 replay snapshot을 담당합니다. LIVE 자동 정책과 채널 목표 배열은 ESP32_A가 계산합니다. MacBook과 ESP32_A 사이에는 별도 GPIO UART 배선을 사용하지 않으며, ESP32_A DevKit의 USB 단자에 micro-USB 케이블을 직접 연결합니다.
+MacBook↔ESP32_A에는 별도 GPIO UART를 사용하지 않습니다. ESP32_A DevKit의 USB
+단자에 데이터 micro-USB 케이블을 직접 연결하고 macOS의 `/dev/cu.usbmodem*`
+장치를 엽니다.
 
-## 화면과 동작
+## 제공 기능
 
 - IONIQ 5 3D 모형과 CH0~CH3 선택
 - 기본, 열부하, 차박, 주차, 카메라 역광 시나리오
 - 채널별 30초 수동 MI와 AUTO 복귀
-- 카메라 좌/우 ROI 포화도, Edge Density와 내부온도 표시
-- `영상 보기` 버튼으로 ESP32_A OV2640 실시간 영상 열기/닫기
-- ESP32_A `targetMi`/`commandedMi`와 ESP32_B `appliedMi` 분리
-- SERVER, ESP32_A와 ESP32_B 연결·stale·Fault 상태 구분
+- 카메라 좌/우 ROI 포화, Edge Density와 내부온도 표시
+- on-demand ESP32_A OV2640 영상
+- A의 target/commanded MI와 B의 applied MI 분리
+- SERVER, ESP32_A, ESP32_B의 online·stale·Fault 분리
+- LIVE, MOCK, REPLAY의 명시적 구분
 
-`LIVE` 연결이 끊기면 마지막 실제 값을 유지하고 명령을 막습니다. 브라우저 상태를 MOCK으로 자동 전환하지 않습니다. `MOCK`은 명시적으로 mock transport를 선택했을 때만 사용합니다.
+LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습니다. MOCK으로
+자동 전환하지 않습니다. 포화 감소율은 전·후 자극 값이 함께 있는 MOCK에서만
+계산하며, LIVE에서는 baseline 없이 임의의 개선율을 만들지 않습니다.
 
-포화 감소율은 원본 카메라 자극과 적용 후 값을 함께 제공하는 MOCK에서만 계산합니다. LIVE는 별도의 baseline capture가 없으면 현재 ROI 포화도만 표시합니다.
-
-## 카메라 영상 보기
-
-정책 근거 패널의 `영상 보기` 버튼을 누르면 ESP32_A가 VGA(640×480) RGB565
-프레임을 품질 90 JPEG로 변환해 최대 약 5 fps로 전송합니다. 독립 시험 프로젝트에서 확인한
-`KUGLCAM1` 28바이트 header, JPEG marker와 FNV-1a 검사를 참고했지만,
-제품 구현은 `ESP32_A_Algo/`와 TabUI 안에서 완결되며 standalone 프로젝트를
-빌드 입력이나 별도 프로세스로 사용하지 않습니다.
-
-영상과 JSON 텔레메트리는 기존 DevKit USB Serial/JTAG 연결 하나에서 다중화됩니다.
-따라서 외부 UART, 두 번째 USB 케이블 또는 별도 카메라 viewer를 추가하지 않습니다.
-TabUI 수신기는 JSON record와 JPEG frame을 분리하고, 검사가 끝난 최신 JPEG만
-동일 출처 HTTP API로 브라우저에 제공합니다. ESP32_A에서는 JPEG USB 송출을
-별도의 저우선순위 task가 맡아 다음 카메라 분석과 겹쳐 처리하며, 전송 queue가
-차 있으면 추가 JPEG 생성을 건너뜁니다. 목표 MI 계산과 ESP32_B heartbeat가 항상
-영상 처리보다 높은 우선순위입니다.
-
-영상 전송은 버튼을 연 동안에만 요청됩니다. 요청은 15초 lease이며 열린 뷰어가
-10초마다 갱신합니다. 뷰어 종료, 브라우저 이탈 또는 갱신 중단 시 `camera_stream`
-off 명령 또는 lease 만료로 중지됩니다. 영상 인코딩 실패는 카메라 ROI 분석,
-20 Hz 제어 정책 또는 ESP32_B heartbeat를 중단시키지 않습니다.
-
-MOCK에는 실제 카메라 프레임이 없으므로 뷰어의 대기 상태만 확인할 수 있습니다.
-
-## ESP32_A 명령
-
-TabUI backend는 `v=1`, `type=ui_command`, 단조 증가 `seq`를 갖는 compact JSON Lines를 전송합니다.
-
-```json
-{"v":1,"type":"ui_command","seq":1,"command":"set_mode","mode":"camping"}
-{"v":1,"type":"ui_command","seq":2,"command":"set_demo","demo_mode":"camping"}
-{"v":1,"type":"ui_command","seq":3,"command":"manual_channel","channel_id":0,"target_mi":0.42,"ttl_ms":30000,"enable":true}
-{"v":1,"type":"ui_command","seq":4,"command":"return_auto","channel_id":0}
-{"v":1,"type":"ui_command","seq":5,"command":"camera_stream","enable":true,"ttl_ms":15000}
-```
-
-채널은 0~3만 허용합니다. 자동 모드에서는 저수준 `ch` 배열을 생성하지 않습니다.
-
-HIL 환경 입력은 내부온도와 카메라 좌/우 포화도·Edge Density만 지원합니다. LIVE에서는 환경과 latched fault를 UI 값으로 덮어쓰지 않습니다.
-
-## 상태 정규화
-
-지원 장치 record:
-
-- `type=boot`: ESP32_A 역할과 진단 허용 여부
-- `type=ack`: 명령 sequence 수락 또는 거부
-- `type=state`: ESP32_A 정책, 카메라·온도와 CH0~CH3 목표/명령 상태
-- `type=status`, `controller_id=B`: ESP32_B 실제 적용 MI와 Fault
-- `type=protocol_error`: A 또는 B link 오류
-
-`appliedMi`는 유효한 ESP32_B 상태에서만 갱신합니다. A의 목표값을 실제 적용값으로 대신 표시하지 않습니다.
-
-ESP32_B status는 `v`, `seq`, `boot_id`, `reset_challenge`, `estop`,
-`fault_code`, 정확히 네 채널과 ADC block을 함께 검증합니다. 잘못된 B status는
-UI 상태나 장치 연결 freshness를 갱신하지 않습니다. B UART 통신 상태와 E-Stop/Fault
-같은 operational 상태는 서로 분리해 표시합니다.
-
-ADC의 current/temperature 항목은 Power Stage의 sense 입력입니다. calibration이
-유효하면 mV, 그렇지 않으면 유효 mask가 설정된 raw 값만 표시합니다. 회로의 전류
-환산계수와 NTC 곡선이 확정되기 전에는 이를 A 또는 °C 값으로 변환하지 않습니다.
-`reset_fault` 결과는 B의 `control_result.seq`와 A가 중계한 최종 ACK sequence로
-상관되며, 요청을 UART에 쓴 것만으로 성공으로 표시하지 않습니다.
-
-## MacBook LIVE 실행
+## 빠른 시작
 
 Node.js 22+와 Python 3.11+를 권장합니다.
-
-1. ESP32_A DevKit의 USB 단자와 MacBook을 데이터 통신이 가능한 micro-USB 케이블로 연결합니다.
-2. ESP32_A firmware는 `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`로 빌드·플래시합니다.
-3. TabUI 의존성을 설치하고 로컬 백엔드를 실행합니다.
 
 ```bash
 python3 -m venv .venv
@@ -108,62 +47,98 @@ npm run build
 npm start
 ```
 
-브라우저에서 `http://localhost:8080/demo`을 엽니다. `npm start`는 기본적으로 `usb` transport를 사용하며 macOS의 단일 `/dev/cu.usbmodem*` 장치를 자동으로 찾습니다. 둘 이상의 USB modem 장치가 연결되어 있으면 장치를 명시합니다.
+브라우저에서 `http://localhost:8080/demo`을 엽니다. `npm start`의 기본값은
+`--transport usb --usb-port auto`이며 단일 `/dev/cu.usbmodem*`를 자동 선택합니다.
 
-```bash
-python3 server.py --transport usb --usb-port /dev/cu.usbmodem1101
-```
-
-장치 이름은 다음 명령으로 확인할 수 있습니다.
+USB modem이 여러 개면 ESP32_A 장치를 지정합니다.
 
 ```bash
 python3 -m serial.tools.list_ports -v
+python3 server.py --transport usb --usb-port /dev/cu.usbmodem1101
 ```
 
-`/dev/cu.SLAB_USBtoUART` 같은 USB-to-UART bridge 장치는 자동 선택하지 않습니다. 현재 제품 경로는 ESP32_A DevKit의 내장 USB Serial/JTAG 단자가 만드는 `/dev/cu.usbmodem*`입니다. pyserial은 macOS CDC/ACM 장치 파일을 여는 라이브러리로만 사용하며, MacBook과 ESP32_A 사이에 외부 UART TX/RX 배선을 뜻하지 않습니다.
+`/dev/cu.SLAB_USBtoUART` 같은 USB-UART bridge는 자동 선택하지 않습니다.
 
 ## 프런트엔드 개발
 
-두 터미널에서 다음을 실행합니다.
+두 터미널에서 backend와 Vite를 실행합니다.
 
 ```bash
 npm run dev:api
+```
+
+```bash
 npm run dev
 ```
 
-`http://localhost:5173/demo`을 엽니다. Vite가 `/api`와 `/health`를 MacBook의 8080 포트 백엔드로 proxy합니다.
+`http://localhost:5173/demo`을 엽니다. Vite는 `/api`와 `/health`를 8080 포트의
+로컬 backend로 proxy합니다.
 
-## MOCK
+## MOCK과 설정
 
-ESP32_A 없이 화면만 개발할 때 명시적으로 MOCK을 선택합니다.
+ESP32_A 없이 화면만 개발할 때 MOCK을 명시합니다.
 
 ```bash
 python3 server.py --transport mock
 ```
 
-| 변수 | 기본값 | 설명 |
-|---|---:|---|
-| `TABUI_TRANSPORT` | `usb` | MacBook LIVE의 `usb` 또는 명시적 `mock` |
+| 환경 변수 | 기본값 | 의미 |
+| --- | --- | --- |
+| `TABUI_TRANSPORT` | `usb` | LIVE `usb` 또는 명시적 `mock` |
 | `TABUI_USB_PORT` | `auto` | ESP32_A `/dev/cu.usbmodem*` 자동 탐색 또는 명시 경로 |
-| `TABUI_HIL_ENABLED` | `0` | TabUI HIL 명령 허용 |
-| `TABUI_PORT` | `8080` | 로컬 백엔드 HTTP 포트 |
+| `TABUI_HIL_ENABLED` | `0` | 격리 HIL 명령 허용 |
+| `TABUI_PORT` | `8080` | backend HTTP 포트 |
 
-## 안전 경계
+MOCK/REPLAY는 ESP32_A USB 장치를 열거나 하드웨어 출력 명령을 만들지 않습니다.
 
-- LIVE 장치가 연결되지 않았거나 telemetry가 stale이면 명령을 HTTP 503으로 거부합니다.
-- TabUI와 ESP32_A가 모두 HIL을 허용한 격리 벤치에서만 환경·fault 진단 명령을 사용합니다.
-- 채널 slider 연속 명령은 채널별 최신 값만 75 ms 간격으로 전달합니다.
-- replay는 기본적으로 `TabUI/data/replays`의 상태 snapshot이며 하드웨어 명령을 만들지 않습니다.
-- 현재 서버는 plain HTTP와 인증 없는 시연용 구성이므로 신뢰된 격리 LAN에서만 직접 사용합니다.
+## 명령과 상태
+
+TabUI↔A 명령, ACK, A state, B status와 Fault reset은
+[`../docs/PROTOCOL.md`](../docs/PROTOCOL.md)를 따릅니다.
+
+- backend는 `v=1`, `type=ui_command`, 단조 증가 `seq`를 가진 compact JSON
+  Lines를 전송합니다.
+- 채널은 0~3만 허용하며 LIVE 자동 모드에서 저수준 `ch` 배열을 만들지 않습니다.
+- 환경·Fault 주입은 TabUI와 ESP32_A 양쪽이 허용한 격리 HIL에서만 사용합니다.
+- `appliedMi`는 strict 검증을 통과한 B status에서만 갱신합니다.
+- 잘못된 B status는 UI 상태나 link freshness를 갱신하지 않습니다.
+- A/B 통신 상태와 E-Stop/Fault operational 상태를 분리합니다.
+- ADC는 validity가 있는 raw 또는 mV만 표시하고 A/°C로 임의 변환하지 않습니다.
+- Fault reset은 B `control_result`와 최종 A ACK가 일치할 때만 성공으로 표시합니다.
+
+## 카메라 영상
+
+`영상 보기`를 열면 ESP32_A가 VGA 640×480 RGB565를 품질 90 JPEG로 변환하여
+최대 약 5 fps로 전송합니다. JSON Lines와 `KUGLCAM1` JPEG는 기존 USB
+Serial/JTAG stream 하나에서 다중화됩니다. 별도 UART, 두 번째 USB 케이블이나
+외부 viewer process는 사용하지 않습니다.
+
+backend는 header, JPEG marker와 FNV-1a 검사를 통과한 최신 frame만 동일 출처
+HTTP API로 제공합니다. 요청은 15초 lease이고 열린 viewer가 10초마다 갱신합니다.
+종료·이탈·갱신 중단 시 off 명령 또는 lease 만료로 중지됩니다. 영상 실패는
+카메라 scalar metric, A의 정책이나 20 Hz A→B heartbeat를 멈추지 않습니다.
+
+MOCK에는 실제 frame이 없으므로 viewer 대기 상태만 확인할 수 있습니다.
 
 ## API
 
-- `GET /health`: 서버와 ESP32_A link 상태
-- `GET /api/state`: 전체 UI 상태와 A/B link 상태
-- `GET /api/camera/status`: 영상 요청·최신 프레임·FPS·검사 오류 상태
-- `GET /api/camera/frame?after=<seq>`: 새 프레임이 있을 때만 반환하는 JPEG
-- `POST /api/command`: 고수준 UI 명령
-- `GET /demo`: 태블릿 UI
+| endpoint | 역할 |
+| --- | --- |
+| `GET /health` | 서버와 ESP32_A link 상태 |
+| `GET /api/state` | UI 전체 상태와 A/B link 상태 |
+| `GET /api/camera/status` | 영상 lease, 최신 frame, FPS와 검사 오류 |
+| `GET /api/camera/frame?after=<seq>` | 새 frame이 있을 때 JPEG 반환 |
+| `POST /api/command` | 고수준 UI 명령 |
+| `GET /demo` | 태블릿 HMI |
+
+## 안전과 네트워크
+
+- 장치가 없거나 LIVE telemetry가 stale이면 명령을 HTTP 503으로 거부합니다.
+- 채널 slider는 채널별 최신 값만 75 ms 간격으로 전달합니다.
+- replay는 `TabUI/data/replays`의 상태 snapshot이며 감사 로그나 제어 완료 증거가
+  아닙니다.
+- 서버는 인증 없는 plain HTTP 시연 구성입니다. localhost 또는 신뢰된 격리
+  LAN에서만 직접 사용합니다.
 
 ## 검증
 
@@ -172,4 +147,5 @@ npm run check
 npm run build
 ```
 
-`npm run check`는 TypeScript 검사와 Python unit test를 실행합니다.
+`npm run check`는 TypeScript typecheck와 Python unit test를 실행합니다. 전체
+변경별 검증 범위는 [`../docs/VALIDATION.md`](../docs/VALIDATION.md)를 참고하세요.

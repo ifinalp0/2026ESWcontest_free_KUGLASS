@@ -1,93 +1,84 @@
-# ESP32_B_Algo
+# ESP32_B 제품 펌웨어
 
-`ESP32_B_Algo/`는 KUGLASS의 **ESP32_B DevKit**에 빌드·플래시하는 canonical ESP-IDF 펌웨어 프로젝트입니다. ESP32_B는 물리 장치 이름이며, 이 폴더가 ESP32_A에서 받은 CH0~CH3 명령을 검증하고 제작된 Logic Carrier를 통해 제작된 단일 채널 Power Stage PCB 네 장에 `PWM_MAG`, `DIR`, `ENABLE`을 출력하는 actuator 로직을 구현합니다. 핀과 신호 극성은 [`hardware/README.md`](../hardware/README.md)와 [`esp32_b_io.json`](../hardware/contracts/esp32_b_io.json)의 as-built 계약을 기준으로 구현했습니다.
+`ESP32_B_Algo/`는 KUGLASS의 ESP32_B DevKit에 빌드·플래시하는 canonical
+ESP-IDF 프로젝트입니다. ESP32_A의 CH0~CH3 명령을 검증하고 제작된 Logic
+Carrier를 통해 단일 채널 Power Stage PCB 4장을 구동합니다.
 
-이 프로젝트는 protocol/JSON 구현까지 `ESP32_B_Algo/` 안에 포함하므로 ESP32_A 소스 디렉터리에 빌드 의존성이 없습니다.
+이 프로젝트는 protocol과 JSON 구현을 자체 소유하며 ESP32_A source에 빌드
+의존성이 없습니다. `For_Test/`의 독립 시험 firmware는 제품 대체 구현이 아니며,
+제품 변경은 이 폴더와 `host_tests/`를 기준으로 합니다.
 
-독립 시험용 펌웨어는 `../For_Test/`에 격리되어 있으며 ESP32_B 제품 펌웨어의 대체 구현이나 빌드 입력이 아닙니다. 제품 변경 검증에는 이 폴더의 `host_tests/`를 함께 사용합니다.
+## 책임
+
+- A→B full-frame의 version, sequence, TTL, 채널 집합과 값 검증
+- CH0~CH3의 16 kHz carrier와 60 Hz polarity SPWM 생성
+- E-Stop, Power Stage Fault, invalid frame, timeout과 watchdog safe-off
+- 방향 전환 blanking과 MI slew
+- 실제 applied MI, Fault, ADC와 reset 결과 status 전송
+- boot/session/challenge에 묶인 latched Fault reset
+
+## 코드 구조
+
+| 경로 | 역할 |
+| --- | --- |
+| `main/app_main.cpp` | 하드웨어 초기화, task와 link 조립 |
+| `main/control_protocol.*` | actuator/control frame 검증 |
+| `main/channel_manager.*` | full-frame 적용, MI slew와 출력 상태 |
+| `main/spwm_generator.*` | MCPWM, 60 Hz 위상과 방향 blanking |
+| `main/fault_manager.*` | E-Stop/Fault/timeout latch와 reset |
+| `main/analog_monitor.*` | ADC1 8채널 sampling과 validity |
+| `main/status_reporter.*` | B status와 `control_result` |
+| `main/power_stage_pinmap.h` | Logic Carrier exact pin 계약 |
+| `host_tests/` | 제품 계약의 host 검증 |
+
+## 출력과 안전 동작
 
 ```text
-ESP32_A
-  -> UART JSONL: 4채널 full command + seq + TTL
-ESP32_B
-  -> 검증 / fault latch / MI slew / 60 Hz SPWM
-Logic Carrier
-  -> CHx_ENABLE = EN_GLOBAL AND ENABLE_CHx
-단일 채널 Power Stage PCB x4 (CH0~CH3 각 1장)
-  -> RUN_OK = CHx_ENABLE AND FAULT_N
-  -> PWM_LEFT = PWM_MAG AND DIR
-  -> PWM_RIGHT = PWM_MAG AND NOT DIR
+ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
+                          |                    |
+                          +<- Fault/ADC <------+
 ```
 
-## 안전 동작
+- 초기화 첫 단계에서 네 `ENABLE`을 LOW, MCPWM을 continuous force-low로 만듭니다.
+- `EN_GLOBAL`과 네 `FAULT_N` falling edge는 ISR에서 latch하고 software enable을
+  즉시 LOW로 내립니다.
+- invalid/oversize JSON, 불완전·중복 채널, 범위 밖 MI, 활성 lease의 stale
+  sequence는 lease 전체를 무효화하고 safe-off합니다.
+- timeout과 output task watchdog도 `ENABLE LOW + PWM force-low + applied_mi=0`으로
+  처리합니다.
+- 방향 반전 순서는 `ENABLE LOW -> PWM force-low -> 1 ms blanking -> DIR 변경 ->
+  PWM 준비 -> 안전 입력 재검사 -> ENABLE HIGH`입니다.
+- IRS2104 bootstrap refresh를 위해 MI/duty는 최대 0.95입니다. 10 MHz MCPWM에서
+  1 carrier tick보다 작은 duty는 enable하지 않습니다.
+- 물리 E-Stop과 Power Stage `RUN_OK`가 최종 차단 경로지만 인증된 안전 회로는
+  아닙니다.
 
-- 초기화 첫 단계에서 네 `ENABLE`을 LOW로 만들고 MCPWM을 continuous force-low로 고정합니다.
-- E-Stop `EN_GLOBAL`과 네 `FAULT_N`의 falling edge는 ISR에서 latch하며, 모든 software enable을 즉시 LOW로 내립니다.
-- ISR는 lock을 기다리지 않고 trip을 먼저 기록해 enable을 내리며, 출력 task는 ENABLE commit 전후의 trip/event를 모두 검사합니다. 입력이 다시 HIGH가 되어도 승인되지 않은 edge가 있으면 재활성화되지 않습니다.
-- 잘못된 JSON, oversize line, 불완전/중복 channel set, 범위 밖 MI, active lease 중 stale sequence는 현재 command lease 전체를 즉시 무효화하고 safe-off합니다.
-- 통신 TTL 초과, E-Stop, Power Stage fault, 출력 task watchdog 실패도 `ENABLE LOW + PWM force-low + applied_mi=0`으로 처리합니다.
-- 방향 반전은 `ENABLE LOW -> PWM force-low -> 1 ms blanking -> DIR 변경 -> PWM 준비 -> 안전 입력 재검사 -> ENABLE HIGH` 순서입니다.
-- Power Stage의 IRS2104 bootstrap refresh 여유를 위해 MI/duty는 최대 `0.95`로 제한합니다. 10 MHz MCPWM에서 1 carrier tick보다 작은 duty는 enable하지 않습니다.
-- 출력 task는 실제 경과시간으로 60 Hz 위상과 MI slew를 갱신하며 100 ms task watchdog에 등록됩니다.
+## 하드웨어 계약
 
-물리 E-Stop과 Power Stage의 `RUN_OK` 차단이 최종 안전 경로입니다. 이 펌웨어만으로 인증된 안전 회로를 대체하지 않습니다.
+핀과 극성의 기준은 [`../hardware/README.md`](../hardware/README.md),
+[`esp32_b_io.json`](../hardware/contracts/esp32_b_io.json)과 회로 원본입니다.
 
-## 명령과 reset
-
-정상 출력 명령은 CH0~CH3를 정확히 한 번씩 포함해야 합니다.
-
-```json
-{"v":1,"type":"actuator_command","seq":5501,"ttl_ms":250,"ch":[[0,0.72,true],[1,0.68,true],[2,0.42,true],[3,0.55,true]]}
-```
-
-- `seq`는 active lease 동안 wrap-safe forward 값이어야 합니다.
-- `ttl_ms` 허용 범위는 50~1000 ms입니다.
-- 통신 timeout 또는 invalid command fault는 다음 정상 full frame으로 복구할 수 있습니다.
-- E-Stop/Power Stage fault는 입력이 HIGH로 복귀해도 latch되며 명시적 reset이 필요합니다.
-
-```json
-{"v":1,"type":"control","seq":9001,"source_session_id":2712847316,"target_boot_id":305419896,"reset_challenge":2271560481,"command":"reset_fault"}
-```
-
-`source_session_id`는 A가 부팅마다 생성한 nonzero u32, `target_boot_id`와 `reset_challenge`는 가장 최근 B status에서 받은 값이어야 합니다. B는 challenge를 각 safety trip과 유효 reset 시도마다 원자적으로 교체하므로 지연·재생된 reset이 이후 fault를 지울 수 없습니다. 모든 안전 입력이 HIGH이고 challenge 확인 뒤 새 ISR event가 없을 때만 fault를 clear하며, 성공 후에도 새 actuator full frame이 오기 전까지 출력하지 않습니다. A는 UART write만으로 성공 처리하지 않고 아래 `control_result`를 정확한 `source_session_id`와 `seq`로 확인해야 합니다.
-
-## 상태와 ADC
-
-B가 송신하는 모든 프레임은 현재 A가 파싱할 수 있는 `type=status` 형식입니다. `seq`는 command sequence가 아니라 B의 독립적인 status sequence이므로 100 ms 주기 frame마다 증가합니다. 부팅·오류·reset 결과는 선택적 `diagnostic` 필드로 전달됩니다.
-
-```json
-{"v":1,"type":"status","controller_id":"B","seq":101,"boot_id":305419896,"reset_challenge":2271560481,"estop":false,"fault_code":"NONE","ch":[{"id":0,"mi":0.7200,"fault":false},{"id":1,"mi":0.6800,"fault":false},{"id":2,"mi":0.4200,"fault":false},{"id":3,"mi":0.5500,"fault":false}],"adc":{"initialized":true,"i_cali":true,"t_cali":true,"raw_valid_mask":255,"mv_valid_mask":255,"i_raw":[120,121,119,122],"t_raw":[2010,2002,2021,1998],"i_mv":[28,29,28,29],"t_mv":[1620,1614,1628,1611]}}
-```
-
-- `boot_id`는 B 부팅 동안 고정되고 재부팅 때 바뀝니다. `reset_challenge`는 one-time reset 권한이며 safety trip 또는 reset 시도 뒤 바뀝니다. 둘 다 nonzero u32입니다.
-- reset 응답 status에는 `control_result:{"command":"reset_fault","seq":9001,"source_session_id":2712847316,"ok":true,"error":"NONE"}`가 추가됩니다. 실패 error는 `RESET_UNSAFE`, `TARGET_BOOT_MISMATCH`, `CHALLENGE_MISMATCH` 중 하나입니다.
-- `mi`는 목표값이 아니라 B가 실제로 적용 중인 값입니다. safe-off 즉시 0이 됩니다.
-- `raw_valid_mask`와 `mv_valid_mask`의 bit 0~3은 CH0~CH3 current, bit 4~7은 CH0~CH3 temperature입니다.
-- current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
-- 각 입력은 settling read 뒤 5개 표본 median과 EWMA 1/8을 거칩니다. 전체 8채널 scan 주기는 5 ms이고 100 ms보다 오래된 표본은 status에서 invalid 처리합니다.
-- ESP-IDF curve-fitting calibration을 만들 수 없더라도 raw ADC는 계속 보고합니다. 이때 해당 `mv_valid_mask` bit는 0입니다.
-- `diagnostic` 예: `BOOT`, `BOOT_ADC_UNAVAILABLE`, `INVALID_CHANNEL_SET`, `RESET_OK`, `RESET_UNSAFE`, `TARGET_BOOT_MISMATCH`, `CHALLENGE_MISMATCH`.
-
-Power Stage의 R9 0.1 ohm과 R14/TH1 10 kohm에서 명목 current/temperature 관계를 계산할 수 있지만, NTC Beta와 보드별 slope/offset, 허용 온도 및 실제 fault 임계값은 측정 기록이 없습니다. 따라서 ADC는 현재 진단 telemetry이며 보정되지 않은 수치로 software over-current/over-temperature trip을 만들지 않았습니다. 명목식과 상태는 [`power_stage.json`](../hardware/contracts/power_stage.json)에 있습니다.
-
-## Logic Carrier 핀맵
-
-| 채널 | `PWM_MAG` | `DIR` | `ENABLE` | `FAULT_N` | Current ADC | Temperature ADC |
+| 채널 | `PWM_MAG` | `DIR` | MCU `ENABLE` | `FAULT_N` | Current ADC | Temperature ADC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | CH0 | GPIO10 | GPIO11 | GPIO12 | GPIO13 | GPIO1 / ADC1_CH0 | GPIO2 / ADC1_CH1 |
 | CH1 | GPIO14 | GPIO15 | GPIO16 | GPIO17 | GPIO4 / ADC1_CH3 | GPIO5 / ADC1_CH4 |
 | CH2 | GPIO18 | GPIO21 | GPIO38 | GPIO39 | GPIO6 / ADC1_CH5 | GPIO7 / ADC1_CH6 |
 | CH3 | GPIO40 | GPIO41 | GPIO42 | GPIO47 | GPIO8 / ADC1_CH7 | GPIO3 / ADC1_CH2 |
 
-- `EN_GLOBAL`은 GPIO19 active-high input입니다. NC E-Stop과 외부 10 kΩ pull-down을 firmware가 우회하지 않습니다.
-- `FAULT_N`은 외부 10 kΩ pull-up이 있는 active-low 입력입니다.
-- ADC 여덟 개에는 Carrier의 1 kΩ/100 nF filter가 있지만 별도 clamp는 없습니다.
-- GPIO3은 strapping pin이고, DevKitC-1 onboard RGB LED의 GPIO38 사용은 `ENABLE_CH2`와 충돌하므로 LED/RMT를 초기화하면 안 됩니다.
-- J7의 모든 짝수 핀은 GND입니다. 각 채널은 단일 `PWM_MAG/DIR` 인터페이스이며 `PWM_A/PWM_B` 직접 출력 방식이 아닙니다.
+- `EN_GLOBAL`은 GPIO19 active-high input-only입니다. USB/JTAG나 pull-up으로
+  재구성하지 않습니다.
+- `FAULT_N`은 외부 10 kΩ pull-up을 사용하는 active-low 입력입니다.
+- Logic Carrier가 `CHx_ENABLE = EN_GLOBAL AND ENABLE_CHx`를 만듭니다.
+- 각 Power Stage의 `RUN_OK = CHx_ENABLE AND FAULT_N`이 두 IRS2104를 shutdown합니다.
+- ADC 입력에는 1 kΩ/100 nF filter가 있지만 divider/clamp가 없습니다.
+- GPIO3은 strapping pin, GPIO38은 일부 DevKit의 RGB LED와 공유됩니다.
+- J7은 모든 짝수 핀이 GND인 2x32입니다. pin 1과 mating 방향은 실물에서 확인합니다.
 
-## UART와 설정
+ESP32_B를 Power Stage에 직결하거나 Logic Carrier를 생략하지 않습니다.
 
-B UART1 기본 핀은 TX=GPIO43, RX=GPIO44, 115200 8-N-1입니다. Logic Carrier에는 A↔B UART connector가 없으므로 공통 GND를 포함한 외부 harness가 필요합니다.
+## A↔B UART
+
+UART1은 115200 8-N-1, B TX=GPIO43, RX=GPIO44입니다.
 
 ```text
 ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
@@ -95,32 +86,46 @@ ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
 GND               --- GND
 ```
 
-GPIO43/44는 DevKit의 onboard USB-UART/ROM UART0와도 연결될 수 있습니다. 외부 A 신호와 bridge TX의 push-pull contention, ROM boot byte 유입 여부를 반드시 실기에서 확인해야 합니다. `sdkconfig.defaults`는 USB Serial/JTAG를 비활성화하여 GPIO19 `EN_GLOBAL` 점유를 막고, console 및 second-stage bootloader log를 끄며, GPIO 제어 함수를 IRAM에 배치합니다. ROM 자체 출력은 eFuse를 변경하지 않았으므로 보드에서 별도 확인이 필요합니다.
+Logic Carrier에 UART connector가 없으므로 외부 harness가 필요합니다. GPIO43/44와
+DevKit USB-UART bridge의 push-pull contention, ROM boot byte 유입을 실기에서
+확인해야 합니다. `sdkconfig.defaults`는 native USB Serial/JTAG와 console을
+비활성화하고 GPIO 제어 함수를 IRAM에 배치합니다.
+
+## 통신과 ADC 상태
+
+Actuator command, B status와 Fault reset의 frame은
+[`../docs/PROTOCOL.md`](../docs/PROTOCOL.md)를 따릅니다.
+
+- B의 status `seq`는 command와 별개이며 100 ms마다 증가합니다.
+- nonzero `boot_id`는 부팅 동안 유지되고, `reset_challenge`는 safety trip과 reset
+  시도 후 교체됩니다.
+- E-Stop/Power Stage Fault는 입력이 HIGH로 돌아와도 latched 상태이며 안전 조건과
+  일치하는 reset이 필요합니다. 성공 뒤에도 새 full command 전까지 출력하지 않습니다.
+- ADC는 5 ms마다 8채널을 scan하고 settling read, 5-sample median, EWMA 1/8을
+  적용합니다. 100 ms보다 오래된 값은 invalid입니다.
+- current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
+- calibration 생성이 실패해도 raw는 보고하되 해당 mV validity bit는 0입니다.
+- 보드별 slope/offset, NTC 계수와 보호 임계가 실측되기 전 raw/mV를 A/°C 또는
+  software trip 기준으로 사용하지 않습니다.
 
 ## 빌드와 검증
 
-ESP-IDF 6.0.2 / ESP32-S3 빌드:
+ESP-IDF 6.0.2와 ESP32-S3를 사용합니다.
 
 ```bash
-python3 hardware/tools/validate_hardware_contract.py
+python3 ../hardware/tools/validate_hardware_contract.py
 
-cd ESP32_B_Algo
 idf.py set-target esp32s3
 idf.py build
 sh host_tests/run_tests.sh
 ```
 
-Host test는 exact pin/ADC channel, session/challenge가 필수인 strict reset parser, correlated reset result formatting, transactional full-frame 적용, 0.95 clamp, hard safe-off, fault 우선순위, ADC filter와 timestamp wrap, status/diagnostic, 1-tick 이하 PWM 차단, 방향 blanking, ENABLE commit 거부, oversize JSONL 복구를 검사합니다.
+Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
+full frame, 0.95 clamp, hard safe-off, Fault priority, ADC filter/stale, status,
+direction blanking, ENABLE commit 거부와 JSONL 복구를 검사합니다.
 
-실제 Power Stage/HV를 연결하기 전에는 다음 HIL 검증이 필요합니다.
-
-1. 전원 인가와 reset 전 구간에서 네 `ENABLE`, `PWM_MAG`, `DIR` 파형 확인
-2. 네 채널 16 kHz carrier, 60 Hz polarity, 최대 95% duty 확인
-3. 방향 전환 시 ENABLE/PWM LOW blanking 시간 확인
-4. 짧은 `FAULT_N`/E-Stop pulse가 latch되고 reset 전까지 재활성되지 않는지 확인
-5. UART 단선/oversize/stale/replayed frame과 task watchdog safe-off 확인
-6. GPIO3 cold boot, GPIO19 USB/reset glitch, GPIO38 RGB LED contention 확인
-7. ADC 여덟 입력의 실제 전압 범위, current 환산, NTC 곡선과 saturation 확인
-8. 제작된 단일 채널 Power Stage PCB 네 장 각각에서 `RUN_OK = CH_ENABLE AND FAULT_N` 확인
-
-최초 검증은 Power Stage와 고전압을 분리한 상태에서 logic-level 파형부터 수행하십시오.
+실제 Power Stage/HV를 연결하기 전에는
+[`../hardware/validation/README.md`](../hardware/validation/README.md)의 순서로
+부팅·reset 출력, 4채널 carrier/polarity, blanking, E-Stop/Fault pulse, UART 실패,
+GPIO3/19/38, ADC 입력 범위와 네 Power Stage의 `RUN_OK`를 검증합니다. 최초 시험은
+Power Stage와 고전압을 분리한 logic-level 조건에서 시작합니다.
