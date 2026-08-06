@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "status": "active_for_as_built_hardware",
+  "invariants": [
+    {
+      "id": "HW-001",
+      "severity": "critical",
+      "rule": "ESP32_B must use the manufactured Logic Carrier between the MCU and every Power Stage; no direct replacement pinmap or bypass is allowed."
+    },
+    {
+      "id": "HW-002",
+      "severity": "critical",
+      "rule": "ENABLE_CH0 through ENABLE_CH3 must be driven low and PWM forced low before any other output initialization."
+    },
+    {
+      "id": "HW-003",
+      "severity": "critical",
+      "rule": "GPIO19 EN_GLOBAL is input-only, must not enable native USB/JTAG on ESP32_B, and must never be driven or internally pulled high."
+    },
+    {
+      "id": "HW-004",
+      "severity": "critical",
+      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a low level latches safe-off and a high level alone does not prove connector presence."
+    },
+    {
+      "id": "HW-005",
+      "severity": "critical",
+      "rule": "Output enable requires a valid full CH0-CH3 command, live TTL, EN_GLOBAL high, and every FAULT_N high."
+    },
+    {
+      "id": "HW-006",
+      "severity": "critical",
+      "rule": "Safe-off lowers channel enable first, then forces PWM low and applies the safe direction state."
+    },
+    {
+      "id": "HW-007",
+      "severity": "critical",
+      "rule": "J7 and J10 even pins are GND; connector orientation and pin 1 must be verified on the physical assembly before power is applied."
+    },
+    {
+      "id": "HW-008",
+      "severity": "critical",
+      "rule": "Logic Carrier J6 5V injection and a USB cable that sources DevKit power must not be used simultaneously."
+    },
+    {
+      "id": "HW-009",
+      "severity": "critical",
+      "rule": "Direction changes require enable low, PWM force-low, a blanking interval, direction update, and safety-input recheck before re-enable."
+    },
+    {
+      "id": "HW-010",
+      "severity": "high",
+      "rule": "Maximum modulation index remains below 1.0 to preserve IRS2104 bootstrap refresh; firmware currently limits it to 0.95."
+    },
+    {
+      "id": "HW-011",
+      "severity": "high",
+      "rule": "ADC raw or millivolt telemetry must not be presented as calibrated amperes or degrees Celsius, or used for new software protection thresholds, until board measurements provide calibration and limits."
+    },
+    {
+      "id": "HW-012",
+      "severity": "critical",
+      "rule": "The E-Stop gates CHx_ENABLE only; 24V, 12V, 5V and 72V rails may remain live and the circuit must not be described as a safety-rated power disconnect."
+    },
+    {
+      "id": "HW-013",
+      "severity": "critical",
+      "rule": "The four Power Stage boards are energized progressively, logic-only and low-voltage first, before PDLC and 72V operation."
+    },
+    {
+      "id": "HW-014",
+      "severity": "high",
+      "rule": "KiCad design files and physical pin contracts are not changed during software work unless the user explicitly requests a hardware design change."
+    }
+  ]
+}

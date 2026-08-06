@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "physical_hardware": {
+    "logic_carrier": "manufactured_as_built",
+    "power_stage": "four_manufactured_identical_single_channel_boards"
+  },
+  "artifact_validation": {
+    "logic_carrier_pdf": {
+      "status": "inspected",
+      "pages": 2,
+      "contains_adc_filter_page": true
+    },
+    "logic_carrier_kicad_schematic": {
+      "tool": "kicad-cli 10.0.4",
+      "netlist_export": "completed_for_main_sheet",
+      "bom_export": "completed_but_excludes_missing_adc_subsheet",
+      "erc": {
+        "status": "not_clean",
+        "errors": 19,
+        "warnings": 46,
+        "primary_causes": [
+          "missing untitled.kicad_sch hierarchical ADC filter sheet",
+          "missing custom symbol and footprint library tables",
+          "power pin type checks"
+        ]
+      }
+    },
+    "power_stage_pdf": {
+      "status": "inspected",
+      "pages": 1
+    },
+    "power_stage_kicad_schematic": {
+      "tool": "kicad-cli 10.0.4",
+      "netlist_export": "completed",
+      "bom_export": "completed",
+      "erc": {
+        "status": "warnings_only",
+        "errors": 0,
+        "warnings": 15,
+        "primary_cause": "missing custom symbol and footprint library tables"
+      }
+    },
+    "power_stage_kicad_pcb": {
+      "tool": "kicad-cli 10.0.4",
+      "drc": {
+        "status": "not_completed",
+        "result": "tool terminated with exit code 133 and Array index out of range",
+        "interpretation": "neither pass nor electrical failure"
+      }
+    }
+  },
+  "firmware_alignment": {
+    "contract_validator": "python3 hardware/tools/validate_hardware_contract.py",
+    "canonical_pinmap": "ESP32_B_Algo/main/power_stage_pinmap.h",
+    "canonical_adc_descriptors": "ESP32_B_Algo/main/analog_monitor.h"
+  },
+  "measurement_state": {
+    "gpio_and_connector_continuity": "not_recorded_in_repository",
+    "boot_and_reset_waveforms": "not_recorded_in_repository",
+    "current_calibration": "not_recorded_in_repository",
+    "temperature_calibration": "not_recorded_in_repository",
+    "fault_trip_measurement": "not_recorded_in_repository",
+    "thermal_and_hv_results": "not_recorded_in_repository"
+  }
+}

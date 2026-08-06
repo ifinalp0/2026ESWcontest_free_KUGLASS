@@ -1,0 +1,47 @@
+(version 1)
+(rule "A to B 40mil"
+    (constraint clearance (min 40mil))
+    (condition "A.NetName == '+72V_HV' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == '+72V_HV' ") 
+)
+
+(version 2)
+(rule "A to B 40mil"
+    (constraint clearance (min 40mil))
+    (condition "A.NetName == '/OUT_A' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == '/OUT_A' ") 
+)
+
+
+(version 3)
+(rule "A to B 40mil"
+    (constraint clearance (min 40mil))
+    (condition "A.NetName == '/OUT_B' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == '/OUT_B' ") 
+)
+
+(version 4)
+(rule "A to B 40mil"
+    (constraint clearance (min 1.5mm))
+    (condition "A.NetName == 'PDLC_A' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == 'PDLC_A' ") 
+)
+
+(version 5)
+(rule "A to B 40mil"
+    (constraint clearance (min 1.5mm))
+    (condition "A.NetName == 'PDLC_B' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == 'PDLC_B' ") 
+)
+
+(version 6)
+(rule "A to B 40mil"
+    (constraint clearance (min 40mil))
+    (condition "A.NetName == '/PGND_CH0' && B.NetName == 'GND' ")  
+    (condition "A.NetName == 'GND' && B.NetName == '/PGND_CH0' ") 
+)
+(version 7)
+(rule "Kelvin_Area"
+    (condition  "A.insideArea('Kelvin_Area')")
+    (constraint clearance (min 0.2mm))
+)

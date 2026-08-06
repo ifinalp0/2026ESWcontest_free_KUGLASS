@@ -32,7 +32,7 @@ TabUI는 화면 제공, 고수준 명령 검증·변환, ESP32_A telemetry 중�
 ## 카메라 영상 보기
 
 정책 근거 패널의 `영상 보기` 버튼을 누르면 ESP32_A가 VGA(640×480) RGB565
-프레임을 품질 90 JPEG로 변환해 최대 약 5 fps로 전송합니다. `ESP_Camera/`에서 검증한
+프레임을 품질 90 JPEG로 변환해 최대 약 5 fps로 전송합니다. 독립 시험 프로젝트에서 확인한
 `KUGLCAM1` 28바이트 header, JPEG marker와 FNV-1a 검사를 참고했지만,
 제품 구현은 `ESP32_A_Algo/`와 TabUI 안에서 완결되며 standalone 프로젝트를
 빌드 입력이나 별도 프로세스로 사용하지 않습니다.

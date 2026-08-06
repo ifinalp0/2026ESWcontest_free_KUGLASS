@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "scope": "KUGLASS manufactured as-built hardware",
+  "authority": {
+    "assembly_state": "manufactured_as_built",
+    "software_alignment": "firmware_and_documentation_must_conform_to_hardware",
+    "design_mutation": "requires_explicit_hardware_design_request",
+    "conflict_policy": [
+      "do_not_guess",
+      "compare_physical_board_and_primary_design_source",
+      "update_contracts_firmware_and_tests_together"
+    ]
+  },
+  "read_order": [
+    "hardware/manifest.json",
+    "hardware/contracts/esp32_b_io.json",
+    "hardware/contracts/power_stage.json",
+    "hardware/contracts/safety.json",
+    "hardware/Logic_carrier/README.md",
+    "hardware/Power_stage/README.md",
+    "primary KiCad/PDF source",
+    "hardware/validation/README.md"
+  ],
+  "boards": {
+    "logic_carrier": {
+      "manufactured": true,
+      "quantity": 1,
+      "revision_id": null,
+      "revision_status": "not_marked_in_available_sources",
+      "primary_sources": [
+        {
+          "path": "hardware/Logic_carrier/Logic carrier.pdf",
+          "role": "complete_two_page_as_built_schematic",
+          "canonical": true
+        },
+        {
+          "path": "hardware/Logic_carrier/Logic carrier.kicad_sch",
+          "role": "editable_main_schematic",
+          "canonical": true,
+          "limitations": [
+            "references_missing_file_untitled.kicad_sch_for_adc_filter_sheet"
+          ]
+        }
+      ],
+      "unavailable_artifacts": [
+        "pcb_layout",
+        "gerber",
+        "drill",
+        "placement",
+        "assembly_bom",
+        "board_serial_mapping"
+      ]
+    },
+    "power_stage": {
+      "manufactured": true,
+      "quantity": 4,
+      "topology": "four_identical_single_channel_boards",
+      "revision_id": null,
+      "revision_status": "not_marked_in_available_sources",
+      "primary_sources": [
+        {
+          "path": "hardware/Power_stage/power stage_.kicad_sch",
+          "role": "editable_as_built_schematic",
+          "canonical": true
+        },
+        {
+          "path": "hardware/Power_stage/power stage_.kicad_pcb",
+          "role": "editable_as_built_pcb",
+          "canonical": true
+        },
+        {
+          "path": "hardware/Power_stage/power stage_.kicad_pro",
+          "role": "kicad_project_settings",
+          "canonical": true
+        },
+        {
+          "path": "hardware/Power_stage/power stage_.kicad_dru",
+          "role": "custom_design_rules_as_stored",
+          "canonical": true
+        },
+        {
+          "path": "hardware/Power_stage/Power_stage.pdf",
+          "role": "single_page_schematic_release_view",
+          "canonical": true
+        }
+      ],
+      "unavailable_artifacts": [
+        "gerber",
+        "drill",
+        "placement",
+        "assembly_bom",
+        "board_serial_mapping",
+        "custom_library_tables"
+      ]
+    }
+  },
+  "integrity_file": "hardware/SHA256SUMS",
+  "machine_contracts": [
+    "hardware/contracts/esp32_b_io.json",
+    "hardware/contracts/power_stage.json",
+    "hardware/contracts/safety.json"
+  ],
+  "validator": "python3 hardware/tools/validate_hardware_contract.py"
+}

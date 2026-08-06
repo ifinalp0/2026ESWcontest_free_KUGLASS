@@ -18,8 +18,7 @@ struct PowerStagePinmap {
     PowerStageChannelPins channels[KUGLASS_CHANNEL_COUNT];
 };
 
-// As-built Logic Carrier U3 ownership mirrored from
-// hardware/contracts/esp32_b_io.json and validated by the hardware checker.
+// Logic Carrier U3 pin ownership from hardware/Logic carrier.pdf.
 static constexpr PowerStagePinmap KUGLASS_POWER_STAGE_PINMAP = {
     19,
     {

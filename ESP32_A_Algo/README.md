@@ -1,6 +1,8 @@
 # ESP32_A_Algo
 
-ESP32_A는 KUGLASS의 카메라·내부온도 입력과 4채널 목표 MI를 소유하는 ESP-IDF firmware입니다.
+`ESP32_A_Algo/`는 KUGLASS의 **ESP32_A DevKit**에 빌드·플래시하는 canonical ESP-IDF 펌웨어 프로젝트입니다. ESP32_A는 물리 장치 이름이며, 이 폴더가 그 장치의 카메라·내부온도 입력과 4채널 목표 MI 로직을 구현합니다.
+
+독립 시험용 펌웨어는 `../For_Test/`에 격리되어 있으며 이 프로젝트의 소스나 빌드 입력이 아닙니다. 제품 동작을 변경할 때는 이 폴더와 함께 유지되는 `host_tests/`만 제품 계약 검증에 사용합니다.
 
 ```text
 OV2640 카메라 + YwRobot SEN050007 DS18B20 내부온도
@@ -32,13 +34,11 @@ vertical flip을 함께 설정해 180° 보정합니다. 따라서 센서에서 
 사용합니다. 방향 설정에 실패하면 잘못된 영상으로 계산하지 않고 카메라 시작을
 실패 처리한 뒤 기존 복구 backoff로 재초기화합니다.
 
-깨끗한 개발 환경의 최초 빌드에는 ESP-IDF 6.0.2와 Espressif Component Registry 접속 또는 이미 채워진 component cache가 필요합니다. 생성되는 `managed_components/`는 로컬 빌드 산출물이며 `ESP_Camera/`를 대체하거나 참조하지 않습니다.
+깨끗한 개발 환경의 최초 빌드에는 ESP-IDF 6.0.2와 Espressif Component Registry 접속 또는 이미 채워진 component cache가 필요합니다. 생성되는 `managed_components/`는 로컬 빌드 산출물이며 독립 시험 프로젝트를 대체하거나 참조하지 않습니다.
 
-선택적인 standalone 카메라 시험 프로젝트는 ESP32_A firmware의 일부가 아닙니다. 해당 프로젝트의 `app_main`, serial frame server, viewer, partition 설정이나 빌드 캐시는 사용하지 않으며 그 폴더가 삭제되어도 ESP32_A에는 영향이 없습니다.
-
-TabUI 영상 보기는 standalone `ESP_Camera`에서 검증된 RGB565 byte order와
-`KUGLCAM1` 28바이트 header/FNV-1a 검사 계약을 참고해 ESP32_A 내부에 독립적으로
-구현합니다. 캡처는 VGA(640×480), 소프트웨어 JPEG 품질은 90입니다. 드라이버의
+TabUI 영상 보기는 RGB565 byte order와 `KUGLCAM1` 28바이트 header/FNV-1a 검사
+계약을 ESP32_A 내부에 구현합니다. 캡처는 VGA(640×480), 소프트웨어 JPEG 품질은
+90입니다. 드라이버의
 고정 128 KiB `frame2jpg()` 버퍼 대신 최대 384 KiB의 bounded callback encoder를
 사용해 디테일이 많은 VGA 프레임의 잘림을 방지합니다. JSON Lines와 JPEG는 DevKit
 USB Serial/JTAG 링크에서 다중화하며 GPIO43/44 UART나 별도 viewer process를

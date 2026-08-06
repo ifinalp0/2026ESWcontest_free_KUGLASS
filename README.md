@@ -1,8 +1,16 @@
 # KUGLASS — 능동형 스마트 글라스 모빌리티
 
-KUGLASS는 카메라와 내부온도에 따라 1:10 차량 모형의 PDLC 4채널을 능동 제어하는 시연용 프로토타입입니다. ESP32_A가 입력 처리와 목표 MI 계산을 담당하고, ESP32_B가 **Logic Carrier에 장착되어** 4채널 SPWM과 제어 신호를 생성합니다. Logic Carrier의 CH0~CH3에는 동일한 단일 채널 Power Stage PCB를 한 장씩, 총 네 장 연결합니다.
+KUGLASS는 카메라와 내부온도에 따라 1:10 차량 모형의 PDLC 4채널을 능동 제어하는 시연용 프로토타입입니다. ESP32_A가 입력 처리와 목표 MI 계산을 담당하고, ESP32_B가 **Logic Carrier에 장착되어** 4채널 SPWM과 제어 신호를 생성합니다. 제작된 Logic Carrier의 CH0~CH3에는 제작된 동일 단일 채널 Power Stage PCB를 한 장씩, 총 네 장 연결합니다.
 
 > 이 저장소는 모형 시연용 개발 자산입니다. 실차 안전 장치나 자율주행 인지 성능 향상 장치를 표방하지 않습니다.
+
+## 이름과 코드 위치
+
+- **ESP32_A**와 **ESP32_B**는 시스템에 사용하는 두 대의 ESP32-S3 DevKit 장치를 뜻합니다.
+- **`ESP32_A_Algo/`**는 ESP32_A에 빌드·플래시하는 제품 펌웨어 프로젝트입니다.
+- **`ESP32_B_Algo/`**는 ESP32_B에 빌드·플래시하는 제품 펌웨어 프로젝트입니다.
+- **`For_Test/`**는 독립 시험용 펌웨어와 실험 프로젝트만 모아 둔 격리 영역입니다. 제품 구현을 이해하거나 수정할 때는 기본적으로 참조하지 않습니다.
+- `ESP32_A_Algo/host_tests/`와 `ESP32_B_Algo/host_tests/`는 각 제품 펌웨어의 계약을 검증하는 동반 테스트이므로 해당 제품 코드를 변경할 때 함께 확인합니다.
 
 ## 시스템 구성
 
@@ -48,13 +56,11 @@ flowchart LR
 | `개발 계획서.md` | 현재 제품 구조와 개발·검증 범위의 기준 |
 | `TabUI/` | 브라우저 HMI, MacBook 로컬 API와 ESP32_A DevKit USB gateway |
 | `ESP32_A_Algo/` | 카메라·내부온도 처리, 정책/MI master, ESP32_B 통신 펌웨어 |
-| `ESP_Camera/` (선택) | standalone 카메라 시험을 보존할 때만 사용하는 레퍼런스. ESP32_A의 빌드·플래시에는 필요하지 않으며 보관이 불필요하면 삭제 가능 |
 | `ESP32_B_Algo/` | ESP32_B에 빌드·플래시할 유일한 기준 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage, TTL/Fault 처리 |
-| `ESP32_A_TESTT/` | `type=set`, `mi[]` frame을 전송하는 독립 UART 시험 프로젝트. 현재 `ESP32_B_Algo/` 제품 계약과는 비호환 |
-| `ESP32_TEST/` | ESP32_B–Logic Carrier GPIO 배선을 전력단 분리 상태에서 검증하는 독립 프로젝트 |
-| `hardware/` | `Logic carrier.pdf`, `Power_stage.pdf`와 회로 분석·핀맵·HIL 규칙 |
+| `For_Test/` | 독립 시험용 펌웨어·실험 프로젝트. 일반 제품 개발에서는 제외하고 시험 목적이 명시된 경우에만 사용 |
+| `hardware/` | 제작된 Logic Carrier/Power Stage의 KiCad·PDF·datasheet 원본, 기계 판독 계약과 HIL 규칙 |
 | `Simul_Twin/` | 독립 MOCK 디지털 트윈. 수정 금지 |
-| `AGENT.md` | 후속 개발의 아키텍처·안전·검증 지침 |
+| `AGENTS.md` / `AGENT.md` | AI 작업 진입점과 상세 아키텍처·안전·검증 지침 |
 
 ## 제어 계약
 
@@ -108,7 +114,7 @@ B는 대상 boot, one-time challenge와 실제 `EN_GLOBAL/FAULT_N` 상태를 확
 
 `control_result` fields는 `command`, `seq`, `source_session_id`, `ok`, `error`입니다. A는 `boot_id`, `source_session_id`, request `seq`가 모두 pending request와 일치하는 결과만 수락하며 UART write 성공을 reset 성공으로 ACK하지 않습니다. 현재 1,500 ms 내에 일치하는 결과가 없으면 `B_RESET_TIMEOUT`으로 실패 처리합니다. B 결과 error는 `NONE`, `RESET_UNSAFE`, `TARGET_BOOT_MISMATCH`, `CHALLENGE_MISMATCH`입니다.
 
-ADC의 raw/mV 수집·filter·calibration validity telemetry는 구현되었지만, 현재 mV는 진단 전압입니다. Power Stage revision별 전류 A·온도 °C 환산, clamp·단선·포화 보호와 HIL이 완료되기 전에는 물리량이나 보호 판단으로 표시하지 않습니다.
+ADC의 raw/mV 수집·filter·calibration validity telemetry는 구현되었지만, 현재 mV는 진단 전압입니다. Power Stage 회로의 명목 current/NTC 식은 [`hardware/contracts/power_stage.json`](hardware/contracts/power_stage.json)에 정리되어 있으나 보드별 실측 calibration, clamp·단선·포화 보호와 HIL이 완료되기 전에는 A/°C 물리량이나 보호 판단으로 표시하지 않습니다.
 
 ## TabUI 실행
 
@@ -128,7 +134,7 @@ npm start
 ```
 
 브라우저에서 `http://localhost:8080/demo`을 엽니다. 정책 근거 패널의
-`영상 보기` 버튼은 새 ESP32_A firmware가 연결된 LIVE 모드에서 실제 OV2640
+`영상 보기` 버튼은 ESP32_A firmware가 연결된 LIVE 모드에서 실제 OV2640
 영상을 표시합니다. MOCK에서는 실제 프레임 대신 대기 안내를 표시합니다.
 
 USB 장치가 여러 개이면 ESP32_A 장치를 명시합니다.
@@ -156,7 +162,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-ESP32_A는 [`ESP32_A_Algo/main/camera_service.*`](ESP32_A_Algo/main/)와 핀 계약, 카메라 드라이버 의존성 및 lock file을 자체 소유합니다. 따라서 루트 `ESP_Camera/`가 없더라도 `ESP32_A_Algo/` 안에서 구성·빌드·플래시할 수 있습니다. `ESP_Camera/`는 선택적인 standalone 자료이며 보관이 불필요하면 삭제할 수 있습니다.
+ESP32_A는 [`ESP32_A_Algo/main/camera_service.*`](ESP32_A_Algo/main/)와 핀 계약, 카메라 드라이버 의존성 및 lock file을 자체 소유합니다. `ESP32_A_Algo/`만으로 구성·빌드·플래시할 수 있으며 독립 시험 코드를 빌드 입력으로 사용하지 않습니다.
 
 ESP32_A 기본 연결은 다음과 같습니다.
 
@@ -171,7 +177,7 @@ ESP32_A 기본 연결은 다음과 같습니다.
 
 ## ESP32_B 빌드
 
-ESP32_B에 빌드·플래시할 코드는 `ESP32_B_Algo/`입니다. [hardware/Logic carrier.pdf](<hardware/Logic carrier.pdf>)의 회로와 [hardware/README.md](hardware/README.md)의 규칙을 기준으로 구현하며, 물리 경로는 `ESP32_B U3 → Logic Carrier 74HC08/RC/J7 → 채널별 단일 채널 Power Stage PCB`입니다. CH0~CH3에 동일 PCB를 한 장씩 연결하며 Carrier를 생략한 임의 직결 핀맵을 사용하지 않습니다.
+ESP32_B에 빌드·플래시할 코드는 `ESP32_B_Algo/`입니다. [`hardware/README.md`](hardware/README.md), [`esp32_b_io.json`](hardware/contracts/esp32_b_io.json)과 [Logic Carrier 원본](hardware/Logic_carrier/)을 기준으로 구현하며, 물리 경로는 `ESP32_B U3 → Logic Carrier 74HC08/RC/J7 → 채널별 단일 채널 Power Stage PCB`입니다. CH0~CH3에 제작된 동일 PCB를 한 장씩 연결하며 Carrier를 생략한 임의 직결 핀맵을 사용하지 않습니다.
 
 | 채널 | `PWM_MAG` | `DIR` | MCU `ENABLE` | `FAULT_N` | Current ADC | Temperature ADC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -190,9 +196,9 @@ idf.py build
 
 `ESP32_B_Algo/main/power_stage_pinmap.h`는 현재 Logic Carrier 핀맵을 사용하고, B측 UART는 제어 핀과 겹치지 않는 GPIO43/44로 설정되어 있으며, native USB console은 비활성화되어 있습니다. 핀 중복은 compile-time 검사와 host test로 검증합니다.
 
-> **실기 주의:** 회로도의 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 별도 A↔B connector가 없습니다. 외부 UART harness와 DevKit USB-to-UART bridge contention을 확정하고, ADC A/°C 환산·입력 보호 및 Power Stage fault 차단을 완성한 뒤 HIL을 통과하기 전에는 Power Stage/PDLC/HV를 연결하지 마십시오. 부팅·잘못된 frame·A→B timeout 상태의 기본 출력은 off여야 합니다.
+> **실기 주의:** 회로도의 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 별도 A↔B connector가 없습니다. 외부 UART harness와 DevKit USB-to-UART bridge contention을 확인하고, ADC A/°C calibration·입력 범위 및 Power Stage fault 차단 HIL을 통과하기 전에는 PDLC/72 V를 연결하지 마십시오. 부팅·잘못된 frame·A→B timeout 상태의 기본 출력은 off여야 합니다.
 
-> 현재 `hardware/`에는 PDF 회로도와 분석 문서만 있고 편집 가능한 EDA/CAD source·BOM은 없습니다. 외부 harness connector, UART bridge 격리와 ADC clamp 등의 회로 개정은 해당 CAD 원본을 확보한 뒤 별도 EDA 작업으로 반영해야 합니다.
+> Logic Carrier와 Power Stage는 제작 완료된 현재 하드웨어입니다. 저장소에는 Logic Carrier schematic/PDF와 Power Stage schematic/PCB/project/PDF가 있으며, 자료별 완결성과 누락 항목은 [`hardware/manifest.json`](hardware/manifest.json)에 기록되어 있습니다.
 
 ## 안전 동작
 
@@ -206,7 +212,7 @@ E-Stop > latched Fault > Manual(TTL) > Demo/Auto
 - A→B heartbeat가 TTL을 넘기면 ESP32_B가 출력을 차단합니다.
 - J5 NC E-Stop이 열리면 R18 pull-down으로 `EN_GLOBAL=LOW`가 되고, 74HC08이 펌웨어와 무관하게 네 `CHx_ENABLE`을 LOW로 만들어야 합니다.
 - E-Stop은 enable만 차단하며 +24 V/+12 V/+5 V rail은 계속 live입니다. PWM/DIR도 별도이므로 firmware가 동시에 PWM 0을 적용해야 하며, 이 회로를 safety-rated 전원 차단기로 표현하지 않습니다.
-- 각 `FAULT_N`은 외부 10 kΩ pull-up의 active-low 입력입니다. Fault는 Logic Carrier U4의 enable AND에는 포함되지 않으므로 CH0~CH3에 연결한 단일 채널 Power Stage PCB 네 장 각각의 `FAULT_N/RUN_OK` 하드웨어 차단과 펌웨어 polling latency를 실측합니다.
+- 각 `FAULT_N`은 Logic Carrier의 외부 10 kΩ pull-up을 사용하는 active-low 입력입니다. Fault는 Logic Carrier U4의 enable AND에는 포함되지 않지만 각 Power Stage U14의 `RUN_OK = CHx_ENABLE AND FAULT_N`이 두 IRS2104를 shutdown합니다. 네 제작 보드 각각의 하드웨어 차단과 펌웨어 latch latency를 실측합니다.
 - 수동 제어는 기본 30초 후 ESP32_A에서 AUTO로 복귀합니다.
 - LIVE telemetry가 stale이면 UI는 마지막 실제 값을 유지하고 명령을 막습니다. MOCK으로 자동 전환하지 않습니다.
 - MOCK/REPLAY는 ESP32_A USB 장치나 Power Stage 출력을 사용하지 않습니다.
@@ -215,6 +221,8 @@ E-Stop > latched Fault > Manual(TTL) > Demo/Auto
 ## 검증
 
 ```bash
+python3 hardware/tools/validate_hardware_contract.py
+
 cd TabUI
 npm run check
 npm run build

@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "status": "as_built",
+  "board": "Power Stage",
+  "topology": "single_channel_h_bridge",
+  "physical_quantity": 4,
+  "channel_assignment": "one identical board per Logic Carrier J7 channel block",
+  "source": {
+    "schematic": "hardware/Power_stage/power stage_.kicad_sch",
+    "pcb": "hardware/Power_stage/power stage_.kicad_pcb",
+    "project": "hardware/Power_stage/power stage_.kicad_pro",
+    "design_rules": "hardware/Power_stage/power stage_.kicad_dru",
+    "release_view": "hardware/Power_stage/Power_stage.pdf"
+  },
+  "j10": {
+    "type": "2x8 odd/even",
+    "footprint": "IDC-Header_2x08_P2.54mm_Vertical",
+    "all_even_pins": "GND",
+    "pins": {
+      "1": "PWM_MAG_CH0",
+      "3": "DIR_CH0",
+      "5": "CH0_ENABLE",
+      "7": "FAULT_N_CH0",
+      "9": "ADC_I_CH0_RAW",
+      "11": "ADC_TEMP_CH0_RAW",
+      "13": "+3.3V",
+      "15": "+12V"
+    },
+    "carrier_mapping": "J10 odd pin n maps to the same relative odd position in each J7 16-pin channel block"
+  },
+  "logic": {
+    "input_bias": {
+      "CH0_ENABLE": "R15 10kohm pulldown",
+      "PWM_MAG_CH0": "R16 10kohm pulldown",
+      "DIR_CH0": "R17 10kohm pulldown"
+    },
+    "equations": {
+      "DIR_N_CH0": "NOT DIR_CH0",
+      "PWM_LEFT_CH0": "PWM_MAG_CH0 AND DIR_CH0",
+      "PWM_RIGHT_CH0": "PWM_MAG_CH0 AND DIR_N_CH0",
+      "RUN_OK_CH0": "CH0_ENABLE AND FAULT_N_CH0"
+    },
+    "devices": {
+      "U13": "74LVC04",
+      "U14": "74LVC08",
+      "U1_U2": "IRS2104 half-bridge gate drivers"
+    },
+    "gate_driver_shutdown": "RUN_OK_CH0 drives the active-low shutdown pins of both IRS2104 devices",
+    "complementary_drive_and_dead_time": "provided by IRS2104, not by Logic Carrier"
+  },
+  "power_path": {
+    "dc_bus": {
+      "connector": "J8",
+      "pin_1": "+72V_HV",
+      "pin_2": "GND"
+    },
+    "gate_driver_supply_v": 12,
+    "logic_supply_v": 3.3,
+    "mosfets": {
+      "references": ["Q1", "Q2", "Q3", "Q4"],
+      "schematic_value": "STP40NF20",
+      "datasheet_property": "IRF540N URL",
+      "part_identity_status": "conflict_verify_physical_marking"
+    },
+    "bridge_nodes": ["OUT_A", "OUT_B"],
+    "output_filter": {
+      "L1_h": 0.00047,
+      "L2_h": 0.00047,
+      "C10_f": 4.7e-7,
+      "output_connector": "J9",
+      "output_pins": {
+        "1": "PDLC_A",
+        "2": "PDLC_B"
+      }
+    },
+    "pcb_stackup": {
+      "layers": 2,
+      "thickness_mm": 1.6,
+      "copper_thickness_in_file_mm_per_layer": 0.035,
+      "schematic_note": "2 oz copper preferred",
+      "physical_copper_weight_status": "unknown"
+    },
+    "schematic_clearance_note_mm": 1.5
+  },
+  "current_feedback": {
+    "status": "schematic_derived_not_calibrated",
+    "shunt": {
+      "reference": "R9",
+      "resistance_ohm": 0.1,
+      "connection": "PGND_CH0 to logic GND"
+    },
+    "adc_path": {
+      "series_resistor": "R10",
+      "series_resistance_ohm": 10000,
+      "shunt_capacitor": "C8",
+      "shunt_capacitance_f": 1e-7,
+      "ideal_dc_transfer_v_per_a": 0.1
+    },
+    "fault_comparator": {
+      "device": "U5 TLV1701 open collector",
+      "sense_input_series_resistor": "R11 1kohm",
+      "reference_top": "R12 33kohm to 3.3V",
+      "reference_bottom": "R13 1kohm to GND",
+      "nominal_reference_v": 0.0970588,
+      "nominal_trip_current_a": 0.970588,
+      "trip_value_status": "derived_nominal_only_not_measured"
+    }
+  },
+  "temperature_feedback": {
+    "status": "schematic_derived_not_calibrated",
+    "pullup": "R14 10kohm to 3.3V",
+    "sensor": "TH1 NTC 10kohm at 25C to GND",
+    "nominal_adc_v_at_25c": 1.65,
+    "resistance_formula": "R_NTC = 10000 * V_ADC / (3.3 - V_ADC)",
+    "beta_or_steinhart_hart": "unknown",
+    "temperature_accuracy": "unknown"
+  },
+  "fault_interface": {
+    "signal": "FAULT_N_CH0",
+    "active_level": "low",
+    "driver": "U5 open collector",
+    "local_pullup": false,
+    "pullup_location": "Logic Carrier R19-R22, one per channel",
+    "hardware_effect": "low fault forces RUN_OK_CH0 low and shuts down both IRS2104 drivers"
+  },
+  "do_not_infer": [
+    "physical MOSFET identity until markings are checked",
+    "calibrated current or temperature from nominal component values",
+    "measured over-current threshold from divider arithmetic",
+    "DIR level to named optical polarity without HIL",
+    "thermal capacity, maximum continuous current or insulation rating",
+    "four board serials or revision labels"
+  ]
+}

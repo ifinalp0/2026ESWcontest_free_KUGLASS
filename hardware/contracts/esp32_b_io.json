@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "status": "as_built",
+  "board": "Logic Carrier",
+  "mcu_module": "ESP32-S3-DevKitC-1-N8R8",
+  "source": {
+    "complete_schematic": "hardware/Logic_carrier/Logic carrier.pdf",
+    "editable_main_sheet": "hardware/Logic_carrier/Logic carrier.kicad_sch",
+    "adc_filter_source": "hardware/Logic_carrier/Logic carrier.pdf page 2"
+  },
+  "common": {
+    "estop_signal": "EN_GLOBAL",
+    "estop_n_gpio": 19,
+    "estop_u3_header": "J3-20",
+    "direction": "input_only",
+    "normal_level": "high",
+    "safe_level": "low",
+    "external_bias": "R18 10kohm pulldown",
+    "hardware_gate_equation": "CHx_ENABLE = EN_GLOBAL AND ENABLE_CHx"
+  },
+  "channels": [
+    {
+      "channel_id": 0,
+      "pwm_mag_gpio": 10,
+      "direction_gpio": 11,
+      "mcu_enable_gpio": 12,
+      "fault_n_gpio": 13,
+      "current_adc_gpio": 1,
+      "current_adc1_channel": 0,
+      "temperature_adc_gpio": 2,
+      "temperature_adc1_channel": 1,
+      "u3_header": {
+        "pwm_mag": "J1-16",
+        "direction": "J1-17",
+        "mcu_enable": "J1-18",
+        "fault_n": "J1-19",
+        "current_adc": "J3-4",
+        "temperature_adc": "J3-5"
+      },
+      "j7": {
+        "pwm_mag": 1,
+        "direction": 3,
+        "gated_enable": 5,
+        "fault_n": 7,
+        "current_adc_raw": 9,
+        "temperature_adc_raw": 11,
+        "3v3": 13,
+        "12v": 15
+      }
+    },
+    {
+      "channel_id": 1,
+      "pwm_mag_gpio": 14,
+      "direction_gpio": 15,
+      "mcu_enable_gpio": 16,
+      "fault_n_gpio": 17,
+      "current_adc_gpio": 4,
+      "current_adc1_channel": 3,
+      "temperature_adc_gpio": 5,
+      "temperature_adc1_channel": 4,
+      "u3_header": {
+        "pwm_mag": "J1-20",
+        "direction": "J1-8",
+        "mcu_enable": "J1-9",
+        "fault_n": "J1-10",
+        "current_adc": "J1-4",
+        "temperature_adc": "J1-5"
+      },
+      "j7": {
+        "pwm_mag": 17,
+        "direction": 19,
+        "gated_enable": 21,
+        "fault_n": 23,
+        "current_adc_raw": 25,
+        "temperature_adc_raw": 27,
+        "3v3": 29,
+        "12v": 31
+      }
+    },
+    {
+      "channel_id": 2,
+      "pwm_mag_gpio": 18,
+      "direction_gpio": 21,
+      "mcu_enable_gpio": 38,
+      "fault_n_gpio": 39,
+      "current_adc_gpio": 6,
+      "current_adc1_channel": 5,
+      "temperature_adc_gpio": 7,
+      "temperature_adc1_channel": 6,
+      "u3_header": {
+        "pwm_mag": "J1-11",
+        "direction": "J3-18",
+        "mcu_enable": "J3-10",
+        "fault_n": "J3-9",
+        "current_adc": "J1-6",
+        "temperature_adc": "J1-7"
+      },
+      "j7": {
+        "pwm_mag": 33,
+        "direction": 35,
+        "gated_enable": 37,
+        "fault_n": 39,
+        "current_adc_raw": 41,
+        "temperature_adc_raw": 43,
+        "3v3": 45,
+        "12v": 47
+      }
+    },
+    {
+      "channel_id": 3,
+      "pwm_mag_gpio": 40,
+      "direction_gpio": 41,
+      "mcu_enable_gpio": 42,
+      "fault_n_gpio": 47,
+      "current_adc_gpio": 8,
+      "current_adc1_channel": 7,
+      "temperature_adc_gpio": 3,
+      "temperature_adc1_channel": 2,
+      "u3_header": {
+        "pwm_mag": "J3-8",
+        "direction": "J3-7",
+        "mcu_enable": "J3-6",
+        "fault_n": "J3-17",
+        "current_adc": "J1-12",
+        "temperature_adc": "J1-13"
+      },
+      "j7": {
+        "pwm_mag": 49,
+        "direction": 51,
+        "gated_enable": 53,
+        "fault_n": 55,
+        "current_adc_raw": 57,
+        "temperature_adc_raw": 59,
+        "3v3": 61,
+        "12v": 63
+      }
+    }
+  ],
+  "j7": {
+    "type": "2x32 odd/even",
+    "footprint_in_schematic": "IDC-Header_2x32_P2.54mm_Vertical",
+    "all_even_pins": "GND",
+    "channel_block_stride": 16,
+    "mating_face_orientation": "unknown_verify_pin1_on_physical_assembly"
+  },
+  "signal_semantics": {
+    "PWM_MAG_CHx": "ESP32_B output, 0 to 3.3V PWM magnitude",
+    "DIR_CHx": "ESP32_B output, polarity selection",
+    "ENABLE_CHx": "ESP32_B active-high request into U4",
+    "CHx_ENABLE": "U4 active-high gated enable sent to Power Stage",
+    "FAULT_N_CHx": "Power Stage open-collector active-low fault, R19-R22 10kohm pullups on Logic Carrier",
+    "ADC_I_CHx_RAW": "Power Stage current feedback before Logic Carrier RC",
+    "ADC_TEMP_CHx_RAW": "Power Stage temperature feedback before Logic Carrier RC"
+  },
+  "adc_filter": {
+    "status": "as_built_from_released_pdf",
+    "series_resistance_ohm": 1000,
+    "shunt_capacitance_f": 1e-7,
+    "time_constant_s": 0.0001,
+    "ideal_cutoff_hz": 1591.55,
+    "channels": [
+      {"channel_id": 0, "current": ["R23", "C24"], "temperature": ["R24", "C25"]},
+      {"channel_id": 1, "current": ["R25", "C26"], "temperature": ["R26", "C27"]},
+      {"channel_id": 2, "current": ["R27", "C28"], "temperature": ["R28", "C29"]},
+      {"channel_id": 3, "current": ["R29", "C30"], "temperature": ["R30", "C31"]}
+    ],
+    "protection": "no_divider_clamp_or_level_shifter_shown"
+  },
+  "reserved_and_conflicting_resources": {
+    "gpio3": "CH3 temperature ADC and ESP32-S3 strapping pin",
+    "gpio19": "EN_GLOBAL; do not use native USB/JTAG on ESP32_B",
+    "gpio38": "CH2 enable and DevKitC-1 v1.1 onboard RGB LED",
+    "gpio39_to_42": "Logic Carrier signals and classic JTAG functions",
+    "gpio43_44": "A-B UART in firmware; not routed by Logic Carrier and may share DevKit USB-UART bridge"
+  }
+}

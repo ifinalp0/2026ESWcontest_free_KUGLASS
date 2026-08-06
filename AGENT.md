@@ -3,8 +3,12 @@
 ## 기준 문서
 
 - 제품 구조와 개발 범위의 기준은 루트의 `개발 계획서.md`이다.
-- **ESP32_B의 물리 GPIO, 신호 극성, 전원과 커넥터의 최우선 기준은 `hardware/Logic carrier.pdf`이다.** `hardware/README.md`는 이 회로도를 코드 개발용으로 해설한 문서다. 제품 계획과 회로가 충돌하면 하드웨어 연결은 회로도를 따르고 계획서·README·코드·테스트를 함께 정정한다.
-- 현재 분석 기준 `Logic carrier.pdf` SHA-256은 `c6e7c129e7d5cd66f2e6cc850b9797e58e25d15bd59cb817267279b90fc0fa92`이다. PDF가 바뀌면 핀맵을 추측해 이어서 개발하지 말고 회로를 다시 분석한 뒤 해시와 관련 문서를 갱신한다.
+- `ESP32_A`와 `ESP32_B`는 각각 시스템에 사용하는 별도의 ESP32-S3 DevKit 장치를 뜻한다. 폴더나 소프트웨어 모듈 이름으로 해석하지 않는다.
+- `ESP32_A_Algo/`와 `ESP32_B_Algo/`는 각각 ESP32_A와 ESP32_B에 빌드·플래시하는 제품 펌웨어의 canonical 프로젝트다.
+- `For_Test/`는 독립 시험용 펌웨어와 실험 코드를 제품 코드에서 분리한 영역이다. 사용자가 시험 코드의 분석·실행·수정을 명시적으로 요청하지 않는 한 탐색, 설계 판단, 구현 참고와 일괄 검색 대상에서 제외한다.
+- 제품 프로젝트 내부의 `host_tests/`는 해당 제품 펌웨어 계약과 함께 유지되는 검증 코드다. 제품 코드 변경 시에는 제외하지 말고 관련 테스트를 함께 확인한다.
+- Logic Carrier 1장과 단일 채널 Power Stage 4장은 제작 완료된 as-built 하드웨어다. 펌웨어와 문서가 하드웨어에 맞춰야 하며 명시적인 하드웨어 설계 요청 없이 KiCad 원본이나 핀 계약을 바꾸지 않는다.
+- ESP32_B의 물리 GPIO, 신호 극성, 전원과 커넥터는 `hardware/manifest.json`, `hardware/contracts/*.json`, 보드별 README와 해당 KiCad/PDF 원본을 순서대로 확인한다. 원본 무결성은 `hardware/SHA256SUMS`와 `python3 hardware/tools/validate_hardware_contract.py`로 검사한다.
 - 작품은 1:10 차량 모형용 PDLC 4채널 시연 프로토타입이다. 실차 안전 장치나 자율주행 인지 성능 향상 장치로 표현하지 않는다.
 - 입력 센서는 카메라 1대와 YwRobot SEN050007 DS18B20 내부온도센서 모듈 1개만 사용한다.
 - 채널 범위는 CH0~CH3이다. 코드, 프로토콜, UI, 테스트와 문서에서 이 범위를 동일하게 유지한다.
@@ -41,12 +45,10 @@ MacBook TabUI -> 브라우저
 
 - `개발 계획서.md`: 제품 구조, 개발 범위, 검증 목표의 기준 문서.
 - `TabUI/`: MacBook에서 직접 실행하는 production 백엔드, 브라우저 HMI와 ESP32_A USB gateway.
-- `ESP32_A_Algo/`: 카메라·내부온도 입력, 정책/MI master, A→B 통신 펌웨어.
-- `ESP_Camera/`(선택): 독립 카메라 시험을 보존할 때만 두는 standalone 레퍼런스. `ESP32_A_Algo/`가 제품 카메라 서비스·핀 계약·드라이버 의존성을 자체 소유하므로 이 폴더는 저장소에 없어도 되며 A의 빌드·플래시에 사용하지 않는다. 폴더가 남아 있다면 별도의 명시적인 사용자 지시 없이 내부 기능 코드를 수정하지 않는다.
-- `ESP32_B_Algo/`: ESP32_B에 빌드·플래시할 유일한 canonical 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage 제어, Fault와 A→B TTL 처리를 소유한다.
-- `ESP32_A_TESTT/`: `type=set`, `mi[]` frame을 전송하는 독립 UART 시험 프로젝트. 현재 `ESP32_B_Algo/`의 `actuator_command` 계약과 비호환이므로 B 제품 검증에 사용하지 않는다.
-- `ESP32_TEST/`: Power Stage/HV를 분리한 상태에서 ESP32_B–Logic Carrier GPIO 배선을 확인하는 독립 시험 프로젝트.
-- `hardware/`: `Logic carrier.pdf`와 `Power_stage.pdf` 회로 기준 및 `hardware/README.md`의 개발용 핀맵·검증 규칙.
+- `ESP32_A_Algo/`: ESP32_A DevKit에 빌드·플래시하는 canonical 펌웨어. 카메라·내부온도 입력, 정책/MI master와 A→B 통신을 소유한다.
+- `ESP32_B_Algo/`: ESP32_B DevKit에 빌드·플래시하는 유일한 canonical 펌웨어. CH0~CH3 SPWM, Logic Carrier/Power Stage 제어, Fault와 A→B TTL 처리를 소유한다.
+- `For_Test/`: 독립 시험 펌웨어와 실험 프로젝트. 일반 작업에서는 읽거나 참조하지 않으며, 제품 펌웨어의 대체 구현이나 canonical 계약 근거로 사용하지 않는다. 시험 작업에서는 먼저 `For_Test/README.md`에서 대상과 제약을 확인한다.
+- `hardware/`: 제작된 Logic Carrier/Power Stage의 KiCad·PDF·datasheet 원본, 기계 판독 계약, 안전 불변조건과 HIL 기준.
 - `Simul_Twin/`: 독립 디지털 트윈 시뮬레이터. **사용자 지시에 따라 절대 수정하지 않는다.** production 하드웨어 명령 경로에도 연결하지 않는다.
 
 ## 명령과 상태 계약
@@ -95,19 +97,19 @@ MacBook TabUI -> 브라우저
 | CH2 | GPIO18 | GPIO21 | GPIO38 | GPIO39 | GPIO6 | GPIO7 |
 | CH3 | GPIO40 | GPIO41 | GPIO42 | GPIO47 | GPIO8 | GPIO3 |
 
-- 공통 `EN_GLOBAL`은 GPIO19 **input-only**다. J5 NC E-Stop은 정상 시 +3.3 V를 연결하고 R18 10 kΩ이 open/E-Stop 상태를 LOW로 만든다. GPIO19를 output, USB 또는 강제 pull-up으로 구성하지 않는다. ESP32-S3의 GPIO19 power-up high glitch는 firmware 초기화 전에도 생길 수 있으므로 reset 중 U4/J7 enable 파형을 계측하고 필요하면 하드웨어 보강을 요구한다.
+- 공통 `EN_GLOBAL`은 GPIO19 **input-only**다. J5 NC E-Stop은 정상 시 +3.3 V를 연결하고 R18 10 kΩ이 open/E-Stop 상태를 LOW로 만든다. GPIO19를 output, USB 또는 강제 pull-up으로 구성하지 않는다. ESP32-S3의 GPIO19 power-up high glitch는 firmware 초기화 전에도 생길 수 있으므로 as-built U4/J7 enable 파형을 reset 중 계측한다.
 - `FAULT_N_CH0~3`은 active-low이며 R19~R22 10 kΩ 외부 pull-up이 있다. LOW를 fault로 처리한다. 단선/미연결도 pull-up 때문에 HIGH로 보일 수 있으므로 커넥터 presence를 별도 검증한다.
 - J7은 2x32이다. 모든 짝수 핀은 GND이고 각 채널의 홀수 핀 8개는 순서대로 `PWM_MAG, DIR, CHx_ENABLE, FAULT_N, ADC_I_RAW, ADC_TEMP_RAW, +3.3V, +12V`다. CH0은 1~15, CH1은 17~31, CH2는 33~47, CH3은 49~63을 사용한다.
 - 여덟 ADC는 각 1 kΩ/100 nF RC filter를 통과한다(`tau=100 us`, 약 1.59 kHz). Carrier에 분압/clamp가 보이지 않으므로 ADC 허용 전압을 Power Stage에서 보장하고, attenuation/calibration/saturation/단선 처리를 코드와 HIL에 포함한다. GPIO3은 strapping pin이므로 CH3 temperature source 연결 상태의 cold boot/reset을 검증한다.
-- Logic Carrier는 `PWM_MAG/DIR`만 전달하며 complementary gate 신호나 dead time을 만들지 않는다. Power Stage가 이를 안전하게 제공하는지 확인하고, direction 전환은 PWM=0/blanking 조건에서 수행한다.
+- Logic Carrier는 `PWM_MAG/DIR`만 전달한다. Power Stage의 IRS2104가 complementary gate drive와 dead time을 담당하며, direction 전환은 PWM=0/blanking 조건에서 수행하고 실기 파형을 검증한다.
 - `PWM_MAG/DIR`에는 buffer/level shifter/절연이 보이지 않는다. 3.3 V input 호환성과 cable noise를 실측한다. 16 kHz/60 Hz는 firmware 요구이지 Carrier 회로가 보장한 값이 아니다.
 - J5 E-Stop은 U4를 통해 `CHx_ENABLE`만 차단하고 +24 V/+12 V/+5 V rail이나 PWM/DIR을 끊지 않는다. 동작 후에도 전력부를 live로 취급하고 firmware도 PWM 0을 적용한다. 이 단일 74HC08 경로를 safety-rated power disconnect로 표현하지 않는다.
-- 회로도상 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 J7에도 A↔B 통신 경로가 없다. B측 UART는 회로 개정 또는 명시적 외부 harness 없이는 확정된 것이 아니다. GPIO43/44는 DevKit USB-to-UART bridge와, GPIO19/20은 native USB/JTAG와 충돌할 수 있다.
-- 현재 `hardware/`에는 PDF 회로도와 분석 문서만 있고 편집 가능한 EDA/CAD source·BOM은 없다. harness connector, USB-to-UART bridge 격리, ADC clamp 등 물리 개정은 CAD 원본과 확정된 board revision을 확보한 뒤 반영하고 새 회로도/PDF 해시와 문서를 함께 갱신한다.
+- 회로도상 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 J7에도 A↔B 통신 경로가 없다. 현재 A↔B UART는 공통 GND를 포함한 명시적 외부 harness가 필요하다. GPIO43/44는 DevKit USB-to-UART bridge와, GPIO19/20은 native USB/JTAG와 충돌할 수 있다.
+- `hardware/Logic_carrier/`에는 전체 2페이지 PDF와 main KiCad schematic이 있지만 ADC 하위 시트 원본과 PCB/fabrication 자료가 없다. `hardware/Power_stage/`에는 KiCad schematic/PCB/project/rule과 PDF가 있지만 fabrication 출력과 조립 BOM은 없다. 누락 자료를 추측하거나 미제작 상태로 해석하지 말고 `hardware/manifest.json`의 상태를 따른다.
 - GPIO39~42는 Logic Carrier 신호와 classic JTAG 핀이 겹친다. ESP32_B에서 JTAG를 이 핀에 attach하지 않는다. N8R8의 Octal PSRAM 관련 GPIO35~37도 대체 UART/GPIO로 임의 사용하지 않는다. DevKitC-1 v1.1에서는 GPIO38이 onboard RGB LED와 공유되므로 CH2 enable을 건드리는 LED/RMT 초기화를 금지한다.
 - J6 +5 V pin 공급과 USB 전원 공급을 동시에 사용하지 않는다. 전원 주입 전 J1/J2/J3/J6 극성·전압, 공통 GND와 J7 pin 1/odd-even 방향을 계측한다.
 - `ESP32_B_Algo/main/power_stage_pinmap.h`는 Logic Carrier 핀맵을 따르고, B UART는 GPIO43/44를 사용하며, native USB console은 비활성화한다. compile-time 핀 소유권 검사와 host exact-value test를 유지한다. 다만 UART 외부 harness/bridge contention, ADC 물리 단위 환산·입력 보호와 Power Stage fault 차단을 HIL로 확정하기 전에는 Power Stage/PDLC/HV를 연결하지 않는다.
-- 저전압 제어부와 고전압 전력부를 분리하고 E-Stop, 퓨즈, 방전저항, HV 표시와 절연 구조를 적용한다.
+- 저장소 회로 원본에서 확인되는 안전 요소는 Logic Carrier의 F1과 J5 E-Stop enable gate이다. 저전압/고전압 분리, 외부 퓨즈, 방전, HV 표시와 절연·접근 통제는 조립 자료나 실물에서 확인하고, 확인되지 않은 항목을 as-built 보드 기능으로 표현하지 않는다.
 
 ## 네트워크와 기록 경계
 
@@ -117,13 +119,15 @@ MacBook TabUI -> 브라우저
 
 ## 개발 및 검증 규칙
 
+- 일반 검색과 코드 탐색은 `For_Test/`를 제외한다. 사용자가 특정 시험 프로젝트를 지목했거나 독립 시험 자체가 작업 범위인 경우에만 필요한 하위 폴더를 제한적으로 연다.
+- `For_Test/`의 코드를 제품 폴더로 복사하거나 제품 아키텍처의 근거로 삼지 않는다. 시험에서 확인된 사항을 제품에 반영할 때는 canonical 제품 계약과 하드웨어 기준을 다시 검증한다.
 - `Simul_Twin/`은 읽기와 실행만 허용하며 파일 생성·수정·삭제·포맷을 하지 않는다.
-- `ESP32_A_Algo/`의 카메라 기능은 반드시 프로젝트 내부에서 완결하고 sibling 경로·symlink·`ESP_Camera/` 소스를 빌드 입력으로 사용하지 않는다. 선택적인 `ESP_Camera/`가 남아 있다면 standalone 레퍼런스로만 취급한다.
+- `ESP32_A_Algo/`의 카메라 기능은 반드시 프로젝트 내부에서 완결하고 sibling 경로·symlink·`For_Test/` 소스를 빌드 입력으로 사용하지 않는다.
 - ESP32_B 제품 펌웨어 변경, 빌드와 플래시 작업은 유일한 canonical 경로인 `ESP32_B_Algo/`를 기준으로 한다.
 - wire schema 변경은 TabUI adapter, ESP32_A, ESP32_B, host tests와 README 예시를 함께 갱신한다.
-- ESP32_B의 핀, peripheral, UART, ADC 또는 출력 극성을 바꾸기 전에 `hardware/Logic carrier.pdf`와 `hardware/README.md`를 읽는다. 하나의 board pinmap에서 역할·방향·active level을 정의하고 exact-value, 중복 소유, 금지 핀과 safe-default를 host/static test로 검사한다.
+- ESP32_B의 핀, peripheral, UART, ADC 또는 출력 극성을 바꾸기 전에 `hardware/README.md`, `hardware/manifest.json`, `hardware/contracts/*.json`과 해당 원본을 읽는다. 변경 뒤 `python3 hardware/tools/validate_hardware_contract.py`와 ESP32_B host test로 exact-value, 중복 소유, 금지 핀과 safe-default를 검사한다.
 - ESP32_B 부팅 시 네 `ENABLE` LOW와 PWM duty 0을 가장 먼저 보장한다. 유효 명령+TTL, `EN_GLOBAL=HIGH`, 모든 `FAULT_N=HIGH` 이전에는 enable하지 않으며, 차단 시 enable LOW를 먼저 적용한다.
-- `FAULT_N`은 U4 하드웨어 AND에 포함되지 않는다. Power Stage 자체 차단이 없다면 펌웨어 polling이 유일한 추가 차단이므로 latency/jitter를 계측하고 요구 한계를 문서화한다.
+- `FAULT_N`은 Logic Carrier U4 AND에는 포함되지 않지만 Power Stage U14의 `RUN_OK = CHx_ENABLE AND FAULT_N`이 양쪽 IRS2104 shutdown을 구동한다. 네 제작 보드 각각에서 이 하드웨어 차단과 펌웨어 latch latency를 계측한다.
 - 문서와 코드에는 현재 사용하는 구성, 센서와 채널만 기록한다.
 - TabUI LIVE 기본값은 `transport=usb`, `usb-port=auto`로 유지한다. `/dev/ttyUSB0`, `TABUI_SERIAL_*` 또는 MacBook↔A 외부 UART를 production 경로로 다시 도입하지 않는다.
 - 실제 하드웨어가 없어도 TabUI typecheck/build, backend unit test, ESP32_A/B host test를 실행한다.

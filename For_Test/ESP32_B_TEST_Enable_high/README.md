@@ -1,10 +1,33 @@
-# ESP32_B_Algo
+# ESP32_B_TEST_Enable_high
 
-`ESP32_B_Algo/`는 KUGLASS의 **ESP32_B DevKit**에 빌드·플래시하는 canonical ESP-IDF 펌웨어 프로젝트입니다. ESP32_B는 물리 장치 이름이며, 이 폴더가 ESP32_A에서 받은 CH0~CH3 명령을 검증하고 제작된 Logic Carrier를 통해 제작된 단일 채널 Power Stage PCB 네 장에 `PWM_MAG`, `DIR`, `ENABLE`을 출력하는 actuator 로직을 구현합니다. 핀과 신호 극성은 [`hardware/README.md`](../hardware/README.md)와 [`esp32_b_io.json`](../hardware/contracts/esp32_b_io.json)의 as-built 계약을 기준으로 구현했습니다.
+> **위험:** MCU의 `ENABLE_CH0..CH3`(GPIO12/16/38/42)를 GPIO 초기화 이후
+> 항상 HIGH로 유지하는 전용 측정 펌웨어입니다. 방향 전환, fault, watchdog 및
+> safe-off에서도 이 네 핀은 LOW로 내려가지 않습니다. Power Stage와 고전압을
+> 모두 분리한 상태에서만 사용하십시오.
 
-이 프로젝트는 protocol/JSON 구현까지 `ESP32_B_Algo/` 안에 포함하므로 ESP32_A 소스 디렉터리에 빌드 의존성이 없습니다.
+이 폴더는 `ESP32_B_TEST`에서 파생되었으며, ESP32_A 명령과 Power Stage 안전
+입력 없이 독립 출력 테스트를 진행합니다. 추가로 MCU의 원시 ENABLE 출력은
+항상 HIGH로 고정합니다. PWM force-low와 DIR/SPWM 계산은 기존대로 동작하지만,
+ENABLE을 이용한 software 차단과 ENABLE LOW blanking은 의도적으로 시험하지
+않습니다. 방향 전환 중 PWM force-low blanking은 유지됩니다.
 
-독립 시험용 펌웨어는 `../For_Test/`에 격리되어 있으며 ESP32_B 제품 펌웨어의 대체 구현이나 빌드 입력이 아닙니다. 제품 변경 검증에는 이 폴더의 `host_tests/`를 함께 사용합니다.
+- 부팅 후 CH0~CH3 모두 `MI=0.75`, `enable=true`인 내부 명령을 1 ms마다
+  갱신합니다. 따라서 ESP32_A UART 명령과 TTL lease가 필요하지 않습니다.
+- 연결되지 않은 `EN_GLOBAL`/`FAULT_N` 상태는 software 출력 허가 조건에서
+  제외하며, 해당 GPIO의 ISR와 내부 pull-up도 설정하지 않습니다.
+- `PWM_MAG`와 `DIR`에서는 기존과 같은 16 kHz carrier/60 Hz SPWM을 확인할 수
+  있고, MCU의 원시 `ENABLE_CHx` 핀은 항상 HIGH입니다.
+- Logic Carrier J7의 `CHx_ENABLE`은 여전히 하드웨어 식
+  `EN_GLOBAL AND ENABLE_CHx`를 따릅니다. J7에서 enable을 측정하려면 E-Stop
+  NC 회로가 연결되어 `EN_GLOBAL=HIGH`여야 합니다.
+
+ENABLE 출력 고정을 제외한 핀맵, SPWM, PWM 방향 blanking, MI slew,
+ADC/status 및 watchdog 구현은 `ESP32_B_TEST`와 같습니다.
+
+핀과 신호 극성은 [`Logic carrier.pdf`](<../../hardware/Logic carrier.pdf>)와
+[`Power_stage.pdf`](<../../hardware/Power_stage.pdf>)를 기준으로 유지했으며,
+protocol/JSON 구현을 이 프로젝트 안에 포함하므로 ESP32_A 소스 디렉터리에
+빌드 의존성이 없습니다.
 
 ```text
 ESP32_A
@@ -19,18 +42,19 @@ Logic Carrier
   -> PWM_RIGHT = PWM_MAG AND NOT DIR
 ```
 
-## 안전 동작
+## 변경된 안전 동작
 
-- 초기화 첫 단계에서 네 `ENABLE`을 LOW로 만들고 MCPWM을 continuous force-low로 고정합니다.
-- E-Stop `EN_GLOBAL`과 네 `FAULT_N`의 falling edge는 ISR에서 latch하며, 모든 software enable을 즉시 LOW로 내립니다.
-- ISR는 lock을 기다리지 않고 trip을 먼저 기록해 enable을 내리며, 출력 task는 ENABLE commit 전후의 trip/event를 모두 검사합니다. 입력이 다시 HIGH가 되어도 승인되지 않은 edge가 있으면 재활성화되지 않습니다.
+- 초기화 첫 단계에서 네 MCU `ENABLE`을 HIGH로 만들고 MCPWM은 continuous force-low로 고정합니다.
+- standalone test이므로 `EN_GLOBAL`과 `FAULT_N` 입력 및 해당 GPIO ISR는 구성하지 않습니다.
+- watchdog 또는 safe-off가 발생해도 MCU `ENABLE`은 HIGH를 유지하며 PWM만 force-low됩니다.
 - 잘못된 JSON, oversize line, 불완전/중복 channel set, 범위 밖 MI, active lease 중 stale sequence는 현재 command lease 전체를 즉시 무효화하고 safe-off합니다.
-- 통신 TTL 초과, E-Stop, Power Stage fault, 출력 task watchdog 실패도 `ENABLE LOW + PWM force-low + applied_mi=0`으로 처리합니다.
-- 방향 반전은 `ENABLE LOW -> PWM force-low -> 1 ms blanking -> DIR 변경 -> PWM 준비 -> 안전 입력 재검사 -> ENABLE HIGH` 순서입니다.
+- 이 변형의 safe-off는 `ENABLE HIGH 유지 + PWM force-low + applied_mi=0`입니다.
+- 방향 반전은 `ENABLE HIGH 유지 -> PWM force-low -> 1 ms blanking -> DIR 변경 -> PWM 준비` 순서입니다.
 - Power Stage의 IRS2104 bootstrap refresh 여유를 위해 MI/duty는 최대 `0.95`로 제한합니다. 10 MHz MCPWM에서 1 carrier tick보다 작은 duty는 enable하지 않습니다.
 - 출력 task는 실제 경과시간으로 60 Hz 위상과 MI slew를 갱신하며 100 ms task watchdog에 등록됩니다.
 
-물리 E-Stop과 Power Stage의 `RUN_OK` 차단이 최종 안전 경로입니다. 이 펌웨어만으로 인증된 안전 회로를 대체하지 않습니다.
+이 테스트 변형은 MCU ENABLE 안전 차단을 의도적으로 무력화합니다. 인증된 안전
+경로로 사용할 수 없으며 Power Stage/HV를 연결하지 마십시오.
 
 ## 명령과 reset
 
@@ -68,7 +92,7 @@ B가 송신하는 모든 프레임은 현재 A가 파싱할 수 있는 `type=sta
 - ESP-IDF curve-fitting calibration을 만들 수 없더라도 raw ADC는 계속 보고합니다. 이때 해당 `mv_valid_mask` bit는 0입니다.
 - `diagnostic` 예: `BOOT`, `BOOT_ADC_UNAVAILABLE`, `INVALID_CHANNEL_SET`, `RESET_OK`, `RESET_UNSAFE`, `TARGET_BOOT_MISMATCH`, `CHALLENGE_MISMATCH`.
 
-Power Stage의 R9 0.1 ohm과 R14/TH1 10 kohm에서 명목 current/temperature 관계를 계산할 수 있지만, NTC Beta와 보드별 slope/offset, 허용 온도 및 실제 fault 임계값은 측정 기록이 없습니다. 따라서 ADC는 현재 진단 telemetry이며 보정되지 않은 수치로 software over-current/over-temperature trip을 만들지 않았습니다. 명목식과 상태는 [`power_stage.json`](../hardware/contracts/power_stage.json)에 있습니다.
+회로도에 current 환산 계수, NTC Beta/분압 사양, 허용 온도 및 보호 임계값이 확정되어 있지 않으므로 ADC는 현재 진단 telemetry입니다. 보정되지 않은 수치로 software over-current/over-temperature trip을 만들지 않았습니다.
 
 ## Logic Carrier 핀맵
 
@@ -102,9 +126,7 @@ GPIO43/44는 DevKit의 onboard USB-UART/ROM UART0와도 연결될 수 있습니�
 ESP-IDF 6.0.2 / ESP32-S3 빌드:
 
 ```bash
-python3 hardware/tools/validate_hardware_contract.py
-
-cd ESP32_B_Algo
+cd For_Test/ESP32_B_TEST_Enable_high
 idf.py set-target esp32s3
 idf.py build
 sh host_tests/run_tests.sh
@@ -116,11 +138,11 @@ Host test는 exact pin/ADC channel, session/challenge가 필수인 strict reset 
 
 1. 전원 인가와 reset 전 구간에서 네 `ENABLE`, `PWM_MAG`, `DIR` 파형 확인
 2. 네 채널 16 kHz carrier, 60 Hz polarity, 최대 95% duty 확인
-3. 방향 전환 시 ENABLE/PWM LOW blanking 시간 확인
+3. 방향 전환 시 ENABLE HIGH 유지와 PWM LOW blanking 시간 확인
 4. 짧은 `FAULT_N`/E-Stop pulse가 latch되고 reset 전까지 재활성되지 않는지 확인
 5. UART 단선/oversize/stale/replayed frame과 task watchdog safe-off 확인
 6. GPIO3 cold boot, GPIO19 USB/reset glitch, GPIO38 RGB LED contention 확인
 7. ADC 여덟 입력의 실제 전압 범위, current 환산, NTC 곡선과 saturation 확인
-8. 제작된 단일 채널 Power Stage PCB 네 장 각각에서 `RUN_OK = CH_ENABLE AND FAULT_N` 확인
+8. 동일 revision의 단일 채널 Power Stage PCB 네 장 각각에서 `RUN_OK = CH_ENABLE AND FAULT_N` 확인
 
 최초 검증은 Power Stage와 고전압을 분리한 상태에서 logic-level 파형부터 수행하십시오.

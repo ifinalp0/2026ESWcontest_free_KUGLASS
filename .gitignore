@@ -1,2 +1,10 @@
 .DS_Store
 **/.DS_Store
+
+# Local analysis and generated previews
+/tmp/
+
+# KiCad and office application session state
+*.lck
+*.kicad_prl
+~$*.xlsx
