@@ -19,11 +19,22 @@ host test가 검증한다. 계약을 변경할 때는 세 컴포넌트, 관련 �
 | 링크 | 전송 경로 | 용도 |
 | --- | --- | --- |
 | TabUI↔A | ESP32_A DevKit USB Serial/JTAG CDC | UI 명령, ACK, 상태, on-demand JPEG |
-| A↔B | UART 115200 8-N-1 + 공통 GND | actuator command, control, B status |
+| A↔B | 외부 3선 UART, 115200 8-N-1, TX↔RX 교차 + 공통 GND | actuator command, control, B status |
 | 브라우저↔TabUI | 동일 출처 HTTP | 화면, API, 최신 JPEG |
 
 TabUI↔A USB의 JSON Lines와 `KUGLCAM1` JPEG frame은 한 byte stream에서
 다중화된다. JPEG는 보조 경로이며 정책 계산과 A→B heartbeat보다 우선하지 않는다.
+
+A↔B 물리 배선은 다음과 같다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
+
+Logic Carrier에는 A↔B UART가 라우팅되지 않는다. 별도 3선 harness를 사용하며
+TX끼리 또는 RX끼리 연결하지 않는다.
 
 ## TabUI → ESP32_A
 

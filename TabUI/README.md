@@ -17,7 +17,14 @@ ESP32_A DevKit USB Serial/JTAG CDC
 
 MacBook↔ESP32_A에는 별도 GPIO UART를 사용하지 않습니다. ESP32_A DevKit의 USB
 단자에 데이터 micro-USB 케이블을 직접 연결하고 macOS의 `/dev/cu.usbmodem*`
-장치를 엽니다.
+장치를 엽니다. ESP32_A↔ESP32_B는 이 USB 링크와 별개이며, 다음 외부 3선 UART
+harness를 사용합니다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
 
 ## 제공 기능
 

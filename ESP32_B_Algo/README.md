@@ -76,20 +76,21 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
 
 ESP32_B를 Power Stage에 직결하거나 Logic Carrier를 생략하지 않습니다.
 
-## A↔B UART
+## A↔B 외부 3선 UART
 
-UART1은 115200 8-N-1, B TX=GPIO43, RX=GPIO44입니다.
+UART1은 115200 8-N-1, flow control 없음이며 B TX=GPIO43, RX=GPIO44입니다.
 
 ```text
 ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
 ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
-GND               --- GND
+ESP32_A GND       --- ESP32_B GND
 ```
 
-Logic Carrier에 UART connector가 없으므로 외부 harness가 필요합니다. GPIO43/44와
-DevKit USB-UART bridge의 push-pull contention, ROM boot byte 유입을 실기에서
-확인해야 합니다. `sdkconfig.defaults`는 native USB Serial/JTAG와 console을
-비활성화하고 GPIO 제어 함수를 IRAM에 배치합니다.
+각 TX를 상대 장치의 RX에 연결하며 TX끼리 또는 RX끼리 연결하지 않습니다. Logic
+Carrier의 U3 TX/RX는 NC이고 J7에도 UART가 없으므로 별도 3선 harness가
+필요합니다. GPIO43/44와 DevKit USB-UART bridge의 push-pull contention, ROM boot
+byte 유입을 실기에서 확인해야 합니다. `sdkconfig.defaults`는 native USB
+Serial/JTAG와 console을 비활성화하고 GPIO 제어 함수를 IRAM에 배치합니다.
 
 ## 통신과 ADC 상태
 

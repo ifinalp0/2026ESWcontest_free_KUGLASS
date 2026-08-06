@@ -43,7 +43,9 @@ sh host_tests/run_tests.sh
 - J1/J2/J3/J6/J8/J9의 극성과 GND 단락 여부를 확인합니다.
 - F1 정격과 J4 main switch 경로를 확인합니다.
 - 네 Power Stage의 Q1-Q4 marking을 기록해 schematic의 `STP40NF20` 값과 Datasheet 속성 충돌을 해소합니다.
-- A-B 외부 UART harness의 TX/RX/GND와 DevKit bridge 동시 구동 가능성을 확인합니다.
+- A-B 외부 3선 UART harness의 `A GPIO39 TX → B GPIO44 RX`,
+  `A GPIO40 RX ← B GPIO43 TX`, `A GND ↔ B GND` 연속성을 확인합니다. TX끼리 또는
+  RX끼리 연결하지 않고 DevKit bridge 동시 구동 가능성을 확인합니다.
 
 ## 2. Logic Carrier 저전압
 

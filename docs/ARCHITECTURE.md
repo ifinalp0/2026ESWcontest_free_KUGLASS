@@ -65,16 +65,18 @@ MacBook과 ESP32_A는 데이터 통신이 가능한 micro-USB 케이블로 DevKi
 
 ### ESP32_A와 ESP32_B
 
-A↔B는 115200 8-N-1 UART와 공통 GND를 사용하는 별도 링크다.
+A↔B는 115200 8-N-1, flow control 없음으로 동작하는 외부 3선 UART harness다.
+각 장치의 TX를 상대 장치의 RX에 교차 연결하고 두 장치의 GND를 연결한다.
 
 ```text
 ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
 ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
-GND               --- GND
+ESP32_A GND       --- ESP32_B GND
 ```
 
-Logic Carrier에는 이 UART용 connector가 없으므로 외부 harness가 필요하다.
-ESP32_B GPIO43/44와 DevKit USB-UART bridge의 contention은 실기에서 확인해야 한다.
+TX끼리 또는 RX끼리 연결하지 않는다. Logic Carrier의 U3 TX(GPIO43)/RX(GPIO44)는
+NC이고 J7에도 이 링크가 없으므로 위 harness를 별도로 배선한다. ESP32_B
+GPIO43/44와 DevKit USB-UART bridge의 contention은 실기에서 확인해야 한다.
 
 ### ESP32_B와 전력부
 

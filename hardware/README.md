@@ -32,6 +32,21 @@ ESP32_B DevKitC-1-N8R8
 - Power Stage의 J10은 2x8이고 모든 짝수 핀은 GND입니다. J10의 홀수 핀 1~15가 J7 각 채널 블록의 홀수 핀에 순서대로 대응합니다.
 - ESP32_B를 Power Stage에 임의 직결하거나 Logic Carrier를 생략하지 않습니다.
 
+### ESP32_A↔ESP32_B 외부 UART
+
+Logic Carrier의 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 J7에도 A↔B UART가 없습니다.
+따라서 두 DevKit은 다음 외부 3선 harness로 직접 연결합니다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
+
+UART1은 115200 8-N-1, flow control 없음입니다. TX끼리 또는 RX끼리 연결하지
+않으며, ESP32_B GPIO43/44와 DevKit USB-UART bridge의 contention을 실기에서
+확인합니다.
+
 ## 파일 구조
 
 ```text
@@ -98,5 +113,5 @@ python3 hardware/tools/validate_hardware_contract.py
 
 - 펌웨어 작업은 구조화 계약과 원본 회로를 읽고 현재 제작 보드에 맞춥니다.
 - 하드웨어 변경을 명시적으로 요청받지 않은 작업에서는 KiCad/PDF를 수정하거나 가상의 차기 회로를 현재 상태에 섞지 않습니다.
-- 외부 A-B UART harness, 외부 DC-DC, E-Stop switch, PDLC와 전원 배선은 회로도 밖의 조립 요소입니다. 커넥터 이름만으로 방향, 정격, 실제 배선을 추정하지 않습니다.
+- 위 A-B 3선 UART harness, 외부 DC-DC, E-Stop switch, PDLC와 전원 배선은 회로도 밖의 조립 요소입니다. 문서에 명시된 TX↔RX/GND 연결 외의 방향, 정격과 실제 조립 상태를 커넥터 이름만으로 추정하지 않습니다.
 - +72 V와 switching node가 존재하므로 저전압 검증을 먼저 완료하고 [`validation/README.md`](validation/README.md)의 순서를 지킵니다.

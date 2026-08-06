@@ -149,13 +149,23 @@ Logic Carrier 1장과 동일한 단일 채널 Power Stage 4장은 제작 완료�
   USB Serial/JTAG(GPIO19/20)`. 외부 GPIO UART를 추가하지 않는다. macOS에서는
   `/dev/cu.usbmodem*`를 사용하고 TabUI LIVE 기본은 `transport=usb`,
   `usb-port=auto`다.
-- ESP32_A: A↔B UART1 TX/RX GPIO39/40, DS18B20 DAT GPIO41. 이는 ESP32_B의
-  핀맵과 별개다. 카메라 핀과 실제 DevKit header 충돌은 HIL 전에 확인한다.
+- ESP32_A와 ESP32_B는 다음 외부 3선 UART harness로 교차 연결한다. TX끼리 또는
+  RX끼리 연결하지 않는다.
+
+  ```text
+  ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+  ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+  ESP32_A GND       --- ESP32_B GND
+  ```
+
+  UART1 설정은 115200 8-N-1, flow control 없음이다. Logic Carrier에는 이 링크가
+  라우팅되지 않으므로 반드시 별도 harness를 사용한다.
+- ESP32_A의 DS18B20 DAT는 GPIO41이다. A의 UART/센서 핀과 ESP32_B 핀맵은
+  별개이며, 카메라 핀과 실제 DevKit header 충돌은 HIL 전에 확인한다.
 - DS18B20 모듈은 3.3 V 외부전원과 공통 GND를 사용한다. parasite power는
   사용하지 않는다.
-- ESP32_B A↔B UART는 GPIO43/44와 외부 공통-GND harness를 사용한다.
-  Logic Carrier 회로의 U3 TX/RX는 NC이며 J7에 통신 경로가 없다. DevKit bridge와의
-  contention을 실측한다.
+- Logic Carrier 회로의 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 J7에도 A↔B 통신
+  경로가 없다. ESP32_B GPIO43/44와 DevKit bridge의 contention을 실측한다.
 
 ### ESP32_B / Logic Carrier 핀 계약
 

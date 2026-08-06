@@ -23,6 +23,19 @@ KiCad main schematic은 ADC filter용 `untitled.kicad_sch`를 참조하지만 �
 
 GPIO와 커넥터의 기계 판독 기준은 [`../contracts/esp32_b_io.json`](../contracts/esp32_b_io.json)입니다.
 
+### ESP32_A↔ESP32_B 외부 UART
+
+Logic Carrier의 U3 TX(GPIO43)/RX(GPIO44)는 NC이고 별도 UART connector가
+없습니다. ESP32_A와 U3에 장착된 ESP32_B는 다음 외부 3선 harness로 연결합니다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
+
+UART1은 115200 8-N-1입니다. TX끼리 또는 RX끼리 연결하지 않습니다.
+
 ## 전원 경로
 
 | 위치 | 연결 | 현재 의미 |
@@ -46,7 +59,7 @@ GPIO와 커넥터의 기계 판독 기준은 [`../contracts/esp32_b_io.json`](..
 - ADC filter에는 clamp, divider 또는 level shifter가 없습니다.
 - GPIO3은 CH3 temperature ADC와 strapping 기능을 공유합니다.
 - GPIO38은 CH2 enable이며 일부 DevKitC-1 보드의 RGB LED와 공유될 수 있습니다.
-- GPIO43/44는 Logic Carrier에서 A-B UART connector로 라우팅되지 않습니다. 펌웨어의 A-B 링크는 외부 harness가 필요합니다.
+- GPIO43/44는 Logic Carrier에서 A-B UART connector로 라우팅되지 않습니다. 위에 명시한 외부 3선 harness가 필요합니다.
 - J7의 mating-face 방향과 실제 케이블 pin 1은 파일만으로 확정하지 않고 실물 조립에서 확인합니다.
 
 ## 제작 자료 상태

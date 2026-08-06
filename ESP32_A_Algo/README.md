@@ -46,14 +46,22 @@ MacBook TabUI <-----------+
 | 링크·센서 | ESP32_A 자원 | 상대편·설정 |
 | --- | --- | --- |
 | MacBook TabUI | DevKit USB 단자, USB Serial/JTAG GPIO19/20 | 데이터 micro-USB, macOS `/dev/cu.usbmodem*` |
-| ESP32_B TX | UART1 TX GPIO39 | ESP32_B RX GPIO44, 115200 8-N-1 |
-| ESP32_B RX | UART1 RX GPIO40 | ESP32_B TX GPIO43, 115200 8-N-1 |
+| A→B 송신 | ESP32_A UART1 TX GPIO39 | ESP32_B RX GPIO44, 115200 8-N-1 |
+| B→A 수신 | ESP32_A UART1 RX GPIO40 | ESP32_B TX GPIO43, 115200 8-N-1 |
 | 내부온도 | GPIO41 | DS18B20 DAT, 3.3 V 외부전원, 공통 GND |
 | 카메라 | GPIO4~18 | `main/camera_pins.h` 계약 |
 
 TabUI용 DevKit USB와 A↔B UART는 서로 다른 링크입니다. MacBook↔A 구간에 외부
-UART 배선을 추가하지 않습니다. A와 B는 GND를 공유해야 하며 DS18B20 parasite
-power는 사용하지 않습니다.
+UART 배선을 추가하지 않습니다. A↔B는 다음 외부 3선 harness로 연결합니다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
+
+TX끼리 또는 RX끼리 연결하지 않습니다. Logic Carrier에는 이 UART가 라우팅되지
+않습니다. DS18B20 parasite power는 사용하지 않습니다.
 
 ### 카메라 핀
 

@@ -32,6 +32,18 @@ ESP32_A가 권위 있는 목표 MI를 계산합니다. ESP32_B는 목표를 다�
 명령 검증, 출력, 로컬 차단과 실제 적용 상태 회신만 수행합니다. TabUI는 LIVE
 자동 정책을 계산하지 않습니다.
 
+ESP32_A와 ESP32_B는 Logic Carrier를 통하지 않는 외부 3선 UART harness로
+연결합니다.
+
+```text
+ESP32_A GPIO39 TX -> ESP32_B GPIO44 RX
+ESP32_A GPIO40 RX <- ESP32_B GPIO43 TX
+ESP32_A GND       --- ESP32_B GND
+```
+
+UART1은 115200 8-N-1이며 TX↔RX를 교차 연결합니다. TX끼리 또는 RX끼리 연결하지
+않습니다.
+
 더 자세한 책임과 물리 연결은 [시스템 구조](docs/ARCHITECTURE.md), frame 형식은
 [통신 계약](docs/PROTOCOL.md)을 참고하세요.
 
