@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "incident_id": "HIL-AB-UART-20260807-001",
+  "status": "open",
+  "captured_at": "2026-08-07T01:00:37+09:00",
+  "observation_window": {
+    "start": "2026-08-07T00:56:00+09:00",
+    "end": "2026-08-07T01:00:37+09:00"
+  },
+  "repository": {
+    "branch": "main",
+    "head": "90a8946922cc8a6110a9d9b5c6024db48b6f5bb0",
+    "worktree": "clean",
+    "running_firmware_matches_head": "unknown"
+  },
+  "assumptions": {
+    "a_b_harness_wiring": "assumed_correct_by_user_not_remeasured",
+    "continuity_result": "not_recorded",
+    "power_condition": "unknown"
+  },
+  "host": {
+    "tabui_pid": 91739,
+    "tabui_listen": "TCP *:8080",
+    "tabui_serial_port": "/dev/cu.usbmodem3101",
+    "serial_ports": [
+      {
+        "path": "/dev/cu.usbmodem3101",
+        "description": "USB JTAG/serial debug unit",
+        "vid_pid": "303A:1001",
+        "serial": "1C:DB:D4:9D:8E:14",
+        "location": "3-1",
+        "role": "ESP32_A"
+      },
+      {
+        "path": "/dev/cu.usbmodem502NTWG146572",
+        "description": "LG Monitor Controls",
+        "vid_pid": "043E:9A39",
+        "serial": "502NTWG14657",
+        "location": "1-1.3",
+        "role": "not_esp32"
+      }
+    ]
+  },
+  "tabui_health_snapshot": {
+    "ok": true,
+    "service": "kuglass-tabui",
+    "controller": "ESP32_A",
+    "link": {
+      "transport": "usb",
+      "hardwareConnected": true,
+      "hilEnabled": false,
+      "port": "/dev/cu.usbmodem3101",
+      "lastTelemetryAt": 1786032037.7541778,
+      "lastCommandSeq": 3618857342,
+      "lastAckSeq": 3618857342,
+      "lastAckCommand": "camera_stream",
+      "lastAckOk": true,
+      "downstreamHealthy": false,
+      "downstreamError": "BAD_JSON",
+      "downstreamOperationalFault": false,
+      "downstreamBootId": null,
+      "downstreamStatusSeq": null,
+      "downstreamResetChallenge": null,
+      "downstreamEstop": null,
+      "downstreamFaultCode": null,
+      "downstreamDiagnostic": null,
+      "downstreamControlResult": null,
+      "downstreamAdc": {
+        "initialized": false,
+        "currentCalibrated": false,
+        "temperatureCalibrated": false,
+        "rawValidMask": 0,
+        "mvValidMask": 0
+      },
+      "error": null
+    }
+  },
+  "tabui_state_excerpt": {
+    "vehicleMode": "driving",
+    "demoMode": "none",
+    "environment": {
+      "internalTemp": 24.06
+    },
+    "cameraMetrics": {
+      "valid": true,
+      "aeMetadataValid": false,
+      "frameId": 562,
+      "timestamp": 300.594
+    },
+    "channels": [
+      {"channel": 0, "targetMi": 0.95, "commandedMi": 0.95, "appliedMi": 0.0, "appliedKnown": false},
+      {"channel": 1, "targetMi": 0.95, "commandedMi": 0.95, "appliedMi": 0.0, "appliedKnown": false},
+      {"channel": 2, "targetMi": 0.9488, "commandedMi": 0.9488, "appliedMi": 0.0, "appliedKnown": false},
+      {"channel": 3, "targetMi": 0.9488, "commandedMi": 0.9488, "appliedMi": 0.0, "appliedKnown": false}
+    ],
+    "downstreamDiagnostics": {
+      "bootId": null,
+      "statusSeq": null,
+      "resetChallenge": null,
+      "estopActive": null,
+      "faultCode": null,
+      "diagnostic": null,
+      "operationalFault": false,
+      "controlResult": null
+    }
+  },
+  "repeat_observation": {
+    "interval_seconds": 2,
+    "first_lastTelemetryAt": 1786031864.9823964,
+    "second_lastTelemetryAt": 1786031867.005091,
+    "downstreamHealthy_both": false,
+    "downstreamError_both": "BAD_JSON",
+    "bootId_both": null,
+    "statusSeq_both": null
+  },
+  "static_verification": {
+    "hardware_contract_validator": "pass",
+    "esp32_a_host_tests": "pass",
+    "esp32_b_host_tests": "pass",
+    "canonical_uart": "UART1 115200 8-N-1 no flow control",
+    "canonical_pins": {
+      "esp32_a_tx": 39,
+      "esp32_a_rx": 40,
+      "esp32_b_tx": 43,
+      "esp32_b_rx": 44
+    },
+    "esp32_b_canonical_console": "disabled"
+  },
+  "unknowns": [
+    "raw malformed UART line",
+    "whether BAD_JSON was a single latched event or repeats",
+    "firmware image hash and Git commit flashed on ESP32_A",
+    "firmware image hash and Git commit flashed on ESP32_B",
+    "ESP32_B reset reason and boot-loop state",
+    "ESP32_B supply voltage and brownout history",
+    "GPIO43/44 USB-UART bridge attachment and contention state",
+    "logic-level waveform, actual baud and framing error count",
+    "actual ESP32_A/B DevKit revisions",
+    "Logic Carrier and Power Stage identifiers"
+  ]
+}
