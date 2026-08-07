@@ -45,7 +45,7 @@
     {
       "id": "HW-009",
       "severity": "critical",
-      "rule": "Direction changes require enable low, PWM force-low, a blanking interval, direction update, and safety-input recheck before re-enable."
+      "rule": "During a healthy active lease ENABLE_CHx remains statically high across SPWM zero crossings and direction blanking. Direction changes require PWM force-low, a blanking interval, direction update, and safety-input recheck before PWM resumes; any disable or safety condition drives ENABLE_CHx low."
     },
     {
       "id": "HW-010",

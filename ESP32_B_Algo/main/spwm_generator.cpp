@@ -148,7 +148,7 @@ void SpwmGenerator::force_safe() {
 void SpwmGenerator::tick(ChannelManager& channels,
                          float dt_s,
                          bool global_enable) {
-    if (!std::isfinite(dt_s) || dt_s <= 0.0f) {
+    if (!std::isfinite(dt_s) || dt_s < 0.0f) {
         force_safe();
         return;
     }
@@ -187,8 +187,7 @@ void SpwmGenerator::apply_request(size_t index,
     const uint32_t compare_ticks = duty_to_compare_ticks(duty);
     SpwmChannelState& state = states_[index];
 
-    if (!enable || compare_ticks == 0U ||
-        compare_ticks >= kPwmPeriodTicks) {
+    if (!enable || compare_ticks >= kPwmPeriodTicks) {
         set_channel_safe(index, false);
         state = SpwmChannelState{};
         blanking_remaining_s_[index] = 0.0f;
@@ -204,15 +203,18 @@ void SpwmGenerator::apply_request(size_t index,
         }
         blanking_remaining_s_[index] -= dt_s;
         if (blanking_remaining_s_[index] > 0.0f) {
-            set_channel_safe(index, state.direction_positive);
+            hold_channel_pwm_low(index);
             state.duty_ratio = 0.0f;
-            state.enabled = false;
+            state.enabled = true;
             return;
         }
 
         const bool next_direction = pending_direction_[index];
-        if (set_channel_active(index, duty, next_direction)) {
-            state.duty_ratio = duty;
+        const bool output_ready = compare_ticks == 0U
+            ? set_channel_enabled_idle(index, next_direction)
+            : set_channel_active(index, duty, next_direction);
+        if (output_ready) {
+            state.duty_ratio = compare_ticks == 0U ? 0.0f : duty;
             state.direction_positive = next_direction;
             state.enabled = true;
             state.blanking = false;
@@ -224,20 +226,24 @@ void SpwmGenerator::apply_request(size_t index,
     }
 
     if (state.enabled && positive != state.direction_positive) {
-        // Keep the old direction for the complete blanking interval. PWM is
-        // forced low immediately and ENABLE is already low before DIR moves.
-        set_channel_safe(index, state.direction_positive);
+        // Keep ENABLE_CHx statically high while the healthy channel blanks.
+        // PWM is force-low before DIR moves, so ENABLE is reserved for actual
+        // disable and safety conditions rather than becoming a 120 Hz pulse.
+        hold_channel_pwm_low(index);
         pending_direction_[index] = positive;
         blanking_remaining_s_[index] =
             static_cast<float>(KUGLASS_DIRECTION_BLANKING_MS) / 1000.0f;
         state.duty_ratio = 0.0f;
-        state.enabled = false;
+        state.enabled = true;
         state.blanking = true;
         return;
     }
 
-    if (set_channel_active(index, duty, positive)) {
-        state.duty_ratio = duty;
+    const bool output_ready = compare_ticks == 0U
+        ? set_channel_enabled_idle(index, positive)
+        : set_channel_active(index, duty, positive);
+    if (output_ready) {
+        state.duty_ratio = compare_ticks == 0U ? 0.0f : duty;
         state.direction_positive = positive;
         state.enabled = true;
         state.blanking = false;
@@ -256,12 +262,7 @@ void SpwmGenerator::set_channel_safe(size_t index, bool direction_positive) {
     if (pwm.enable_gpio >= 0) {
         gpio_set_level(static_cast<gpio_num_t>(pwm.enable_gpio), 0);
     }
-    if (pwm.generator != nullptr) {
-        (void)mcpwm_generator_set_force_level(pwm.generator, 0, true);
-    }
-    if (pwm.comparator != nullptr) {
-        (void)mcpwm_comparator_set_compare_value(pwm.comparator, 0);
-    }
+    hold_channel_pwm_low(index);
     if (pwm.direction_gpio >= 0) {
         gpio_set_level(static_cast<gpio_num_t>(pwm.direction_gpio),
                        direction_positive ? 1 : 0);
@@ -270,6 +271,55 @@ void SpwmGenerator::set_channel_safe(size_t index, bool direction_positive) {
     (void)index;
     (void)direction_positive;
 #endif
+}
+
+void SpwmGenerator::hold_channel_pwm_low(size_t index) {
+#ifdef ESP_PLATFORM
+    if (index >= KUGLASS_CHANNEL_COUNT) return;
+    PwmHandle& pwm = g_pwm[index];
+    if (pwm.generator != nullptr) {
+        (void)mcpwm_generator_set_force_level(pwm.generator, 0, true);
+    }
+    if (pwm.comparator != nullptr) {
+        (void)mcpwm_comparator_set_compare_value(pwm.comparator, 0);
+    }
+#else
+    (void)index;
+#endif
+}
+
+bool SpwmGenerator::set_channel_enabled_idle(size_t index,
+                                              bool direction_positive) {
+    if (index >= KUGLASS_CHANNEL_COUNT) return false;
+    const bool must_commit = !states_[index].enabled ||
+        states_[index].direction_positive != direction_positive;
+#ifdef ESP_PLATFORM
+    PwmHandle& pwm = g_pwm[index];
+    if (pwm.generator == nullptr || pwm.comparator == nullptr ||
+        pwm.enable_gpio < 0 || pwm.direction_gpio < 0) {
+        return false;
+    }
+    if (!states_[index].enabled) {
+        gpio_set_level(static_cast<gpio_num_t>(pwm.enable_gpio), 0);
+    }
+    hold_channel_pwm_low(index);
+    if (must_commit) {
+        gpio_set_level(static_cast<gpio_num_t>(pwm.direction_gpio),
+                       direction_positive ? 1 : 0);
+        const bool enabled = enable_commit_callback_ != nullptr
+            ? enable_commit_callback_(index, enable_commit_context_)
+            : gpio_set_level(static_cast<gpio_num_t>(pwm.enable_gpio), 1) ==
+                ESP_OK;
+        if (!enabled) return false;
+    }
+#else
+    (void)direction_positive;
+    if (must_commit && enable_commit_callback_ != nullptr &&
+        !enable_commit_callback_(index, enable_commit_context_)) {
+        return false;
+    }
+#endif
+    return true;
 }
 
 bool SpwmGenerator::set_channel_active(size_t index,
@@ -285,8 +335,13 @@ bool SpwmGenerator::set_channel_active(size_t index,
     }
 
     const bool was_enabled = states_[index].enabled;
+    const bool direction_changed =
+        states_[index].direction_positive != direction_positive;
+    const bool must_commit = !was_enabled || direction_changed;
     if (!was_enabled) {
         gpio_set_level(static_cast<gpio_num_t>(pwm.enable_gpio), 0);
+    }
+    if (must_commit) {
         if (mcpwm_generator_set_force_level(pwm.generator, 0, true) != ESP_OK) {
             return false;
         }
@@ -303,19 +358,21 @@ bool SpwmGenerator::set_channel_active(size_t index,
         ESP_OK) {
         return false;
     }
-    if (!was_enabled) {
-        if (mcpwm_generator_set_force_level(pwm.generator, -1, true) != ESP_OK) {
-            return false;
-        }
+    if (must_commit) {
         const bool enabled = enable_commit_callback_ != nullptr
             ? enable_commit_callback_(index, enable_commit_context_)
             : gpio_set_level(static_cast<gpio_num_t>(pwm.enable_gpio), 1) ==
                 ESP_OK;
         if (!enabled) return false;
     }
+    if (mcpwm_generator_set_force_level(pwm.generator, -1, true) != ESP_OK) {
+        return false;
+    }
 #else
     (void)direction_positive;
-    if (!states_[index].enabled && enable_commit_callback_ != nullptr &&
+    const bool must_commit = !states_[index].enabled ||
+        states_[index].direction_positive != direction_positive;
+    if (must_commit && enable_commit_callback_ != nullptr &&
         !enable_commit_callback_(index, enable_commit_context_)) {
         return false;
     }

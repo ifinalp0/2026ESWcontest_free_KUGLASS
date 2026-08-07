@@ -8,6 +8,8 @@
 struct SpwmChannelState {
     float duty_ratio = 0.0f;
     bool direction_positive = false;
+    // Mirrors the static ENABLE_CHx request, independently of whether PWM is
+    // temporarily force-low for a zero crossing or direction blanking.
     bool enabled = false;
     bool blanking = false;
 };
@@ -31,6 +33,8 @@ private:
                        bool enable,
                        float dt_s);
     void set_channel_safe(size_t index, bool direction_positive);
+    void hold_channel_pwm_low(size_t index);
+    bool set_channel_enabled_idle(size_t index, bool direction_positive);
     bool set_channel_active(size_t index, float duty, bool direction_positive);
 
     float phase_rad_ = 0.0f;

@@ -213,8 +213,10 @@ Logic Carrier 1장과 동일한 단일 채널 Power Stage 4장은 제작 완료�
 - 유효 full command와 TTL, `EN_GLOBAL=HIGH` 이전에는 어떤 채널도 enable하지
   않는다. 각 채널은 자신의 `FAULT_N_CHx=HIGH`일 때만 enable한다.
 - 차단 시 enable LOW를 먼저 적용하고 PWM 0과 safe direction을 적용한다.
-- 방향 전환은 enable LOW, PWM force-low, blanking, DIR 변경, 안전 입력 재검사,
-  재활성화 순서를 지킨다.
+- 정상 활성 lease에서 `ENABLE_CHx`는 SPWM zero crossing과 방향 blanking 동안에도
+  정적 HIGH를 유지한다. 방향 전환은 PWM force-low, blanking, DIR 변경, 안전 입력
+  재검사, PWM 재개 순서를 지키며 disable 또는 안전 조건에서는 enable을 LOW로
+  내린다.
 - 최대 MI는 IRS2104 bootstrap refresh를 위해 0.95를 넘지 않는다.
 - E-Stop, 잘못된 frame, timeout, watchdog은 전체 safe-off한다. latched Power Stage
   Fault는 해당 채널만 safe-off하고 나머지 정상 채널은 활성 lease를 계속 따른다.

@@ -319,7 +319,7 @@ int main() {
     waveform.tick(waveform_channels, 0.001f, true);
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
         const SpwmChannelState* state = waveform.state(i);
-        assert(state != nullptr && !state->enabled && state->blanking);
+        assert(state != nullptr && state->enabled && state->blanking);
         assert(state->direction_positive);
         assert(near(state->duty_ratio, 0.0f));
     }
@@ -344,8 +344,63 @@ int main() {
     sub_tick_waveform.begin(pinmap);
     sub_tick_waveform.tick(sub_tick_channels, 1.0f / 240.0f, true);
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
-        assert(!sub_tick_waveform.state(i)->enabled);
+        assert(sub_tick_waveform.state(i)->enabled);
         assert(near(sub_tick_waveform.state(i)->duty_ratio, 0.0f));
+    }
+
+    SpwmGenerator zero_crossing_waveform;
+    zero_crossing_waveform.begin(pinmap);
+    zero_crossing_waveform.tick(waveform_channels, 0.0f, true);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(zero_crossing_waveform.state(i)->enabled);
+        assert(near(zero_crossing_waveform.state(i)->duty_ratio, 0.0f));
+    }
+
+    ChannelManager disabled_channels;
+    disabled_channels.begin();
+    assert(disabled_channels.apply_command(make_full_command(0.5f, false)));
+    disabled_channels.update(1.0f, true);
+    SpwmGenerator disabled_waveform;
+    disabled_waveform.begin(pinmap);
+    disabled_waveform.tick(disabled_channels, 1.0f / 240.0f, true);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(!disabled_waveform.state(i)->enabled);
+    }
+
+    ChannelManager zero_mi_channels;
+    zero_mi_channels.begin();
+    assert(zero_mi_channels.apply_command(make_full_command(0.0f)));
+    zero_mi_channels.update(1.0f, true);
+    SpwmGenerator zero_mi_waveform;
+    zero_mi_waveform.begin(pinmap);
+    zero_mi_waveform.tick(zero_mi_channels, 1.0f / 240.0f, true);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(!zero_mi_waveform.state(i)->enabled);
+    }
+
+    EnableCommitProbe allowed;
+    allowed.allow = true;
+    SpwmGenerator static_enable_waveform;
+    static_enable_waveform.begin(pinmap);
+    static_enable_waveform.set_enable_commit_callback(
+        probe_enable_commit, &allowed);
+    static_enable_waveform.tick(waveform_channels, 0.008f, true);
+    assert(allowed.calls == KUGLASS_CHANNEL_COUNT);
+    static_enable_waveform.tick(waveform_channels, 0.001f, true);
+    assert(allowed.calls == KUGLASS_CHANNEL_COUNT);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(static_enable_waveform.state(i)->enabled);
+        assert(static_enable_waveform.state(i)->blanking);
+    }
+    static_enable_waveform.tick(waveform_channels, 0.001f, true);
+    assert(allowed.calls == KUGLASS_CHANNEL_COUNT * 2U);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(static_enable_waveform.state(i)->enabled);
+        assert(!static_enable_waveform.state(i)->blanking);
+    }
+    static_enable_waveform.tick(waveform_channels, 0.001f, false);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(!static_enable_waveform.state(i)->enabled);
     }
 
     EnableCommitProbe denied;

@@ -48,10 +48,15 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
   sequence는 lease 전체를 무효화하고 safe-off합니다.
 - timeout과 output task watchdog도 `ENABLE LOW + PWM force-low + applied_mi=0`으로
   처리합니다.
-- 방향 반전 순서는 `ENABLE LOW -> PWM force-low -> 1 ms blanking -> DIR 변경 ->
-  PWM 준비 -> 안전 입력 재검사 -> ENABLE HIGH`입니다.
+- 유효한 활성 명령과 정상 안전 입력이 유지되는 동안 MCU `ENABLE_CHx`는 정적
+  HIGH입니다. SPWM zero crossing이나 방향 blanking을 ENABLE 펄스로 만들지
+  않습니다. 명시적 disable/MI 0, invalid frame, timeout, E-Stop, watchdog과 해당
+  채널 Fault에서는 LOW입니다.
+- 방향 반전 순서는 `PWM force-low -> 1 ms blanking -> DIR 변경 -> 안전 입력 재검사
+  -> PWM 재개`입니다. 정상 채널의 `ENABLE_CHx`는 이 과정에서도 HIGH를
+  유지합니다.
 - IRS2104 bootstrap refresh를 위해 MI/duty는 최대 0.95입니다. 10 MHz MCPWM에서
-  1 carrier tick보다 작은 duty는 enable하지 않습니다.
+  1 carrier tick보다 작은 duty는 PWM을 force-low로 유지합니다.
 - 물리 E-Stop과 Power Stage `RUN_OK`가 최종 차단 경로지만 인증된 안전 회로는
   아닙니다.
 
@@ -128,7 +133,8 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
 full frame, 0.95 clamp, 전역 hard safe-off, 채널별 Fault 격리, ADC filter/stale,
-status, direction blanking, ENABLE commit 거부와 JSONL 복구를 검사합니다.
+status, direction blanking 중 정적 ENABLE, ENABLE commit 거부와 JSONL 복구를
+검사합니다.
 BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
 순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 
