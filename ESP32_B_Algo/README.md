@@ -119,11 +119,14 @@ python3 ../hardware/tools/validate_hardware_contract.py
 idf.py set-target esp32s3
 idf.py build
 sh host_tests/run_tests.sh
+sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
 full frame, 0.95 clamp, hard safe-off, Fault priority, ADC filter/stale, status,
 direction blanking, ENABLE commit 거부와 JSONL 복구를 검사합니다.
+BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
+순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 
 실제 Power Stage/HV를 연결하기 전에는
 [`../hardware/validation/README.md`](../hardware/validation/README.md)의 순서로

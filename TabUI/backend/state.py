@@ -157,7 +157,6 @@ class StateStore:
         self.downstream_error: str | None = None
         self.firmware_diagnostics_enabled: bool | None = None
         self.estop_active: bool | None = None
-        self._downstream_protocol_error_latched = False
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -225,7 +224,6 @@ class StateStore:
                 if source in {"b", "esp32_b"}:
                     self.downstream_healthy = False
                     self.downstream_error = error
-                    self._downstream_protocol_error_latched = True
                 else:
                     self.last_device_error = error
             return True
@@ -254,7 +252,7 @@ class StateStore:
         if isinstance(channels, list):
             self._merge_channels(channels, source="master")
         downstream = body.get("downstream")
-        if isinstance(downstream, dict) and not self._downstream_protocol_error_latched:
+        if isinstance(downstream, dict):
             healthy = downstream.get("healthy")
             self.downstream_healthy = healthy if isinstance(healthy, bool) else None
             error = downstream.get("error")
@@ -292,7 +290,6 @@ class StateStore:
                 if record.get("controlResult") is not None:
                     diagnostics["controlResult"] = record["controlResult"]
                 self.estop_active = record["estop"]
-                self._downstream_protocol_error_latched = False
                 self.downstream_healthy = True
                 self.downstream_error = "NONE"
         if record.get("mode") in {"driving", "stopped", "camping", "parked"}:

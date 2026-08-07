@@ -11,6 +11,28 @@ enum class JsonLineResult : uint8_t {
     OUTPUT_TOO_SMALL,
 };
 
+// ESP32-S3 ROM boot messages share UART0 GPIO43 with ESP32_B's application TX
+// before the application takes control of the pin. Match only known ROM banner
+// records so arbitrary malformed downstream payloads remain protocol errors.
+inline bool is_esp32s3_rom_boot_line(const char* line) {
+    if (line == nullptr || line[0] == '\0') return false;
+    static constexpr const char* kKnownPrefixes[] = {
+        "ESP-ROM:esp32s3-",
+        "Build:",
+        "rst:",
+        "Saved PC:",
+        "SPIWP:",
+        "mode:",
+        "load:",
+        "entry ",
+        "waiting for download",
+    };
+    for (const char* prefix : kKnownPrefixes) {
+        if (std::strncmp(line, prefix, std::strlen(prefix)) == 0) return true;
+    }
+    return false;
+}
+
 // Allocation-free JSONL framing shared by the UART receive path and host tests.
 // Once a line exceeds the internal capacity, every remaining byte in that line
 // is ignored until '\n'.  This prevents the tail of one oversized frame from

@@ -44,6 +44,12 @@ void ResetFaultCoordinator::note_status_context(const DownstreamStatus& status) 
     latest_reset_challenge_ = status.reset_challenge;
 }
 
+void ResetFaultCoordinator::invalidate_status_context() {
+    context_valid_ = false;
+    latest_boot_id_ = 0;
+    latest_reset_challenge_ = 0;
+}
+
 bool ResetFaultCoordinator::begin(uint32_t request_seq,
                                   uint32_t source_session_id,
                                   uint32_t now_ms,
@@ -109,6 +115,8 @@ bool ResetFaultCoordinator::poll_timeout(uint32_t now_ms,
 
 bool Esp32BLink::begin() {
 #ifdef ESP_PLATFORM
+    status_parse_error_ = DownstreamStatusError::OK;
+    rom_boot_seen_ = false;
     uart_config_t config = {};
     config.baud_rate = kDownstreamBaud;
     config.data_bits = UART_DATA_8_BITS;
@@ -219,6 +227,15 @@ bool Esp32BLink::read_line(char* output, size_t output_size, uint32_t timeout_ms
 #endif
 }
 
+void Esp32BLink::note_rom_boot() {
+    rom_boot_seen_.store(true);
+    status_parse_error_.store(DownstreamStatusError::OK);
+}
+
+void Esp32BLink::note_status_parse_error(DownstreamStatusError error) {
+    if (error != DownstreamStatusError::OK) status_parse_error_.store(error);
+}
+
 bool Esp32BLink::note_valid_status(uint32_t now_ms,
                                   uint32_t boot_id,
                                   uint32_t seq) {
@@ -232,19 +249,31 @@ bool Esp32BLink::note_valid_status(uint32_t now_ms,
     last_status_seq_.store(seq);
     last_status_ms_.store(now_ms);
     status_received_.store(true);
+    status_parse_error_.store(DownstreamStatusError::OK);
+    rom_boot_seen_.store(false);
     return true;
 }
 
 bool Esp32BLink::status_healthy(uint32_t now_ms) const {
-    return initialized_.load() && status_received_.load() &&
+    return initialized_.load() &&
+           last_write_ok_.load() &&
+           status_parse_error_.load() == DownstreamStatusError::OK &&
+           !rom_boot_seen_.load() &&
+           status_received_.load() &&
            static_cast<uint32_t>(now_ms - last_status_ms_.load()) <=
                KUGLASS_B_STATUS_TIMEOUT_MS;
 }
 
 const char* Esp32BLink::status_name(uint32_t now_ms) const {
+    const DownstreamStatusError parse_error = status_parse_error_.load();
+    if (parse_error != DownstreamStatusError::OK) {
+        return downstream_status_error_name(parse_error);
+    }
+    if (rom_boot_seen_.load()) return "B_RESTARTING";
     if (!initialized_.load()) return error_name_.load();
+    if (!last_write_ok_.load()) return error_name_.load();
     if (!status_received_.load()) {
-        return last_write_ok_.load() ? "UART_TX_READY/WAITING_B" : error_name_.load();
+        return "UART_TX_READY/WAITING_B";
     }
     if (static_cast<uint32_t>(now_ms - last_status_ms_.load()) >
         KUGLASS_B_STATUS_TIMEOUT_MS) {

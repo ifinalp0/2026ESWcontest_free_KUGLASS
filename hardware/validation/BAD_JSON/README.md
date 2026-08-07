@@ -5,7 +5,7 @@
 | 항목 | 값 |
 | --- | --- |
 | incident ID | `HIL-AB-UART-20260807-001` |
-| 상태 | `OPEN` |
+| 상태 | `OPEN` — software root cause 수정 완료, flash/HIL 재검증 대기 |
 | 관측 구간 | 2026-08-07 00:56~01:00 KST |
 | 관측자 | Codex의 read-only 소프트웨어/API 관측; 물리 작업자 미기록 |
 | 저장소 branch / HEAD | `main` / `90a8946922cc8a6110a9d9b5c6024db48b6f5bb0` |
@@ -23,7 +23,7 @@
 이번 관측에서 연속성·핀 위치·GND 전위는 다시 측정하지 않았다. 따라서 배선 상태를
 `PASS`로 승격하지 않는다.
 
-## 결론
+## 관측 당시 결론
 
 ESP32_A는 MacBook/TabUI와 정상적으로 통신했지만, ESP32_A↔ESP32_B 링크에서는
 유효한 B status가 한 번도 확인되지 않았다. TabUI의 지속 상태는 다음과 같았다.
@@ -44,6 +44,72 @@ B applied MI/E-Stop/Fault   확인 불가
 다음 유효 B status가 올 때까지 이 오류를 latch한다. 다만 ESP32_A는 거부한 원문을
 TabUI로 전달하지 않으므로, 한 번의 부팅 잡음인지 반복되는 손상 frame인지는 현재
 snapshot만으로 구분할 수 없다.
+
+## 코드 교차 검증으로 확인한 canonical 원인
+
+후속 분석에서 raw UART를 추측하지 않고 canonical B formatter의 실제 출력을 A
+parser에 직접 넣는 cross-project host regression을 추가했다. 이 검사로 canonical
+source에서 관측을 완전히 설명하는 `BAD_JSON` software 결함을 재현했다. 다만 관측
+당시 보드의 실제 flash image와 거부 원문은 미확인이므로, 이 결함이 실기 사건의
+유일한 원인이었다고 확정하지는 않는다.
+
+1. B의 `format_status_line()`은 정상 ADC 포함 status를 만들 때 `adc` object를
+   마지막 top-level field로 둔다.
+2. 기존 A `parse_adc()`는 ADC object의 `}`를 이미 소비한 뒤, 바로 뒤에 top-level
+   `}`가 있으면 그것까지 중첩 parser 안에서 소비했다.
+3. top-level status parser는 자신의 닫는 `}`를 찾지 못해 정상 B status 전체를
+   `BAD_JSON`으로 거부했다. 따라서 `boot_id`, status `seq`, applied MI가 한 번도
+   갱신되지 않은 관측 결과와 정확히 일치한다.
+4. 기존 A host fixture는 `adc` 뒤에 `future` field를 추가해 두었기 때문에 잘못된
+   두 번째 `}` 소비 경로를 지나지 않았고, B formatter test는 결과를 A parser에
+   넣지 않아 양쪽 test가 각각 PASS하면서도 결함을 놓쳤다.
+5. TabUI는 첫 B `protocol_error`를 유효 B status가 올 때까지 latch했다. 모든
+   ADC 포함 status가 위 결함으로 거부되었으므로 화면의 `BAD_JSON`도 계속 유지됐다.
+
+ESP32-S3의 첫 단계 ROM boot banner가 GPIO43에 비-JSON으로 출력되는 사실은 별도
+혼입 요인이다. canonical config는 second-stage bootloader와 app console을 끄지만
+기본 ROM log는 eFuse 상태를 영구 변경하지 않는 한 출력된다. 이 banner는 위 ADC
+parser 결함의 원인은 아니지만 B reboot 때 같은 오류를 다시 만들 수 있어 함께
+분리 처리했다.
+
+### 적용한 수정
+
+- A의 nested channel/array/ADC/control-result parser가 자신의 닫는 delimiter만
+  소비하도록 수정했다.
+- 실제 B formatter의 ADC 포함 status를 A parser에 넣고, 앞에 ESP32-S3 ROM
+  banner를 붙인 stream까지 검사하는
+  [`host_tests/run_tests.sh`](host_tests/run_tests.sh)를 추가했다.
+- A는 알려진 ROM banner를 `BAD_JSON`이 아닌 `B_RESTARTING`으로 분류하고 이전 B
+  freshness와 Fault reset context를 즉시 무효화한다.
+- 실제 parser 오류는 A state에도 보존하며, stale status가 아니라 다음 유효한
+  forward status에서만 해제한다.
+- TabUI는 과거 protocol error 한 건을 영구 상태로 고정하지 않고 다음 A
+  `state.downstream`의 현재 health/error로 갱신한다.
+- B build는 runtime console, second-stage bootloader log 비활성화와 기본 ROM log
+  eFuse 상태를 compile-time에 확인한다. ROM log를 끄기 위한 영구 eFuse 변경은
+  사용하지 않는다.
+
+이 수정은 저장소의 software 재현을 해결했지만, 관측 장치에 새 A/B image를
+플래시하고 logic-only 10분 실측을 완료하지 않았다. 따라서 incident 상태는
+`RESOLVED`로 올리지 않는다.
+
+### 수정 후 비실기 검증
+
+2026-08-07 `Kill_Bad_JSON` branch의 미커밋 working tree에서 다음 결과를
+확인했다.
+
+| 검사 | 결과 |
+| --- | --- |
+| `python3 hardware/tools/validate_hardware_contract.py` | PASS (`hardware contract ok`) |
+| `ESP32_A_Algo/host_tests/run_tests.sh` | PASS |
+| `ESP32_B_Algo/host_tests/run_tests.sh` | PASS |
+| `hardware/validation/BAD_JSON/host_tests/run_tests.sh` | PASS (`A-B UART ROM-noise/status compatibility ok`) |
+| `TabUI`의 `npm run check && npm run build` | PASS (Python 33 tests, TypeScript, Vite build) |
+| ESP-IDF 6.0.2 ESP32_A target build | PASS (`kuglass_esp32_algo.bin`, `0x47920` bytes, SHA-256 `3005b57215c847301c526ee6170ee1dbbd2f809b150f8e2763e39269cf968f89`) |
+| ESP-IDF 6.0.2 ESP32_B target build | PASS (`kuglass_esp32_b.bin`, `0x3a340` bytes, SHA-256 `bbef9938fe8051a24925bcf5319850e4cee0cdd67776c792747d8877343292b1`) |
+
+이 표는 source와 build artifact의 비실기 정합만 증명한다. 실제 보드의 flash
+image, UART 파형, 전원·reset 상태와 장시간 error count는 여전히 미검증이다.
 
 ## 직접 관측 사실
 
@@ -78,15 +144,20 @@ snapshot만으로 구분할 수 없다.
 | `ESP32_A_Algo/host_tests/run_tests.sh` | PASS | A parser, B status/session/reset correlation, JSON line accumulator 등 |
 | `ESP32_B_Algo/host_tests/run_tests.sh` | PASS | B formatter/parser 및 app host link |
 
-현재 canonical source는 양쪽 UART1을 115200 8-N-1/no-flow-control로 구성하며
+관측 당시 canonical source는 양쪽 UART1을 115200 8-N-1/no-flow-control로 구성하며
 A TX/RX는 GPIO39/40, B TX/RX는 GPIO43/44다. B의 `sdkconfig.defaults`는 bootloader
 log와 runtime console을 끄도록 설정되어 있고 B status formatter는 100 ms마다
-JSON Lines status를 만들도록 구현되어 있다.
+JSON Lines status를 만들도록 구현되어 있다. 여기서 bootloader log는 second-stage
+log이며 첫 단계 ESP32-S3 ROM banner는 별개다.
 
 이 PASS는 현재 저장소 소스끼리 정합한다는 뜻일 뿐, 실제 A/B에 이 HEAD로 빌드한
 이미지가 플래시되었다거나 실기 UART가 정상이라는 증거가 아니다.
 
-## 배선 정상 가정하의 추정 원인
+## 관측 당시 추정 원인
+
+아래 목록은 cross-project 재현 전, raw line이 없던 시점의 진단 후보를 보존한
+것이다. 위의 canonical software 결함을 먼저 수정했지만, flash/HIL 재검증 전에는
+나머지 실기 후보를 완전히 배제하지 않는다.
 
 우선순위는 현재 증거와 canonical code의 알려진 경계에 따른 진단 순서이며,
 발생 확률을 측정한 값은 아니다.

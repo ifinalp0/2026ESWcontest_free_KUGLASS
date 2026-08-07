@@ -162,6 +162,9 @@ sh host_tests/run_tests.sh
 
 cd ../ESP32_B_Algo
 sh host_tests/run_tests.sh
+
+cd ..
+sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 하드웨어 validator와 host test 통과는 Power Stage/PDLC/HV 실기 검증을 대신하지

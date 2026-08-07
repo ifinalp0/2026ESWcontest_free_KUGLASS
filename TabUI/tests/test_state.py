@@ -140,6 +140,56 @@ class StateStoreTests(unittest.TestCase):
         store.apply_record(b_status({"id": 1, "mi": 0.0, "fault": False}, seq=3))
         self.assertFalse(store.snapshot()["channels"][1]["fault"])
 
+    def test_downstream_protocol_error_is_replaced_by_next_master_state(self) -> None:
+        store = StateStore()
+        store.apply_record(b_status({"id": 1, "mi": 0.42, "fault": True}))
+
+        store.apply_record({
+            "type": "protocol_error",
+            "source": "esp32_b",
+            "error": "BAD_JSON",
+        })
+        self.assertFalse(store.downstream_healthy)
+        self.assertEqual(store.downstream_error, "BAD_JSON")
+
+        store.apply_record({
+            "type": "state",
+            "channels": [{
+                "channel_id": 1,
+                "target_mi": 0.8,
+                "commanded_mi": 0.7,
+                "applied_mi": 0.9,
+                "fault": False,
+            }],
+            "downstream": {
+                "controller_id": "B",
+                "healthy": False,
+                "error": "B_STATUS_TIMEOUT",
+            },
+        })
+
+        self.assertFalse(store.downstream_healthy)
+        self.assertEqual(store.downstream_error, "B_STATUS_TIMEOUT")
+        channel = store.snapshot()["channels"][1]
+        self.assertEqual(channel["appliedMi"], 0.42)
+        self.assertTrue(channel["downstreamFault"])
+        self.assertTrue(channel["fault"])
+
+    def test_downstream_status_recovers_after_protocol_error(self) -> None:
+        store = StateStore()
+        store.apply_record({
+            "type": "protocol_error",
+            "source": "esp32_b",
+            "error": "BAD_JSON",
+        })
+
+        self.assertTrue(store.apply_record(
+            b_status({"id": 2, "mi": 0.31, "fault": False}, seq=2)
+        ))
+        self.assertTrue(store.downstream_healthy)
+        self.assertEqual(store.downstream_error, "NONE")
+        self.assertEqual(store.snapshot()["channels"][2]["appliedMi"], 0.31)
+
     def test_downstream_diagnostics_adc_masks_and_control_result_are_normalized(self) -> None:
         store = StateStore(time_fn=lambda: 1234.0)
         record = b_status(

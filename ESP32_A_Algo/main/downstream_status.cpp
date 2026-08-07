@@ -287,10 +287,6 @@ bool parse_channel(JsonCursor* cursor,
             return false;
         }
     }
-    if (cursor->peek('}') && !cursor->consume('}')) {
-        *error = DownstreamStatusError::BAD_CHANNEL;
-        return false;
-    }
     if (!have_id || !have_mi || !have_fault) {
         *error = DownstreamStatusError::BAD_CHANNEL;
         return false;
@@ -327,10 +323,6 @@ bool parse_channels(JsonCursor* cursor,
             *error = DownstreamStatusError::BAD_JSON;
             return false;
         }
-    }
-    if (cursor->peek(']') && !cursor->consume(']')) {
-        *error = DownstreamStatusError::BAD_JSON;
-        return false;
     }
     if (count != KUGLASS_TOTAL_CHANNELS || seen != kExpectedChannelMask) {
         *error = DownstreamStatusError::INCOMPLETE_CHANNELS;
@@ -378,7 +370,6 @@ bool parse_adc(JsonCursor* cursor, DownstreamAdcStatus* output) {
         if (cursor->consume('}')) break;
         if (!cursor->consume(',')) return false;
     }
-    if (cursor->peek('}') && !cursor->consume('}')) return false;
     return seen == 0x01FFU;
 }
 
@@ -416,7 +407,6 @@ bool parse_control_result(JsonCursor* cursor, DownstreamControlResult* output) {
         if (cursor->consume('}')) break;
         if (!cursor->consume(',')) return false;
     }
-    if (cursor->peek('}') && !cursor->consume('}')) return false;
     if (seen != 0x1FU) return false;
     return output->ok
         ? output->error == DownstreamControlResultError::NONE

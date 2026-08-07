@@ -128,6 +128,12 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
 - ESP32_A는 CH0~CH3를 정확히 한 번씩 포함한 full frame만 전송합니다.
 - B status는 version, controller, nonzero boot/challenge, sequence와 채널 집합을
   검증한 뒤에만 적용합니다.
+- ESP32_B application 시작 전에 GPIO43으로 나오는 알려진 ESP32-S3 ROM boot
+  banner line은 status parser 오류로 승격하지 않습니다. 이 line은 B freshness나
+  online 상태를 갱신하지 않으며, `B_RESTARTING`으로 이전 status freshness와
+  Fault reset context를 즉시 무효화합니다.
+- 그 밖의 B status parser 오류는 다음 유효한 forward status를 받을 때까지
+  downstream error로 유지합니다.
 - `applied_mi`는 유효한 B status에서만 갱신합니다.
 - Fault reset은 한 건만 pending으로 유지하며, B의 정확한 `control_result`를
   받아야 완료 ACK합니다. 현재 timeout은 1,500 ms입니다.
@@ -164,11 +170,13 @@ idf.py -D KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1 build
 
 ```bash
 sh host_tests/run_tests.sh
+sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 핀 소유권, 카메라 방향·복구·timestamp, RGB565 ROI, DS18B20,
 센서 병합, 정책, UI/A-B protocol, B status, telemetry, task priority와 프로젝트
-독립성을 검사합니다.
+독립성을 검사합니다. BAD_JSON regression은 실제 B formatter가 `adc`를 마지막
+field로 만든 status와 ROM banner가 섞인 stream을 A parser에 통과시킵니다.
 
 HIL에서는 카메라 장애 중 DS18B20과 20 Hz heartbeat 지속, 1초 stale 전환,
 무재부팅 복구, 실제 영상과 ROI 방향 일치, USB/A-B UART, 수동 TTL, B timeout,

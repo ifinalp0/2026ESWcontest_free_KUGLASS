@@ -31,6 +31,7 @@ bool format_reset_fault_line(const ResetFaultRequest& request,
 class ResetFaultCoordinator {
 public:
     void note_status_context(const DownstreamStatus& status);
+    void invalidate_status_context();
     bool begin(uint32_t request_seq,
                uint32_t source_session_id,
                uint32_t now_ms,
@@ -57,12 +58,22 @@ public:
     bool send_decision(const PolicyDecision& decision);
     bool send_reset_fault(const ResetFaultRequest& request);
     bool read_line(char* output, size_t output_size, uint32_t timeout_ms);
+    // A ROM banner proves that B restarted, but is not a protocol frame.  It
+    // invalidates freshness immediately and is cleared only by an accepted
+    // status from the new application boot.
+    void note_rom_boot();
+    void note_status_parse_error(DownstreamStatusError error);
     // A new B boot_id rebases seq immediately. Within one boot, only wrap-safe
-    // forward progress is accepted, even after a communications timeout.
+    // forward progress is accepted, even after a communications timeout.  An
+    // accepted status also clears the last parser error; stale status does not.
     bool note_valid_status(uint32_t now_ms, uint32_t boot_id, uint32_t seq);
     bool initialized() const { return initialized_.load(); }
     bool status_healthy(uint32_t now_ms) const;
     const char* status_name(uint32_t now_ms) const;
+    DownstreamStatusError status_parse_error() const {
+        return status_parse_error_.load();
+    }
+    bool rom_boot_seen() const { return rom_boot_seen_.load(); }
     const char* error_name() const { return error_name_.load(); }
 
 private:
@@ -71,6 +82,9 @@ private:
     std::atomic<bool> initialized_{false};
     std::atomic<bool> last_write_ok_{false};
     std::atomic<const char*> error_name_{"NOT_INITIALIZED"};
+    std::atomic<DownstreamStatusError> status_parse_error_{
+        DownstreamStatusError::OK};
+    std::atomic<bool> rom_boot_seen_{false};
     std::atomic<bool> status_received_{false};
     std::atomic<uint32_t> last_status_ms_{0};
     std::atomic<uint32_t> last_status_seq_{0};

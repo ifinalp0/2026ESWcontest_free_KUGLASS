@@ -30,6 +30,15 @@
 #ifdef CONFIG_USJ_ENABLE_USB_SERIAL_JTAG
 #error "USB Serial/JTAG must be disabled because GPIO19 is EN_GLOBAL."
 #endif
+#ifndef CONFIG_ESP_CONSOLE_NONE
+#error "ESP32_B runtime console must be disabled on the GPIO43/44 data link."
+#endif
+#ifndef CONFIG_BOOTLOADER_LOG_LEVEL_NONE
+#error "ESP32_B second-stage bootloader logs must be disabled on GPIO43."
+#endif
+#ifndef CONFIG_BOOT_ROM_LOG_ALWAYS_ON
+#error "Boot ROM logging must keep its default eFuse state; ESP32_A filters the known ROM boot lines."
+#endif
 #ifndef CONFIG_GPIO_CTRL_FUNC_IN_IRAM
 #error "Safety GPIO ISR requires CONFIG_GPIO_CTRL_FUNC_IN_IRAM=y."
 #endif

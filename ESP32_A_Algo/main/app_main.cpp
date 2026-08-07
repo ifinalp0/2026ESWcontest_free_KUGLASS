@@ -441,6 +441,16 @@ void downstream_rx_task(void*) {
     char line[1024];
     while (true) {
         if (g_downstream.read_line(line, sizeof(line), 20)) {
+            if (is_esp32s3_rom_boot_line(line)) {
+                // ESP32_B's ROM uses GPIO43 before the application UART starts.
+                // Classify only its known banner records.  They make the old
+                // B status/reset context stale without becoming BAD_JSON.
+                xSemaphoreTake(g_state_mutex, portMAX_DELAY);
+                g_downstream.note_rom_boot();
+                g_reset_fault.invalidate_status_context();
+                xSemaphoreGive(g_state_mutex);
+                continue;
+            }
             DownstreamStatus status;
             DownstreamStatusError error;
             if (parse_downstream_status_line(line, &status, &error)) {
@@ -462,6 +472,7 @@ void downstream_rx_task(void*) {
                 server_console_send_line(line);
                 if (reset_completed) send_reset_outcome(reset_outcome);
             } else {
+                g_downstream.note_status_parse_error(error);
                 server_console_send_protocol_error(
                     "esp32_b", downstream_status_error_name(error));
             }

@@ -10,6 +10,9 @@ CONFIG_ESP_CONSOLE_NONE=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 CONFIG_ESP_CONSOLE_UART_DEFAULT=n
 CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=n
+# Keep the default CONFIG_BOOT_ROM_LOG_ALWAYS_ON. Other Boot ROM log schemes
+# burn eFuse state at app startup; ESP32_A explicitly filters known ROM boot
+# lines on the GPIO43 data path instead.
 CONFIG_GPIO_CTRL_FUNC_IN_IRAM=y
 CONFIG_ESP_TASK_WDT_EN=y
 CONFIG_ESP_TASK_WDT_INIT=y

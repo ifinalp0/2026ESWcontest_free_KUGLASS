@@ -31,6 +31,8 @@ test_id,date,carrier_id,stage_channel,stage_id,firmware_commit,signal,condition,
 python3 hardware/tools/validate_hardware_contract.py
 cd ESP32_B_Algo
 sh host_tests/run_tests.sh
+cd ..
+sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 원본 hash, GPIO/J7/J10 정합 또는 host test가 실패하면 실기 출력 시험으로 진행하지 않습니다.
@@ -63,6 +65,9 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 
 - A/B 각각 powered/unpowered, USB-UART bridge 연결/분리 상태에서 back-power와 push-pull contention을 확인합니다.
 - 115200 8-N-1 장시간 송수신 오류율을 측정합니다.
+- B boot 때 GPIO43에 나오는 알려진 ESP32-S3 ROM banner는 `B_RESTARTING`으로
+  분류되고, 뒤이은 ADC 포함 JSON status에서 `downstreamHealthy=true`로 복구되는지
+  확인합니다. ROM banner 자체를 malformed status로 세지 않습니다.
 - B reboot 때 `boot_id`와 `reset_challenge`, A reboot 때 `source_session_id`가 바뀌는지 확인합니다.
 - stale boot, stale challenge, replay, unsafe physical input에서 fault가 clear되지 않는지 확인합니다.
 - reset 성공 뒤 새 full actuator command 전까지 출력이 off인지 확인합니다.

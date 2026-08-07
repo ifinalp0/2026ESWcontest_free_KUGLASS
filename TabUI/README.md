@@ -125,6 +125,8 @@ TabUI↔A 명령, ACK, A state, B status와 Fault reset은
 - 환경·Fault 주입은 TabUI와 ESP32_A 양쪽이 허용한 격리 HIL에서만 사용합니다.
 - `appliedMi`는 strict 검증을 통과한 B status에서만 갱신합니다.
 - 잘못된 B status는 UI 상태나 link freshness를 갱신하지 않습니다.
+- B `protocol_error`는 즉시 표시하지만, 다음 A `state.downstream`이 현재 link
+  error를 갱신합니다. 과거 오류 한 건을 현재 상태처럼 영구 latch하지 않습니다.
 - A/B 통신 상태와 E-Stop/Fault operational 상태를 분리합니다.
 - ADC는 validity가 있는 raw 또는 mV만 표시하고 A/°C로 임의 변환하지 않습니다.
 - Fault reset은 B `control_result`와 최종 A ACK가 일치할 때만 성공으로 표시합니다.

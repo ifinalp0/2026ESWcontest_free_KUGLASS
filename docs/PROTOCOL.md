@@ -8,6 +8,8 @@ host test가 검증한다. 계약을 변경할 때는 세 컴포넌트, 관련 �
 ## 공통 규칙
 
 - 제어·상태 record는 한 줄에 하나의 compact JSON을 보내는 JSON Lines 형식이다.
+- JSON object의 field 순서는 의미가 없다. 중첩 object parser는 자신의 닫는
+  delimiter만 소비하고 다음 상위 field 또는 상위 object 종료를 남겨야 한다.
 - 현재 protocol version은 `v=1`이다.
 - 채널 ID는 0~3, MI는 유한한 0.0~1.0, enable/fault는 JSON boolean이다.
 - CH0~CH3를 요구하는 frame은 네 채널을 정확히 한 번씩 포함해야 한다.
@@ -35,6 +37,10 @@ ESP32_A GND       --- ESP32_B GND
 
 Logic Carrier에는 A↔B UART가 라우팅되지 않는다. 별도 3선 harness를 사용하며
 TX끼리 또는 RX끼리 연결하지 않는다.
+
+ESP32_B application보다 먼저 GPIO43에 출력되는 알려진 ESP32-S3 ROM boot
+banner는 JSON Lines record가 아니다. A는 이를 `B_RESTARTING`으로 분류해 이전 B
+freshness와 reset context를 무효화하며, 유효한 B status로 online을 다시 확인한다.
 
 ## TabUI → ESP32_A
 
@@ -91,6 +97,8 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
   유효 reset 시도 후 교체된다.
 - `ch[].mi`는 B가 실제 적용 중인 값이며 safe-off 시 0.0이다.
 - `diagnostic`, `adc`, `control_result`는 선택 필드다.
+- canonical B formatter는 `adc`를 마지막 top-level field로 출력한다. A는 이
+  순서를 포함해 유효한 JSON object field 순서에 의존하지 않는다.
 - ADC validity mask의 bit 0~3은 CH0~CH3 current, bit 4~7은 temperature다.
   raw/mV를 보정된 A/°C로 해석하지 않는다.
 
@@ -138,6 +146,8 @@ ESP32_A USB 링크의 주요 record는 다음과 같다.
 
 `target_mi`, `commanded_mi`, `applied_mi`는 서로 다른 상태다. TabUI는 유효한
 B status를 받기 전까지 적용값을 추정하지 않는다.
+TabUI의 현재 link error는 뒤이은 A `state.downstream`으로 갱신되며, 감사 로그처럼
+과거 `protocol_error` 한 건을 영구 latch하지 않는다.
 
 ## Lease와 실패 처리
 

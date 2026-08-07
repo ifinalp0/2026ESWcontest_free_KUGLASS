@@ -19,6 +19,9 @@ sh host_tests/run_tests.sh
 
 cd ../ESP32_B_Algo
 sh host_tests/run_tests.sh
+
+cd ..
+sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 ## 변경 범위별 최소 검사
@@ -31,6 +34,7 @@ sh host_tests/run_tests.sh
 | ESP32_B protocol·출력 | B host test | B README, protocol |
 | ESP32_B 핀·ADC·connector·안전 | hardware validator + B host test | hardware 전체 read order |
 | wire schema | TabUI + A + B 관련 검사 | `docs/PROTOCOL.md` |
+| A↔B status JSONL 경계 | BAD_JSON cross-project host regression | incident README |
 | 하드웨어 실기 | 정적 검사 통과 후 단계별 HIL | `hardware/validation/README.md` |
 
 ## 문서 검증
