@@ -51,11 +51,16 @@ class StateStoreTests(unittest.TestCase):
                 "channel_id": 0,
                 "target_mi": 0.2,
                 "commanded_mi": 0.25,
+                "enable": False,
                 "applied_mi": 0.3,
                 "applied_source": "master_servo_command",
+                "estimated_transmittance": 0.21,
+                "optical_state": "FROST",
                 "fault": False,
             }],
             "decision_reason": "ESP32_A policy",
+            "seq": 44,
+            "thermal_risk": 0.625,
             "timestamp_ms": 1234000,
         })
         self.assertTrue(accepted)
@@ -65,11 +70,41 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(state["cameraMetrics"]["frameId"], 12)
         self.assertEqual(state["channels"][0]["targetMi"], 0.2)
         self.assertEqual(state["channels"][0]["commandedMi"], 0.25)
+        self.assertFalse(state["channels"][0]["commandedEnable"])
+        self.assertTrue(state["channels"][0]["commandedEnableKnown"])
+        self.assertEqual(state["channels"][0]["policyEstimatedTransmittance"], 0.21)
+        self.assertEqual(state["channels"][0]["policyOpticalState"], "FROST")
+        self.assertEqual(state["channels"][0]["appliedSource"], "master_servo_command")
         self.assertEqual(state["channels"][0]["appliedMi"], 0.0)
         self.assertFalse(state["channels"][0]["appliedKnown"])
         self.assertEqual(state["channels"][0]["opticalState"], "FROST")
         self.assertEqual(state["decisionReason"], "ESP32_A policy")
+        self.assertEqual(state["controllerDiagnostics"]["stateSeq"], 44)
+        self.assertEqual(state["controllerDiagnostics"]["thermalRisk"], 0.625)
         self.assertEqual(state["timestamp"], 1234.0)
+
+    def test_controller_boot_context_is_exposed_and_reset_on_reconnect(self) -> None:
+        store = StateStore()
+        self.assertTrue(store.apply_record({
+            "v": 1,
+            "type": "boot",
+            "controller_id": "A",
+            "role": "algorithm_master",
+            "diagnostics_enabled": False,
+            "downstream_ready": True,
+            "source_session_id": 9001,
+        }))
+        diagnostics = store.snapshot()["controllerDiagnostics"]
+        self.assertEqual(diagnostics["protocolVersion"], 1)
+        self.assertEqual(diagnostics["role"], "algorithm_master")
+        self.assertEqual(diagnostics["sourceSessionId"], 9001)
+        self.assertTrue(diagnostics["downstreamReady"])
+        self.assertFalse(diagnostics["firmwareDiagnosticsEnabled"])
+
+        store.reset_firmware_handshake()
+        diagnostics = store.snapshot()["controllerDiagnostics"]
+        self.assertIsNone(diagnostics["sourceSessionId"])
+        self.assertIsNone(diagnostics["downstreamReady"])
 
     def test_downstream_status_channel_telemetry_is_merged(self) -> None:
         store = StateStore()

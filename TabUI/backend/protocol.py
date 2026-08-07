@@ -78,6 +78,9 @@ def translate_ui_command(
         mi = _number(payload.get("mi"), "mi")
         if not 0.0 <= mi <= 1.0:
             raise CommandError("mi must be between 0 and 1")
+        enable = payload.get("enable", True)
+        if not isinstance(enable, bool):
+            raise CommandError("enable must be a boolean")
         ttl_seconds = _number(payload.get("ttlSeconds", 30), "ttlSeconds")
         if not 1.0 <= ttl_seconds <= 300.0:
             raise CommandError("ttlSeconds must be between 1 and 300")
@@ -86,7 +89,7 @@ def translate_ui_command(
             "channel_id": _channel(payload.get("channel")),
             "target_mi": round(mi, 4),
             "ttl_ms": round(ttl_seconds * 1000),
-            "enable": True,
+            "enable": enable,
         }]
     elif command_type == "returnAuto":
         command: dict[str, Any] = {"command": "return_auto"}

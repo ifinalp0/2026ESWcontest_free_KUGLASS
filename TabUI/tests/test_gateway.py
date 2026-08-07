@@ -56,6 +56,21 @@ class GatewayTests(unittest.TestCase):
             before,
         )
 
+    def test_mock_manual_disable_is_reported_and_drives_applied_mi_to_zero(self) -> None:
+        self.gateway.submit({
+            "type": "setManualChannel",
+            "channel": 1,
+            "mi": 0.8,
+            "enable": False,
+            "ttlSeconds": 30,
+        })
+        self.wait_for(lambda: self.gateway.snapshot()["channels"][1]["commandedEnableKnown"])
+        self.wait_for(lambda: not self.gateway.snapshot()["channels"][1]["commandedEnable"])
+        self.wait_for(lambda: self.gateway.snapshot()["channels"][1]["appliedMi"] == 0.0)
+        channel = self.gateway.snapshot()["channels"][1]
+        self.assertEqual(channel["targetMi"], 0.0)
+        self.assertIsNotNone(channel["manualUntil"])
+
 
 class DisconnectedTransport:
     mode = "usb"

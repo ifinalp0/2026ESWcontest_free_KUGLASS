@@ -308,7 +308,7 @@ class MockTransport:
         self._reset_challenge = 2001
         self._source_session_id = 3001
         self._pending_control_result: dict[str, Any] | None = None
-        self._manual_targets: dict[int, tuple[float, float]] = {}
+        self._manual_targets: dict[int, tuple[float, bool, float]] = {}
         self._auto_targets = [0.95] * 4
         self._state["environment"].update({
             "internalTemp": 27.0,
@@ -316,8 +316,17 @@ class MockTransport:
             "frontRightSaturation": 0.07,
             "edgeDensity": 0.86,
         })
+        self._state["controllerDiagnostics"].update({
+            "protocolVersion": 1,
+            "role": "algorithm_master",
+            "sourceSessionId": self._source_session_id,
+            "downstreamReady": True,
+            "firmwareDiagnosticsEnabled": True,
+            "stateSeq": 0,
+            "thermalRisk": 0.0,
+        })
         for channel in self._state["channels"]:
-            self._set_channel(channel, 0.95, 0.95)
+            self._set_channel(channel, 0.95, 0.95, enabled=True)
         self._state["decisionReason"] = "개발용 MOCK ESP32_A가 기본 자동 정책을 보고합니다."
 
     def write_line(self, line: str) -> None:
@@ -377,12 +386,16 @@ class MockTransport:
         elif command == "manual_channel":
             channel_id = int(record["channel_id"])
             mi = clamp(record["target_mi"])
+            enable = bool(record.get("enable", True))
             expires = time.time() + max(0.0, float(record.get("ttl_ms", 30000))) / 1000.0
-            self._manual_targets[channel_id] = (mi, expires)
+            self._manual_targets[channel_id] = (mi, enable, expires)
             channel = self._state["channels"][channel_id]
-            channel["targetMi"] = mi
+            channel["targetMi"] = mi if enable else 0.0
+            channel["commandedEnable"] = enable
+            channel["commandedEnableKnown"] = True
             channel["manualUntil"] = expires
-            self._state["decisionReason"] = f"MOCK ESP32_A: CH{channel_id} 수동 MI {mi:.2f}, TTL 적용 중."
+            action = f"MI {mi:.2f}" if enable else "ENABLE OFF"
+            self._state["decisionReason"] = f"MOCK ESP32_A: CH{channel_id} 수동 {action}, TTL 적용 중."
         elif command == "return_auto":
             channel_id = record.get("channel_id")
             if channel_id is None:
@@ -396,6 +409,8 @@ class MockTransport:
                 channel = self._state["channels"][item]
                 channel["manualUntil"] = None
                 channel["targetMi"] = self._auto_targets[item]
+                channel["commandedEnable"] = True
+                channel["commandedEnableKnown"] = True
             self._state["decisionReason"] = "MOCK ESP32_A: 자동 정책으로 복귀했습니다."
         elif command == "reset_fault":
             for channel in self._state["channels"]:
@@ -433,6 +448,8 @@ class MockTransport:
         self._manual_targets.clear()
         for index, target in enumerate(self._auto_targets):
             self._state["channels"][index]["targetMi"] = target
+            self._state["channels"][index]["commandedEnable"] = True
+            self._state["channels"][index]["commandedEnableKnown"] = True
             self._state["channels"][index]["manualUntil"] = None
         environments = {
             "none": (27, 0.08, 0.07, 0.86),
@@ -456,18 +473,21 @@ class MockTransport:
 
     def _step(self) -> None:
         now = time.time()
-        for channel_id, (_, expires) in list(self._manual_targets.items()):
+        for channel_id, (_, _, expires) in list(self._manual_targets.items()):
             if expires <= now:
                 self._manual_targets.pop(channel_id, None)
                 channel = self._state["channels"][channel_id]
                 channel["manualUntil"] = None
                 channel["targetMi"] = self._auto_targets[channel_id]
+                channel["commandedEnable"] = True
+                channel["commandedEnableKnown"] = True
         for channel in self._state["channels"]:
-            target = 0.0 if channel["fault"] else float(channel["targetMi"])
+            enabled = bool(channel["commandedEnable"])
+            target = 0.0 if channel["fault"] or not enabled else float(channel["targetMi"])
             applied = float(channel["appliedMi"])
             rate = 0.12 if target < applied else 0.04
             delta = max(-rate, min(rate, target - applied))
-            self._set_channel(channel, float(channel["targetMi"]), applied + delta)
+            self._set_channel(channel, float(channel["targetMi"]), applied + delta, enabled=enabled)
         self._update_camera()
         self._state["timestamp"] = now
 
@@ -488,17 +508,27 @@ class MockTransport:
         })
 
     @staticmethod
-    def _set_channel(channel: dict[str, Any], target: float, applied: float) -> None:
+    def _set_channel(
+        channel: dict[str, Any],
+        target: float,
+        applied: float,
+        *,
+        enabled: bool,
+    ) -> None:
         target, applied = clamp(target), clamp(applied)
         channel.update({
             "targetMi": round(target, 4),
             "commandedMi": round(target, 4),
+            "commandedEnable": enabled,
+            "commandedEnableKnown": True,
             "appliedMi": round(applied, 4),
             "estimatedTransmittance": estimated_transmittance(applied),
             "opticalState": optical_state(applied),
         })
 
     def _state_line(self) -> str:
+        diagnostics = self._state["controllerDiagnostics"]
+        diagnostics["stateSeq"] = int(diagnostics["stateSeq"] or 0) + 1
         return json.dumps({"type": "state", "state": copy.deepcopy(self._state)}, ensure_ascii=False, separators=(",", ":"))
 
     def _status_line(self) -> str:

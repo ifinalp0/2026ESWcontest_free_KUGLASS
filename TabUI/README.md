@@ -37,6 +37,8 @@ ESP32_A GND       --- ESP32_B GND
 - SERVER, ESP32_A, ESP32_B의 online·stale·Fault 분리
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
 - Topbar `SERVER` 버튼의 현재 실행 인자 유지 백엔드 재시작
+- `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
+- `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI·TTL 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
 
 LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습니다. MOCK으로
@@ -59,6 +61,12 @@ npm start
 `npm start`, `npm run dev:api`, `npm run check:python`은 활성 shell과 무관하게
 항상 `.venv/bin/python`을 사용하므로 `pyserial`을 시스템 Python에 설치하지
 않습니다.
+
+운영 화면 우측 상단의 `관리자` 버튼 또는 `http://localhost:8080/admin`에서
+관리자 콘솔을 엽니다. 관리자 수동은 ESP32_A의 기존 채널별 TTL override를
+사용하며, 잠금을 다시 닫으면 전체 `return_auto`를 요청합니다. ESP32_B status는
+적용 MI와 Fault를 회신하지만 적용 Enable을 직접 회신하지 않으므로 관리자 화면은
+이를 추정값으로 표시하지 않습니다.
 
 ### 백엔드·화면·ESP32_A 통합 실행
 
@@ -159,6 +167,7 @@ MOCK에는 실제 frame이 없으므로 viewer 대기 상태만 확인할 수 �
 | `POST /api/controller/reconnect` | 현재 CDC handle을 닫고 ESP32_A USB 포트를 즉시 다시 탐색·연결 |
 | `POST /api/server/restart` | 응답 후 현재 인자를 유지해 TabUI 백엔드 프로세스 재시작 |
 | `GET /demo` | 태블릿 HMI |
+| `GET /admin` | 통신·센서·출력 진단과 잠금형 관리자 수동 제어 화면 |
 
 ## 안전과 네트워크
 

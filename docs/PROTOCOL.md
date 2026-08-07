@@ -59,7 +59,7 @@ freshness와 reset context를 무효화하며, 유효한 B status로 online을 �
 | --- | --- |
 | `set_mode` | `driving`, `stopped`, `camping`, `parked` |
 | `set_demo` | `none`, `hot_summer`, `camping`, `parked`, `camera_saturation` |
-| `manual_channel` | channel 0~3, MI 0.0~1.0, TTL 1~300초 |
+| `manual_channel` | channel 0~3, MI 0.0~1.0, `enable` boolean, TTL 1~300초 |
 | `return_auto` | 단일 채널 또는 전체 수동 override 해제 |
 | `reset_fault` | 최신 B boot/challenge context를 사용한 reset 요청 |
 | `camera_stream` | `enable`, 최대 15초 lease |

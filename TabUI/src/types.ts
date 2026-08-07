@@ -8,10 +8,17 @@ export interface ChannelState {
   name: string;
   targetMi: number;
   commandedMi: number;
+  commandedEnable: boolean;
+  commandedEnableKnown: boolean;
   appliedMi: number;
   appliedKnown: boolean;
   estimatedTransmittance: number;
   opticalState: OpticalState;
+  policyEstimatedTransmittance: number | null;
+  policyOpticalState: OpticalState | null;
+  appliedSource: string | null;
+  masterFault: boolean;
+  downstreamFault: boolean;
   fault: boolean;
   manualUntil: number | null;
 }
@@ -81,6 +88,7 @@ export interface ControllerLink {
   lastAckSeq: number | null;
   lastAckCommand: string | null;
   lastAckOk: boolean | null;
+  lastAckError: string | null;
   downstreamHealthy: boolean | null;
   downstreamError: string | null;
   downstreamOperationalFault: boolean;
@@ -95,6 +103,16 @@ export interface ControllerLink {
   error: string | null;
 }
 
+export interface ControllerDiagnostics {
+  protocolVersion: number | null;
+  role: string | null;
+  sourceSessionId: number | null;
+  downstreamReady: boolean | null;
+  firmwareDiagnosticsEnabled: boolean | null;
+  stateSeq: number | null;
+  thermalRisk: number | null;
+}
+
 export interface SimulationState {
   schemaVersion: number;
   vehicleMode: VehicleMode;
@@ -102,6 +120,7 @@ export interface SimulationState {
   environment: EnvironmentInput;
   channels: ChannelState[];
   cameraMetrics: CameraMetrics;
+  controllerDiagnostics: ControllerDiagnostics;
   downstreamDiagnostics: DownstreamDiagnostics;
   decisionReason: string;
   timestamp: number;
@@ -117,7 +136,7 @@ export interface FastState {
 }
 
 export type ControlCommand =
-  | { type: 'setManualChannel'; channel: number; mi: number; ttlSeconds?: number }
+  | { type: 'setManualChannel'; channel: number; mi: number; enable?: boolean; ttlSeconds?: number }
   | { type: 'returnAuto'; channel?: number }
   | { type: 'setScenario'; demoMode: DemoMode }
   | { type: 'setEnvironment'; environment: Partial<EnvironmentInput> }

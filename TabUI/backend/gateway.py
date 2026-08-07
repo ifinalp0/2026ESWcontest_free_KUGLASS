@@ -153,6 +153,7 @@ class ESP32AGateway:
             "lastAckSeq": self.state.last_ack_seq,
             "lastAckCommand": self.state.last_ack_command,
             "lastAckOk": self.state.last_ack_ok,
+            "lastAckError": self.state.last_ack_error,
             "downstreamHealthy": self.state.downstream_healthy,
             "downstreamError": self.state.downstream_error,
             "downstreamOperationalFault": downstream["operationalFault"],

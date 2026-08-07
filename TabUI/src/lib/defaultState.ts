@@ -33,10 +33,17 @@ export const defaultState: SimulationState = {
     name,
     targetMi: 0.95,
     commandedMi: 0.95,
+    commandedEnable: false,
+    commandedEnableKnown: false,
     appliedMi: 0,
     appliedKnown: false,
     estimatedTransmittance: 0.92,
     opticalState: 'CLEAR',
+    policyEstimatedTransmittance: null,
+    policyOpticalState: null,
+    appliedSource: null,
+    masterFault: false,
+    downstreamFault: false,
     fault: false,
     manualUntil: null
   })),
@@ -49,6 +56,15 @@ export const defaultState: SimulationState = {
     glare: 0,
     frameId: 0,
     timestamp: 0
+  },
+  controllerDiagnostics: {
+    protocolVersion: null,
+    role: null,
+    sourceSessionId: null,
+    downstreamReady: null,
+    firmwareDiagnosticsEnabled: null,
+    stateSeq: null,
+    thermalRisk: null
   },
   downstreamDiagnostics: {
     bootId: null,
@@ -73,6 +89,7 @@ export const defaultState: SimulationState = {
     lastAckSeq: null,
     lastAckCommand: null,
     lastAckOk: null,
+    lastAckError: null,
     downstreamHealthy: null,
     downstreamError: null,
     downstreamOperationalFault: false,

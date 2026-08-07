@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { AlertTriangle, Cable, Cpu, Download, RefreshCw, Server, WifiOff } from 'lucide-react';
+import { AlertTriangle, Cable, Cpu, Download, RefreshCw, Server, ShieldAlert, WifiOff } from 'lucide-react';
 import type { SimulationState } from '../types';
 
 interface Props {
@@ -167,6 +167,16 @@ export function TopBar({
             <AlertTriangle size={17} />
           </button>
         ) : null}
+        <button
+          className="topbar-action admin-entry"
+          type="button"
+          onClick={() => window.location.assign('/admin')}
+          title="관리자 페이지 열기"
+          aria-label="관리자 페이지 열기"
+        >
+          <ShieldAlert size={17} />
+          <span>관리자</span>
+        </button>
       </div>
     </header>
   );

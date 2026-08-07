@@ -41,6 +41,30 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(message["ttl_ms"], 30000)
         self.assertNotIn("ch", message)
 
+    def test_manual_command_can_disable_one_channel(self) -> None:
+        [message] = translate_ui_command(
+            {
+                "type": "setManualChannel",
+                "channel": 2,
+                "mi": 0.7,
+                "enable": False,
+                "ttlSeconds": 45,
+            },
+            Sequence().next,
+            diagnostics_enabled=False,
+        )
+        self.assertFalse(message["enable"])
+        self.assertEqual(message["target_mi"], 0.7)
+        self.assertEqual(message["ttl_ms"], 45000)
+
+    def test_manual_enable_requires_json_boolean(self) -> None:
+        with self.assertRaises(CommandError):
+            translate_ui_command(
+                {"type": "setManualChannel", "channel": 0, "mi": 0.5, "enable": "false"},
+                Sequence().next,
+                diagnostics_enabled=False,
+            )
+
     def test_live_sensor_override_is_rejected(self) -> None:
         with self.assertRaises(CommandError) as raised:
             translate_ui_command(

@@ -136,6 +136,7 @@ idf.py build
 - boot/session/challenge에 묶인 Fault reset과 결과 correlation
 - ESP32_B ADC 8채널 raw/mV 및 validity telemetry
 - TabUI LIVE/MOCK/REPLAY 상태 분리, 명령 gateway와 on-demand 카메라 영상
+- TabUI 독립 관리자 콘솔의 A/B 통신·센서·ADC 진단과 채널별 Enable/MI TTL 제어
 - 제작 완료된 Logic Carrier 1장과 동일 단일 채널 Power Stage PCB 4장의 원본·계약
 
 다음 항목은 저장소에 실측 완료 기록이 없으므로 확정값으로 사용하지 않습니다.

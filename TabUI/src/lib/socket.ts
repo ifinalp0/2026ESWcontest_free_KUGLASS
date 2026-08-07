@@ -34,6 +34,10 @@ function mergeSnapshot(current: SimulationState, snapshot: Partial<SimulationSta
     ...snapshot,
     environment: { ...current.environment, ...snapshot.environment },
     cameraMetrics: { ...current.cameraMetrics, ...snapshot.cameraMetrics },
+    controllerDiagnostics: {
+      ...current.controllerDiagnostics,
+      ...snapshot.controllerDiagnostics
+    },
     downstreamDiagnostics: {
       ...current.downstreamDiagnostics,
       ...diagnostics,

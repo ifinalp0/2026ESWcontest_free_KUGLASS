@@ -55,6 +55,18 @@ def _default_downstream_diagnostics() -> dict[str, Any]:
     }
 
 
+def _default_controller_diagnostics() -> dict[str, Any]:
+    return {
+        "protocolVersion": None,
+        "role": None,
+        "sourceSessionId": None,
+        "downstreamReady": None,
+        "firmwareDiagnosticsEnabled": None,
+        "stateSeq": None,
+        "thermalRisk": None,
+    }
+
+
 def clamp(value: Any, lower: float = 0.0, upper: float = 1.0) -> float:
     try:
         number = float(value)
@@ -92,10 +104,15 @@ def default_state() -> dict[str, Any]:
                 "name": name,
                 "targetMi": 0.0,
                 "commandedMi": 0.0,
+                "commandedEnable": False,
+                "commandedEnableKnown": False,
                 "appliedMi": 0.0,
                 "appliedKnown": False,
                 "estimatedTransmittance": 0.12,
                 "opticalState": "FROST",
+                "policyEstimatedTransmittance": None,
+                "policyOpticalState": None,
+                "appliedSource": None,
                 "masterFault": False,
                 "downstreamFault": False,
                 "fault": False,
@@ -113,6 +130,7 @@ def default_state() -> dict[str, Any]:
             "frameId": 0,
             "timestamp": 0.0,
         },
+        "controllerDiagnostics": _default_controller_diagnostics(),
         "downstreamDiagnostics": _default_downstream_diagnostics(),
         "decisionReason": "ESP32_A 상태 텔레메트리를 기다리는 중입니다.",
         "timestamp": 0.0,
@@ -152,6 +170,7 @@ class StateStore:
         self.last_ack_seq: int | None = None
         self.last_ack_command: str | None = None
         self.last_ack_ok: bool | None = None
+        self.last_ack_error: str | None = None
         self.last_device_error: str | None = None
         self.downstream_healthy: bool | None = None
         self.downstream_error: str | None = None
@@ -176,8 +195,10 @@ class StateStore:
                 self.last_ack_command = command if isinstance(command, str) else None
                 self.last_ack_ok = record.get("ok") if isinstance(record.get("ok"), bool) else None
                 if record.get("ok", True) is False:
-                    self.last_device_error = str(record.get("error", "ESP32_A rejected command"))
+                    self.last_ack_error = str(record.get("error", "ESP32_A rejected command"))
+                    self.last_device_error = self.last_ack_error
                 else:
+                    self.last_ack_error = None
                     self.last_device_error = None
             return True
 
@@ -188,6 +209,23 @@ class StateStore:
             diagnostics = record.get("diagnostics_enabled", record.get("diagnosticsEnabled"))
             with self._lock:
                 self.firmware_diagnostics_enabled = diagnostics if isinstance(diagnostics, bool) else None
+                controller = self._state["controllerDiagnostics"]
+                protocol_version = record.get("v")
+                controller.update({
+                    "protocolVersion": protocol_version if isinstance(protocol_version, int) else None,
+                    "role": record.get("role") if isinstance(record.get("role"), str) else None,
+                    "sourceSessionId": _session_identifier(
+                        record.get("source_session_id", record.get("sourceSessionId"))
+                    ),
+                    "downstreamReady": (
+                        record.get("downstream_ready")
+                        if isinstance(record.get("downstream_ready"), bool)
+                        else record.get("downstreamReady")
+                        if isinstance(record.get("downstreamReady"), bool)
+                        else None
+                    ),
+                    "firmwareDiagnosticsEnabled": self.firmware_diagnostics_enabled,
+                })
             return True
 
         if record_type == "state":
@@ -232,9 +270,31 @@ class StateStore:
     def reset_firmware_handshake(self) -> None:
         with self._lock:
             self.firmware_diagnostics_enabled = None
+            controller = self._state["controllerDiagnostics"]
+            controller.update({
+                "protocolVersion": None,
+                "role": None,
+                "sourceSessionId": None,
+                "downstreamReady": None,
+                "firmwareDiagnosticsEnabled": None,
+            })
 
     def _apply_state(self, body: dict[str, Any]) -> None:
         self._state["schemaVersion"] = int(body.get("schemaVersion", body.get("schema_version", 1)))
+        controller = self._state["controllerDiagnostics"]
+        incoming_controller = body.get("controllerDiagnostics")
+        if isinstance(incoming_controller, dict):
+            for key in controller:
+                if key in incoming_controller:
+                    controller[key] = incoming_controller[key]
+        state_sequence = body.get("seq")
+        if isinstance(state_sequence, int) and not isinstance(state_sequence, bool):
+            controller["stateSeq"] = state_sequence
+        thermal_risk = body.get("thermalRisk", body.get("thermal_risk"))
+        if isinstance(thermal_risk, (int, float)) and not isinstance(thermal_risk, bool):
+            thermal_number = float(thermal_risk)
+            if math.isfinite(thermal_number):
+                controller["thermalRisk"] = round(clamp(thermal_number), 4)
         vehicle_mode = body.get("vehicleMode", body.get("vehicle_mode", body.get("mode")))
         if vehicle_mode in {"driving", "stopped", "camping", "parked"}:
             self._state["vehicleMode"] = vehicle_mode
@@ -355,6 +415,28 @@ class StateStore:
                     current["commandedMi"] = round(clamp(commanded_value), 4)
                 elif target_value is not None:
                     current["commandedMi"] = round(clamp(target_value), 4)
+                enable_value = item.get("commandedEnable", item.get("enable"))
+                if isinstance(enable_value, bool):
+                    current["commandedEnable"] = enable_value
+                    current["commandedEnableKnown"] = True
+                policy_transmittance = item.get(
+                    "policyEstimatedTransmittance",
+                    item.get("estimated_transmittance"),
+                )
+                if (
+                    isinstance(policy_transmittance, (int, float))
+                    and not isinstance(policy_transmittance, bool)
+                    and math.isfinite(float(policy_transmittance))
+                ):
+                    current["policyEstimatedTransmittance"] = round(
+                        clamp(policy_transmittance), 4
+                    )
+                policy_optical_state = item.get("policyOpticalState", item.get("optical_state"))
+                if policy_optical_state in {"CLEAR", "DIM", "FROST"}:
+                    current["policyOpticalState"] = policy_optical_state
+                applied_source = item.get("appliedSource", item.get("applied_source"))
+                if isinstance(applied_source, str):
+                    current["appliedSource"] = applied_source
             applied_mi = current["appliedMi"]
             applied_known = current["appliedKnown"]
             if source == "downstream":
