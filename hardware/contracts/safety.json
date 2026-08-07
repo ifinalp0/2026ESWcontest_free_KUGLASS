@@ -20,7 +20,7 @@
     {
       "id": "HW-004",
       "severity": "critical",
-      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a falling edge immediately cuts that channel, while a reset-required firmware latch is confirmed after five consecutive 1 ms output samples remain low. A shorter low glitch may auto-recover, and a high level alone does not prove connector presence."
+      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a falling edge immediately cuts that channel, while a reset-required firmware latch is confirmed after ten consecutive 1 ms output samples remain low. A shorter or intermittent low may auto-recover, and a high level alone does not prove connector presence."
     },
     {
       "id": "HW-005",

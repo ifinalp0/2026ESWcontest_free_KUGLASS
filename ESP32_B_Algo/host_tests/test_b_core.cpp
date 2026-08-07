@@ -62,6 +62,14 @@ int main() {
     assert(fault_qualifier.consecutive_low_samples() == 2U);
     assert(fault_qualifier.sample(true) ==
            FaultInputQualification::HEALTHY);
+    for (uint8_t burst = 0; burst < 3U; ++burst) {
+        for (uint8_t i = 1; i < KUGLASS_FAULT_CONFIRM_SAMPLES; ++i) {
+            assert(fault_qualifier.sample(false) ==
+                   FaultInputQualification::QUALIFYING_LOW);
+        }
+        assert(fault_qualifier.sample(true) ==
+               FaultInputQualification::HEALTHY);
+    }
     for (uint8_t i = 1; i < KUGLASS_FAULT_CONFIRM_SAMPLES; ++i) {
         assert(fault_qualifier.sample(false) ==
                FaultInputQualification::QUALIFYING_LOW);
