@@ -42,8 +42,10 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
 
 - 초기화 첫 단계에서 네 `ENABLE`을 LOW, MCPWM을 continuous force-low로 만듭니다.
 - `EN_GLOBAL` falling edge는 ISR에서 latch하고 네 software enable을 즉시 LOW로
-  내립니다. `FAULT_N_CHx` falling edge는 해당 채널의 enable만 즉시 LOW로 내리고
-  latch하며, 나머지 정상 채널은 활성 lease에 따라 계속 동작합니다.
+  내립니다. `FAULT_N_CHx` falling edge도 해당 채널의 enable을 즉시 LOW로
+  내리지만, reset이 필요한 latch는 1 ms 출력 주기에서 3회 연속 LOW가 확인될 때
+  확정합니다. 그 전에 HIGH로 복귀한 짧은 glitch는 자동 복구하며, 나머지 정상
+  채널은 활성 lease에 따라 계속 동작합니다.
 - invalid/oversize JSON, 불완전·중복 채널, 범위 밖 MI, 활성 lease의 stale
   sequence는 lease 전체를 무효화하고 safe-off합니다.
 - timeout과 output task watchdog도 `ENABLE LOW + PWM force-low + applied_mi=0`으로
@@ -107,10 +109,11 @@ Actuator command, B status와 Fault reset의 frame은
 - B의 status `seq`는 command와 별개이며 100 ms마다 증가합니다.
 - nonzero `boot_id`는 부팅 동안 유지되고, `reset_challenge`는 safety trip과 reset
   시도 후 교체됩니다.
-- E-Stop/Power Stage Fault는 입력이 HIGH로 돌아와도 latched 상태이며 안전 조건과
-  일치하는 reset이 필요합니다. E-Stop 등 전역 fault reset 뒤에는 새 full command
-  전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상 채널 lease는 유지되고
-  복구 채널은 다음 출력 주기부터 다시 적용됩니다.
+- E-Stop과 3회 연속 LOW로 확정된 Power Stage Fault는 입력이 HIGH로 돌아와도
+  latched 상태이며 안전 조건과 일치하는 reset이 필요합니다. 1~2회 LOW sample
+  안에 복귀한 glitch는 즉시 차단 뒤 자동 복구합니다. E-Stop 등 전역 fault reset
+  뒤에는 새 full command 전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상
+  채널 lease는 유지되고 복구 채널은 다음 출력 주기부터 다시 적용됩니다.
 - ADC는 5 ms마다 8채널을 scan하고 settling read, 5-sample median, EWMA 1/8을
   적용합니다. 100 ms보다 오래된 값은 invalid입니다.
 - current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
@@ -132,9 +135,9 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
-full frame, 0.95 clamp, 전역 hard safe-off, 채널별 Fault 격리, ADC filter/stale,
-status, direction blanking 중 정적 ENABLE, ENABLE commit 거부와 JSONL 복구를
-검사합니다.
+full frame, 0.95 clamp, 전역 hard safe-off, `FAULT_N` 3-sample qualification과
+채널별 Fault 격리, ADC filter/stale, status, direction blanking 중 정적 ENABLE,
+ENABLE commit 거부와 JSONL 복구를 검사합니다.
 BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
 순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 

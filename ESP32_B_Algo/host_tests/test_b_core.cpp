@@ -2,6 +2,7 @@
 #include "channel_manager.h"
 #include "control_protocol.h"
 #include "fault_manager.h"
+#include "fault_input_qualifier.h"
 #include "json_line_accumulator.h"
 #include "kuglass_b_config.h"
 #include "power_stage_pinmap.h"
@@ -51,6 +52,26 @@ bool probe_enable_commit(size_t channel_index, void* context) {
 }  // namespace
 
 int main() {
+    FaultInputQualifier fault_qualifier;
+    assert(fault_qualifier.sample(true) ==
+           FaultInputQualification::HEALTHY);
+    assert(fault_qualifier.sample(false) ==
+           FaultInputQualification::QUALIFYING_LOW);
+    assert(fault_qualifier.sample(false) ==
+           FaultInputQualification::QUALIFYING_LOW);
+    assert(fault_qualifier.consecutive_low_samples() == 2U);
+    assert(fault_qualifier.sample(true) ==
+           FaultInputQualification::HEALTHY);
+    for (uint8_t i = 1; i < KUGLASS_FAULT_CONFIRM_SAMPLES; ++i) {
+        assert(fault_qualifier.sample(false) ==
+               FaultInputQualification::QUALIFYING_LOW);
+    }
+    assert(fault_qualifier.sample(false) ==
+           FaultInputQualification::CONFIRMED_LOW);
+    assert(fault_qualifier.sample(false) ==
+           FaultInputQualification::CONFIRMED_LOW);
+    fault_qualifier.reset();
+
     const PowerStagePinmap& pinmap = KUGLASS_POWER_STAGE_PINMAP;
     assert(pinmap.estop_n_gpio == 19);
 
@@ -329,6 +350,12 @@ int main() {
         assert(state != nullptr && state->enabled && !state->blanking);
         assert(!state->direction_positive);
     }
+    waveform.force_channel_safe(2);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(waveform.state(i)->enabled == (i != 2U));
+    }
+    waveform.tick(waveform_channels, 0.0f, true);
+    assert(waveform.state(2)->enabled);
     waveform.force_safe();
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
         const SpwmChannelState* state = waveform.state(i);

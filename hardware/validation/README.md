@@ -57,9 +57,10 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 - 펌웨어 초기화의 첫 출력이 `ENABLE LOW`와 `PWM force-low`인지 확인합니다.
 - J5 closed/open/disconnected에서 `EN_GLOBAL`과 네 U4 출력의 truth table을 확인합니다.
 - GPIO19의 reset/power-up waveform이 U4 enable에 미치는 영향을 측정합니다.
-- 각 `FAULT_N_CHx`를 한 번에 하나씩 LOW로 주입해 ISR latch, 해당 채널의 enable
-  차단과 PWM force-low, reset 전 재활성화 금지를 확인합니다. 동시에 다른 세
-  채널의 enable/PWM과 활성 command lease가 중단되지 않는지 확인합니다.
+- 각 `FAULT_N_CHx`를 한 번에 하나씩 LOW로 주입해 falling edge의 즉시 enable
+  차단, 1~2회 output sample 안에 HIGH로 복귀한 glitch의 자동 복구, 3회 연속
+  LOW의 latch와 PWM force-low, reset 전 재활성화 금지를 확인합니다. 동시에 다른
+  세 채널의 enable/PWM과 활성 command lease가 중단되지 않는지 확인합니다.
 - GPIO3 temperature source가 연결된 cold boot를 반복하고 strapping failure 여부를 기록합니다.
 - GPIO38 RGB LED/RMT가 초기화되지 않는지 확인합니다.
 

@@ -96,9 +96,12 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
 - `reset_challenge`는 nonzero u32 one-time reset 권한이다. safety trip 또는
   유효 reset 시도 후 교체된다.
 - `ch[].mi`는 B가 실제 적용 중인 값이며 safe-off 시 0.0이다.
-- Power Stage Fault는 해당 `ch[].fault`에만 표시되고 그 채널의 `mi`만 0.0이
-  된다. `fault_code`는 E-Stop, 통신과 명령 오류처럼 controller-wide 차단 원인을
-  나타내며, 정상인 나머지 채널은 활성 command lease를 계속 따른다.
+- `FAULT_N` falling edge는 해당 채널 출력을 즉시 차단한다. 1 ms 출력 주기에서
+  3회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
+  `ch[].fault`에 표시되고 그 채널의 `mi`만 0.0이 된다. 그 전에 HIGH로 복귀한
+  glitch는 자동 복구한다. `fault_code`는 E-Stop, 통신과 명령 오류처럼
+  controller-wide 차단 원인을 나타내며, 정상인 나머지 채널은 활성 command
+  lease를 계속 따른다.
 - `diagnostic`, `adc`, `control_result`는 선택 필드다.
 - canonical B formatter는 `adc`를 마지막 top-level field로 출력한다. A는 이
   순서를 포함해 유효한 JSON object field 순서에 의존하지 않는다.

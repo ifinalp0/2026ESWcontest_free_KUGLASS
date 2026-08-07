@@ -2,6 +2,7 @@
 #include "channel_manager.h"
 #include "control_protocol.h"
 #include "fault_manager.h"
+#include "fault_input_qualifier.h"
 #include "json_line_accumulator.h"
 #include "kuglass_b_config.h"
 #include "power_stage_pinmap.h"
@@ -53,6 +54,8 @@ ChannelManager g_channels;
 FaultManager g_fault;
 [[maybe_unused]] SpwmGenerator g_spwm;
 AnalogMonitor g_analog;
+[[maybe_unused]] FaultInputQualifier
+    g_fault_input_qualifiers[KUGLASS_CHANNEL_COUNT];
 
 #ifdef ESP_PLATFORM
 constexpr uart_port_t kUpstreamUart = UART_NUM_1;
@@ -170,10 +173,8 @@ void IRAM_ATTR begin_channel_trip_from_isr(size_t channel_index) {
     if (channel_index >= KUGLASS_CHANNEL_COUNT) return;
     (void)atomic_add_safety_counter(
         &g_channel_trip_inflight[channel_index], 1);
-    (void)atomic_add_safety_counter(
-        &g_channel_trip_epoch[channel_index], 1);
-    (void)rotate_reset_challenge();
-    g_channel_trip_latched[channel_index] = true;
+    // The electrical cut is immediate. The output task qualifies the LOW over
+    // consecutive 1 ms samples before turning it into a reset-required latch.
     __asm__ __volatile__("memw" ::: "memory");
     disable_channel_enable_from_isr(channel_index);
 }
@@ -257,6 +258,64 @@ bool channel_safety_event_pending(size_t channel_index,
             g_acknowledged_channel_trip_epoch[channel_index] ||
         events.channel[channel_index] !=
             g_acknowledged_events.channel[channel_index];
+}
+
+bool confirm_channel_fault_if_still_low(size_t channel_index) {
+    if (channel_index >= KUGLASS_CHANNEL_COUNT) return false;
+    bool confirmed = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (g_channel_trip_inflight[channel_index] == 0U &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.channels[channel_index].fault_n_gpio)) ==
+            0) {
+        if (!g_channel_trip_latched[channel_index]) {
+            // A LOW already present when interrupts were configured has no
+            // falling-edge event, so synthesize one before latching it.
+            if (g_channel_event_count[channel_index] ==
+                g_acknowledged_events.channel[channel_index]) {
+                g_channel_event_count[channel_index] =
+                    g_channel_event_count[channel_index] + 1U;
+            }
+            (void)atomic_add_safety_counter(
+                &g_channel_trip_epoch[channel_index], 1);
+            (void)rotate_reset_challenge();
+            g_channel_trip_latched[channel_index] = true;
+            __asm__ __volatile__("memw" ::: "memory");
+        }
+        confirmed = true;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return confirmed;
+}
+
+bool release_unconfirmed_channel_event_if_high(size_t channel_index) {
+    if (channel_index >= KUGLASS_CHANNEL_COUNT) return false;
+    bool released = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (!g_channel_trip_latched[channel_index] &&
+        g_channel_trip_inflight[channel_index] == 0U &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.channels[channel_index].fault_n_gpio)) !=
+            0) {
+        const bool event_was_pending =
+            g_channel_trip_epoch[channel_index] !=
+                g_acknowledged_channel_trip_epoch[channel_index] ||
+            g_channel_event_count[channel_index] !=
+                g_acknowledged_events.channel[channel_index];
+        g_acknowledged_channel_trip_epoch[channel_index] =
+            g_channel_trip_epoch[channel_index];
+        g_acknowledged_events.channel[channel_index] =
+            g_channel_event_count[channel_index];
+        __asm__ __volatile__("memw" ::: "memory");
+        released = event_was_pending &&
+            !g_channel_trip_latched[channel_index] &&
+            g_channel_trip_inflight[channel_index] == 0U &&
+            gpio_get_level(static_cast<gpio_num_t>(
+                KUGLASS_POWER_STAGE_PINMAP.channels[channel_index]
+                    .fault_n_gpio)) != 0;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return released;
 }
 
 bool commit_channel_enable_if_safe(size_t channel_index, void*) {
@@ -368,6 +427,7 @@ bool acknowledge_safety_events_if_inputs_high() {
             g_acknowledged_channel_trip_epoch[i] =
                 candidate_channel_epoch[i];
             g_channel_trip_latched[i] = false;
+            g_fault_input_qualifiers[i].reset();
         }
         __asm__ __volatile__("memw" ::: "memory");
         accepted = g_safety_trip_inflight == 0U &&
@@ -401,15 +461,31 @@ bool acknowledge_safety_events_if_inputs_high() {
 
 void update_safety_inputs(bool* estop_ok) {
     if (estop_ok == nullptr) return;
-    const SafetyEventCounters events = safety_event_snapshot();
+    SafetyEventCounters events = safety_event_snapshot();
     *estop_ok =
         gpio_get_level(static_cast<gpio_num_t>(
             KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0 &&
         !global_safety_event_pending(events);
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
-        const bool channel_ok =
+        const bool fault_n_high =
             gpio_get_level(static_cast<gpio_num_t>(
-                KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0 &&
+                KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0;
+        const FaultInputQualification qualification =
+            g_fault_input_qualifiers[i].sample(fault_n_high);
+        if (qualification == FaultInputQualification::CONFIRMED_LOW) {
+            (void)confirm_channel_fault_if_still_low(i);
+        } else if (qualification == FaultInputQualification::HEALTHY) {
+            // A LOW that recovered before confirmation caused an immediate
+            // electrical cut but does not require an external reset. Reset the
+            // cached SPWM state so the next tick performs a guarded ENABLE
+            // commit instead of assuming the ISR-lowered GPIO is still HIGH.
+            if (release_unconfirmed_channel_event_if_high(i)) {
+                g_spwm.force_channel_safe(i);
+            }
+        }
+        events = safety_event_snapshot();
+        const bool channel_ok =
+            fault_n_high &&
             !channel_safety_event_pending(i, events);
         g_channels.set_fault(i, !channel_ok);
     }

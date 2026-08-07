@@ -138,11 +138,16 @@ void SpwmGenerator::set_enable_commit_callback(
 
 void SpwmGenerator::force_safe() {
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
-        set_channel_safe(i, false);
-        states_[i] = SpwmChannelState{};
-        blanking_remaining_s_[i] = 0.0f;
-        pending_direction_[i] = false;
+        force_channel_safe(i);
     }
+}
+
+void SpwmGenerator::force_channel_safe(size_t index) {
+    if (index >= KUGLASS_CHANNEL_COUNT) return;
+    set_channel_safe(index, false);
+    states_[index] = SpwmChannelState{};
+    blanking_remaining_s_[index] = 0.0f;
+    pending_direction_[index] = false;
 }
 
 void SpwmGenerator::tick(ChannelManager& channels,

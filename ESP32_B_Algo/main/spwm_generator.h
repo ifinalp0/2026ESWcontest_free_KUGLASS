@@ -23,6 +23,7 @@ public:
     void set_enable_commit_callback(SpwmEnableCommitCallback callback,
                                     void* context);
     void force_safe();
+    void force_channel_safe(size_t index);
     void tick(ChannelManager& channels, float dt_s, bool global_enable);
     const SpwmChannelState* state(size_t index) const;
 

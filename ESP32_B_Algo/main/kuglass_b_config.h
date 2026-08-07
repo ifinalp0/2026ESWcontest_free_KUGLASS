@@ -16,6 +16,10 @@
 static constexpr uint8_t KUGLASS_CHANNEL_COUNT = 4;
 static constexpr uint32_t KUGLASS_DEFAULT_TTL_MS = 250;
 static constexpr uint32_t KUGLASS_OUTPUT_UPDATE_MS = 1;
+// A raw FAULT_N falling edge still cuts the channel immediately. Requiring
+// three consecutive output-task samples only prevents a brief LOW glitch from
+// becoming a reset-required latched fault.
+static constexpr uint8_t KUGLASS_FAULT_CONFIRM_SAMPLES = 3;
 static constexpr uint32_t KUGLASS_DIRECTION_BLANKING_MS = 1;
 static constexpr uint32_t KUGLASS_SAFETY_WATCHDOG_MS = 100;
 static constexpr uint32_t KUGLASS_ANALOG_SCAN_PERIOD_MS = 5;
@@ -33,3 +37,5 @@ static_assert(KUGLASS_MAX_MODULATION_INDEX > 0.0f &&
               "Bootstrap PWM requires a non-zero carrier off-time.");
 static_assert(KUGLASS_DIRECTION_BLANKING_MS >= KUGLASS_OUTPUT_UPDATE_MS,
               "Direction changes require at least one safe output update.");
+static_assert(KUGLASS_FAULT_CONFIRM_SAMPLES >= 2,
+              "Fault qualification must reject at least one-sample glitches.");
