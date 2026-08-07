@@ -9,6 +9,12 @@ export interface TabUIClient {
   state: SimulationState;
   connected: boolean;
   sendCommand: (command: ControlCommand) => void;
+  refreshController: () => void;
+  restartServer: () => void;
+  controllerRefreshing: boolean;
+  serverRestarting: boolean;
+  controllerActionError: string | null;
+  serverActionError: string | null;
 }
 
 function isFourChannelSnapshot(value: unknown): value is SimulationState['channels'] {
@@ -50,8 +56,14 @@ export function useTabUIClient(): TabUIClient {
   const [state, setState] = useState<SimulationState>(defaultState);
   const [connected, setConnected] = useState(false);
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [controllerRefreshing, setControllerRefreshing] = useState(false);
+  const [serverRestarting, setServerRestarting] = useState(false);
+  const [controllerActionError, setControllerActionError] = useState<string | null>(null);
+  const [serverActionError, setServerActionError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const requestInFlightRef = useRef(false);
+  const serverRestartPendingRef = useRef(false);
+  const serverRestartReadyAtRef = useRef(0);
 
   const refreshState = useCallback(async () => {
     if (requestInFlightRef.current) {
@@ -67,6 +79,10 @@ export function useTabUIClient(): TabUIClient {
       if (mountedRef.current) {
         setState((current) => mergeSnapshot(current, snapshot));
         setConnected(true);
+        if (serverRestartPendingRef.current && Date.now() >= serverRestartReadyAtRef.current) {
+          serverRestartPendingRef.current = false;
+          setServerRestarting(false);
+        }
       }
     } catch {
       if (mountedRef.current) {
@@ -121,8 +137,82 @@ export function useTabUIClient(): TabUIClient {
       });
   };
 
+  const refreshController = () => {
+    if (controllerRefreshing || serverRestarting) {
+      return;
+    }
+    setControllerRefreshing(true);
+    setControllerActionError(null);
+    void fetch(`${backendUrl}/api/controller/reconnect`, { method: 'POST' })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as {
+          state?: Partial<SimulationState>;
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(result.error ?? `controller reconnect HTTP ${response.status}`);
+        }
+        if (result.state && mountedRef.current) {
+          setState((current) => mergeSnapshot(current, result.state ?? {}));
+        }
+        if (mountedRef.current) {
+          setConnected(true);
+        }
+        void refreshState();
+      })
+      .catch((error: unknown) => {
+        if (mountedRef.current) {
+          setControllerActionError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (mountedRef.current) {
+          setControllerRefreshing(false);
+        }
+      });
+  };
+
+  const restartServer = () => {
+    if (serverRestarting) {
+      return;
+    }
+    setServerRestarting(true);
+    setServerActionError(null);
+    void fetch(`${backendUrl}/api/server/restart`, { method: 'POST' })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as { error?: string };
+        if (!response.ok) {
+          throw new Error(result.error ?? `server restart HTTP ${response.status}`);
+        }
+        if (!mountedRef.current) {
+          return;
+        }
+        serverRestartPendingRef.current = true;
+        serverRestartReadyAtRef.current = Date.now() + 500;
+        setConnected(false);
+        window.setTimeout(() => void refreshState(), 600);
+      })
+      .catch((error: unknown) => {
+        if (!mountedRef.current) {
+          return;
+        }
+        setServerRestarting(false);
+        setServerActionError(error instanceof Error ? error.message : String(error));
+      });
+  };
+
   const visibleState = commandError
     ? { ...state, link: { ...state.link, error: commandError } }
     : state;
-  return { state: visibleState, connected, sendCommand };
+  return {
+    state: visibleState,
+    connected,
+    sendCommand,
+    refreshController,
+    restartServer,
+    controllerRefreshing,
+    serverRestarting,
+    controllerActionError,
+    serverActionError
+  };
 }

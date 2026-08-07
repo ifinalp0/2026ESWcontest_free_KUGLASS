@@ -134,6 +134,7 @@ class RecordingTransport:
         self.error = None
         self.incoming: list[str] = []
         self.written: list[tuple[float, str]] = []
+        self.reconnect_count = 0
 
     def write_line(self, line: str) -> None:
         self.written.append((time.monotonic(), line))
@@ -145,6 +146,12 @@ class RecordingTransport:
 
     def close(self) -> None:
         self.connected = False
+
+    def reconnect(self) -> bool:
+        self.reconnect_count += 1
+        self.connected = True
+        self.error = None
+        return True
 
 
 class SequencingAndCoalescingTests(unittest.TestCase):
@@ -162,6 +169,38 @@ class SequencingAndCoalescingTests(unittest.TestCase):
         [sequence] = gateway.submit({"type": "returnAuto"})
         self.assertEqual(sequence, 1234568)
         self.assertNotEqual(sequence, 1)
+
+    def test_controller_reconnect_resets_freshness_until_new_telemetry(self) -> None:
+        transport = RecordingTransport(mode="usb")
+        gateway = ESP32AGateway(transport=transport)
+        transport.incoming.append('{"type":"state","channels":[]}')
+        gateway._read_transport()
+        self.assertTrue(gateway.link_snapshot()["hardwareConnected"])
+
+        result = gateway.reconnect_controller()
+
+        self.assertEqual(transport.reconnect_count, 1)
+        self.assertTrue(result["requested"])
+        self.assertTrue(result["portOpen"])
+        self.assertFalse(result["link"]["hardwareConnected"])
+
+    def test_controller_reconnect_drops_queued_command_until_new_telemetry(self) -> None:
+        transport = RecordingTransport(mode="usb")
+        gateway = ESP32AGateway(transport=transport)
+        transport.incoming.append('{"type":"state","channels":[]}')
+        gateway._read_transport()
+        gateway.submit({"type": "returnAuto"})
+
+        gateway.reconnect_controller()
+        gateway._flush_outbox()
+
+        self.assertEqual(transport.written, [])
+
+    def test_mock_controller_reconnect_is_rejected(self) -> None:
+        gateway = ESP32AGateway(transport=MockTransport())
+        with self.assertRaises(CommandError) as raised:
+            gateway.reconnect_controller()
+        self.assertEqual(raised.exception.status, 409)
 
     def test_manual_commands_are_latest_wins_and_rate_limited(self) -> None:
         transport = RecordingTransport()

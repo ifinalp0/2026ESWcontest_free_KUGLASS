@@ -116,6 +116,23 @@ class UsbPortDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "multiple ESP32 USB devices"):
                 transport._resolve_port()
 
+    def test_reconnect_closes_old_handle_and_reopens_immediately(self) -> None:
+        old_serial = FakeSerial()
+        new_serial = FakeSerial()
+        transport = UsbCdcTransport("/dev/cu.usbmodem1101", reconnect_seconds=60.0)
+        transport._serial = old_serial
+        transport.connected = True
+        transport._last_open_attempt = 100.0
+
+        with patch("serial.Serial", return_value=new_serial) as open_serial:
+            self.assertTrue(transport.reconnect())
+
+        self.assertFalse(old_serial.is_open)
+        self.assertIs(transport._serial, new_serial)
+        self.assertTrue(transport.connected)
+        self.assertIsNone(transport.error)
+        open_serial.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -42,6 +42,8 @@ class ESP32AGateway:
         self._gateway_error: str | None = None
         self._camera_stream_requested = False
         self._camera_lock = threading.Lock()
+        self._transport_lock = threading.RLock()
+        self._drop_commands_until_telemetry = False
 
     @classmethod
     def create(
@@ -74,7 +76,26 @@ class ESP32AGateway:
         self._running.clear()
         if self._thread:
             self._thread.join(timeout=1.0)
-        self.transport.close()
+        with self._transport_lock:
+            self.transport.close()
+
+    def reconnect_controller(self) -> dict[str, Any]:
+        """Start a fresh ESP32_A USB session without changing the runtime mode."""
+
+        if self.transport.mode != "usb":
+            raise CommandError("ESP32_A reconnect is available only in LIVE USB mode", 409)
+        with self._transport_lock:
+            self._last_telemetry_at = None
+            self._gateway_error = None
+            self._drop_commands_until_telemetry = True
+            self.state.reset_firmware_handshake()
+            self.camera.clear()
+            port_open = self.transport.reconnect()
+        return {
+            "requested": True,
+            "portOpen": port_open,
+            "link": self.link_snapshot(),
+        }
 
     def submit(self, payload: dict[str, Any]) -> list[int]:
         messages = translate_ui_command(
@@ -197,29 +218,34 @@ class ESP32AGateway:
             self._write_message(message)
 
     def _write_message(self, message: dict[str, Any]) -> None:
-        try:
-            line = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
-            self.transport.write_line(line)
-            self._gateway_error = None
-        except (OSError, ValueError) as exc:
-            self._gateway_error = str(exc)
+        with self._transport_lock:
+            if self._drop_commands_until_telemetry:
+                return
+            try:
+                line = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
+                self.transport.write_line(line)
+                self._gateway_error = None
+            except (OSError, ValueError) as exc:
+                self._gateway_error = str(exc)
 
     def _read_transport(self) -> None:
-        for line in self.transport.read_lines():
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(record, dict):
-                continue
-            if self.state.apply_record(record):
-                if record.get("type") in {"state", "status", "telemetry", "sensor", "sensors", "camera"}:
-                    self._last_telemetry_at = time.monotonic()
-                self._gateway_error = None
-        read_camera_frames = getattr(self.transport, "read_camera_frames", None)
-        if callable(read_camera_frames):
-            for frame in read_camera_frames():
-                self.camera.update(frame)
+        with self._transport_lock:
+            for line in self.transport.read_lines():
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if self.state.apply_record(record):
+                    if record.get("type") in {"state", "status", "telemetry", "sensor", "sensors", "camera"}:
+                        self._last_telemetry_at = time.monotonic()
+                        self._drop_commands_until_telemetry = False
+                    self._gateway_error = None
+            read_camera_frames = getattr(self.transport, "read_camera_frames", None)
+            if callable(read_camera_frames):
+                for frame in read_camera_frames():
+                    self.camera.update(frame)
 
     def _hardware_connected(self, now: float | None = None) -> bool:
         if not self.transport.connected:

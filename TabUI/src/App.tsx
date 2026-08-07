@@ -16,7 +16,17 @@ function getInitialTheme(): BrandTheme {
 }
 
 export default function App() {
-  const { state, connected, sendCommand } = useTabUIClient();
+  const {
+    state,
+    connected,
+    sendCommand,
+    refreshController,
+    restartServer,
+    controllerRefreshing,
+    serverRestarting,
+    controllerActionError,
+    serverActionError
+  } = useTabUIClient();
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [theme, setTheme] = useState<BrandTheme>(getInitialTheme);
   const controllerAvailable = connected && state.link.hardwareConnected;
@@ -39,6 +49,12 @@ export default function App() {
         onToggleTheme={toggleTheme}
         onResetFault={() => sendCommand({ type: 'resetFault' })}
         onSaveReplay={() => sendCommand({ type: 'saveReplay' })}
+        onRefreshController={refreshController}
+        onRestartServer={restartServer}
+        controllerRefreshing={controllerRefreshing}
+        serverRestarting={serverRestarting}
+        controllerActionError={controllerActionError}
+        serverActionError={serverActionError}
       />
       <ScenarioBar active={state.demoMode} sendCommand={sendCommand} enabled={controllerAvailable} />
       <section className="dashboard-grid">

@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { AlertTriangle, Cable, Cpu, Download, Server, WifiOff } from 'lucide-react';
+import { AlertTriangle, Cable, Cpu, Download, RefreshCw, Server, WifiOff } from 'lucide-react';
 import type { SimulationState } from '../types';
 
 interface Props {
@@ -8,6 +8,12 @@ interface Props {
   onToggleTheme: () => void;
   onResetFault: () => void;
   onSaveReplay: () => void;
+  onRefreshController: () => void;
+  onRestartServer: () => void;
+  controllerRefreshing: boolean;
+  serverRestarting: boolean;
+  controllerActionError: string | null;
+  serverActionError: string | null;
 }
 
 type DownstreamStatus = 'ok' | 'waiting' | 'stale' | 'fault';
@@ -33,7 +39,19 @@ function downstreamStatus(connected: boolean, healthy: boolean | null, error: st
   return 'waiting';
 }
 
-export function TopBar({ state, connected, onToggleTheme, onResetFault, onSaveReplay }: Props) {
+export function TopBar({
+  state,
+  connected,
+  onToggleTheme,
+  onResetFault,
+  onSaveReplay,
+  onRefreshController,
+  onRestartServer,
+  controllerRefreshing,
+  serverRestarting,
+  controllerActionError,
+  serverActionError
+}: Props) {
   const hasFault = state.channels.some((channel) => channel.fault);
   const diagnostics = state.downstreamDiagnostics;
   const hasOperationalFault = diagnostics.operationalFault || hasFault;
@@ -96,14 +114,28 @@ export function TopBar({ state, connected, onToggleTheme, onResetFault, onSaveRe
         </div>
       </div>
       <div className="topbar-status">
-        <div className={`status-block compact ${connected ? 'ok' : 'warn'}`} title={connected ? 'TabUI 백엔드 연결됨' : 'TabUI 백엔드 연결 끊김'}>
-          {connected ? <Server size={17} /> : <WifiOff size={17} />}
-          <span>SERVER<strong>{connected ? 'ONLINE' : 'OFFLINE'}</strong></span>
-        </div>
-        <div className={`status-block compact ${hasDeviceError ? 'warn' : deviceConnected ? 'ok' : 'warn'}`} title={state.link.error ?? `ESP32_A ${deviceLabel}`}>
-          <Cpu size={17} />
-          <span>CONTROLLER<strong>{hasDeviceError ? 'REJECTED' : !connected ? 'WAITING' : isMock ? 'MOCK' : deviceConnected ? 'ESP32_A' : 'WAITING'}</strong></span>
-        </div>
+        <button
+          className={`status-block compact interactive ${connected && !serverActionError ? 'ok' : 'warn'}`}
+          type="button"
+          disabled={!connected || controllerRefreshing || serverRestarting}
+          onClick={onRestartServer}
+          title={serverActionError ?? (connected ? 'TabUI 백엔드 재시작' : 'TabUI 백엔드 연결 끊김')}
+          aria-label="TabUI 백엔드 재시작"
+        >
+          {serverRestarting ? <RefreshCw className="spin" size={17} /> : connected ? <Server size={17} /> : <WifiOff size={17} />}
+          <span>SERVER<strong>{serverRestarting ? 'RESTARTING' : serverActionError ? 'FAILED' : connected ? 'ONLINE' : 'OFFLINE'}</strong></span>
+        </button>
+        <button
+          className={`status-block compact interactive ${hasDeviceError || controllerActionError ? 'warn' : deviceConnected ? 'ok' : 'warn'}`}
+          type="button"
+          disabled={!connected || isMock || controllerRefreshing || serverRestarting}
+          onClick={onRefreshController}
+          title={controllerActionError ?? (isMock ? 'MOCK 모드에는 실제 ESP32_A 연결이 없습니다' : state.link.error ?? 'ESP32_A USB 연결 다시 탐색')}
+          aria-label="ESP32_A USB 연결 갱신"
+        >
+          {controllerRefreshing ? <RefreshCw className="spin" size={17} /> : <Cpu size={17} />}
+          <span>CONTROLLER<strong>{controllerRefreshing ? 'REFRESHING' : controllerActionError ? 'FAILED' : hasDeviceError ? 'REJECTED' : !connected ? 'WAITING' : isMock ? 'MOCK' : deviceConnected ? 'ESP32_A' : 'WAITING'}</strong></span>
+        </button>
         <div
           className={`status-block compact ${downstream === 'ok' ? 'ok' : 'warn'}`}
           title={diagnosticTitle}

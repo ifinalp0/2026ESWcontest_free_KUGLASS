@@ -35,6 +35,8 @@ ESP32_A GND       --- ESP32_B GND
 - on-demand ESP32_A OV2640 영상
 - A의 target/commanded MI와 B의 applied MI 분리
 - SERVER, ESP32_A, ESP32_B의 online·stale·Fault 분리
+- Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
+- Topbar `SERVER` 버튼의 현재 실행 인자 유지 백엔드 재시작
 - LIVE, MOCK, REPLAY의 명시적 구분
 
 LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습니다. MOCK으로
@@ -154,11 +156,18 @@ MOCK에는 실제 frame이 없으므로 viewer 대기 상태만 확인할 수 �
 | `GET /api/camera/status` | 영상 lease, 최신 frame, FPS와 검사 오류 |
 | `GET /api/camera/frame?after=<seq>` | 새 frame이 있을 때 JPEG 반환 |
 | `POST /api/command` | 고수준 UI 명령 |
+| `POST /api/controller/reconnect` | 현재 CDC handle을 닫고 ESP32_A USB 포트를 즉시 다시 탐색·연결 |
+| `POST /api/server/restart` | 응답 후 현재 인자를 유지해 TabUI 백엔드 프로세스 재시작 |
 | `GET /demo` | 태블릿 HMI |
 
 ## 안전과 네트워크
 
 - 장치가 없거나 LIVE telemetry가 stale이면 명령을 HTTP 503으로 거부합니다.
+- `CONTROLLER` 갱신 직후에는 새 ESP32_A telemetry가 올 때까지 LIVE 명령을
+  차단합니다. MOCK에서는 실제 USB 장치가 없으므로 이 버튼을 비활성화합니다.
+- `SERVER` 재시작 동안 브라우저에는 잠시 OFFLINE이 표시될 수 있습니다.
+  재시작은 MacBook↔ESP32_A gateway만 끊으며 ESP32_A의 AUTO와 A→B heartbeat를
+  재계산하거나 대신하지 않습니다.
 - 채널 slider는 채널별 최신 값만 75 ms 간격으로 전달합니다.
 - replay는 `TabUI/data/replays`의 상태 snapshot이며 감사 로그나 제어 완료 증거가
   아닙니다.

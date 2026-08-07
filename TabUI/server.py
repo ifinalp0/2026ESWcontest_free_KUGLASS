@@ -5,6 +5,8 @@ import json
 import mimetypes
 import os
 import re
+import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,7 +53,15 @@ class TabUIServer(ThreadingHTTPServer):
         self.gateway = gateway
         self.dist_root = dist_root.resolve()
         self.replays = ReplayStore(data_dir)
+        self.restart_requested = threading.Event()
         super().__init__(server_address, TabUIHandler)
+
+    def request_restart(self) -> bool:
+        if self.restart_requested.is_set():
+            return False
+        self.restart_requested.set()
+        threading.Thread(target=self.shutdown, name="tabui-server-restart", daemon=True).start()
+        return True
 
 
 class TabUIHandler(BaseHTTPRequestHandler):
@@ -116,6 +126,21 @@ class TabUIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = urlsplit(self.path).path
+        if route == "/api/controller/reconnect":
+            try:
+                result = self.server.gateway.reconnect_controller()
+                self._send_json({"ok": True, **result, "state": self.server.gateway.snapshot()}, 202)
+            except CommandError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, exc.status)
+            return
+        if route == "/api/server/restart":
+            if self.server.restart_requested.is_set():
+                self._send_json({"ok": True, "restarting": True}, 202)
+                return
+            self._send_json({"ok": True, "restarting": True}, 202)
+            self.wfile.flush()
+            self.server.request_restart()
+            return
         if route != "/api/command":
             self._send_json({"ok": False, "error": "not found"}, 404)
             return
@@ -227,6 +252,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def restart_current_process() -> None:
+    script = str(Path(__file__).resolve())
+    os.execv(sys.executable, [sys.executable, script, *sys.argv[1:]])
+
+
 def main() -> None:
     args = parse_args()
     gateway = ESP32AGateway.create(
@@ -245,6 +275,8 @@ def main() -> None:
     finally:
         server.server_close()
         gateway.close()
+    if server.restart_requested.is_set():
+        restart_current_process()
 
 
 if __name__ == "__main__":

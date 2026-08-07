@@ -28,6 +28,8 @@ class Transport(Protocol):
 
     def read_lines(self) -> list[str]: ...
 
+    def reconnect(self) -> bool: ...
+
     def close(self) -> None: ...
 
 
@@ -129,6 +131,14 @@ class UsbCdcTransport:
             self._rx_buffer.clear()
             self._discarding_oversize_line = False
             self._camera_frames.clear()
+
+    def reconnect(self) -> bool:
+        """Close the current CDC handle and immediately rediscover/reopen ESP32_A."""
+
+        with self._lock:
+            self._disconnect("ESP32_A reconnect requested")
+            self._last_open_attempt = float("-inf")
+            return self._ensure_open()
 
     def read_camera_frames(self) -> list[CameraFrame]:
         with self._lock:
@@ -340,6 +350,9 @@ class MockTransport:
             lines = list(self._outgoing)
             self._outgoing.clear()
             return lines
+
+    def reconnect(self) -> bool:
+        return True
 
     def close(self) -> None:
         return
