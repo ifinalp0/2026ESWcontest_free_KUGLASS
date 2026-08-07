@@ -71,6 +71,25 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(channel["targetMi"], 0.0)
         self.assertIsNotNone(channel["manualUntil"])
 
+    def test_backend_runtime_can_stop_and_start_without_restarting_http_owner(self) -> None:
+        self.wait_for(lambda: self.gateway.link_snapshot()["hardwareConnected"])
+        self.assertTrue(self.gateway.link_snapshot()["backendRunning"])
+
+        self.assertTrue(self.gateway.stop())
+        stopped = self.gateway.link_snapshot()
+        self.assertFalse(stopped["backendRunning"])
+        self.assertFalse(stopped["hardwareConnected"])
+        self.assertEqual(stopped["downstreamError"], "BACKEND_STOPPED")
+        with self.assertRaises(CommandError) as raised:
+            self.gateway.submit({"type": "returnAuto"})
+        self.assertEqual(raised.exception.status, 503)
+        self.assertFalse(self.gateway.stop())
+
+        self.assertTrue(self.gateway.start())
+        self.assertFalse(self.gateway.start())
+        self.wait_for(lambda: self.gateway.link_snapshot()["hardwareConnected"])
+        self.assertTrue(self.gateway.link_snapshot()["backendRunning"])
+
 
 class DisconnectedTransport:
     mode = "usb"

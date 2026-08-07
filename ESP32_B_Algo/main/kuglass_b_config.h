@@ -17,9 +17,9 @@ static constexpr uint8_t KUGLASS_CHANNEL_COUNT = 4;
 static constexpr uint32_t KUGLASS_DEFAULT_TTL_MS = 250;
 static constexpr uint32_t KUGLASS_OUTPUT_UPDATE_MS = 1;
 // A raw FAULT_N falling edge still cuts the channel immediately. Requiring
-// three consecutive output-task samples only prevents a brief LOW glitch from
+// five consecutive output-task samples prevent a brief LOW glitch from
 // becoming a reset-required latched fault.
-static constexpr uint8_t KUGLASS_FAULT_CONFIRM_SAMPLES = 3;
+static constexpr uint8_t KUGLASS_FAULT_CONFIRM_SAMPLES = 5;
 static constexpr uint32_t KUGLASS_DIRECTION_BLANKING_MS = 1;
 static constexpr uint32_t KUGLASS_SAFETY_WATCHDOG_MS = 100;
 static constexpr uint32_t KUGLASS_ANALOG_SCAN_PERIOD_MS = 5;

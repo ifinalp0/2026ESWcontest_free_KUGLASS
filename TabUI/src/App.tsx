@@ -21,11 +21,11 @@ export default function App() {
     connected,
     sendCommand,
     refreshController,
-    restartServer,
+    toggleBackend,
     controllerRefreshing,
-    serverRestarting,
+    backendPowerChanging,
     controllerActionError,
-    serverActionError
+    backendPowerError
   } = useTabUIClient();
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [theme, setTheme] = useState<BrandTheme>(getInitialTheme);
@@ -50,11 +50,11 @@ export default function App() {
         onResetFault={() => sendCommand({ type: 'resetFault' })}
         onSaveReplay={() => sendCommand({ type: 'saveReplay' })}
         onRefreshController={refreshController}
-        onRestartServer={restartServer}
+        onToggleBackend={toggleBackend}
         controllerRefreshing={controllerRefreshing}
-        serverRestarting={serverRestarting}
+        backendPowerChanging={backendPowerChanging}
         controllerActionError={controllerActionError}
-        serverActionError={serverActionError}
+        backendPowerError={backendPowerError}
       />
       <ScenarioBar active={state.demoMode} sendCommand={sendCommand} enabled={controllerAvailable} />
       <section className="dashboard-grid">

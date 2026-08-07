@@ -341,6 +341,7 @@ export function AdminPage() {
           <div className="admin-card-body split-data">
             <dl>
               <DataRow label="TabUI server" value={connected ? 'ONLINE' : 'OFFLINE'} />
+              <DataRow label="Backend runtime" value={state.link.backendRunning ? 'RUNNING' : 'STOPPED'} />
               <DataRow label="Runtime transport" value={state.link.transport.toUpperCase()} mono />
               <DataRow label="USB port" value={state.link.port ?? (state.link.transport === 'mock' ? 'N/A · MOCK' : 'AUTO / 미탐색')} mono />
               <DataRow label="A last telemetry" value={ageLabel(state.link.lastTelemetryAt)} />

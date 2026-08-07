@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { AlertTriangle, Cable, Cpu, Download, RefreshCw, Server, ShieldAlert, WifiOff } from 'lucide-react';
+import { AlertTriangle, Cable, Cpu, Download, Power, RefreshCw, ShieldAlert } from 'lucide-react';
 import type { SimulationState } from '../types';
 
 interface Props {
@@ -9,11 +9,11 @@ interface Props {
   onResetFault: () => void;
   onSaveReplay: () => void;
   onRefreshController: () => void;
-  onRestartServer: () => void;
+  onToggleBackend: () => void;
   controllerRefreshing: boolean;
-  serverRestarting: boolean;
+  backendPowerChanging: boolean;
   controllerActionError: string | null;
-  serverActionError: string | null;
+  backendPowerError: string | null;
 }
 
 type DownstreamStatus = 'ok' | 'waiting' | 'stale' | 'fault';
@@ -46,16 +46,17 @@ export function TopBar({
   onResetFault,
   onSaveReplay,
   onRefreshController,
-  onRestartServer,
+  onToggleBackend,
   controllerRefreshing,
-  serverRestarting,
+  backendPowerChanging,
   controllerActionError,
-  serverActionError
+  backendPowerError
 }: Props) {
   const hasFault = state.channels.some((channel) => channel.fault);
   const diagnostics = state.downstreamDiagnostics;
   const hasOperationalFault = diagnostics.operationalFault || hasFault;
   const isMock = state.link.transport === 'mock';
+  const backendRunning = connected && state.link.backendRunning;
   const deviceConnected = connected && state.link.hardwareConnected;
   const hasDeviceError = connected && Boolean(state.link.error);
   const downstream = state.link.downstreamHealthy === true && hasOperationalFault
@@ -115,20 +116,20 @@ export function TopBar({
       </div>
       <div className="topbar-status">
         <button
-          className={`status-block compact interactive ${connected && !serverActionError ? 'ok' : 'warn'}`}
+          className={`status-block compact interactive ${backendRunning && !backendPowerError ? 'ok' : 'warn'}`}
           type="button"
-          disabled={!connected || controllerRefreshing || serverRestarting}
-          onClick={onRestartServer}
-          title={serverActionError ?? (connected ? 'TabUI 백엔드 재시작' : 'TabUI 백엔드 연결 끊김')}
-          aria-label="TabUI 백엔드 재시작"
+          disabled={!connected || controllerRefreshing || backendPowerChanging}
+          onClick={onToggleBackend}
+          title={backendPowerError ?? (!connected ? 'TabUI HTTP 제어 셸 연결 끊김' : backendRunning ? 'ESP32_A gateway 백엔드 종료' : 'ESP32_A gateway 백엔드 시동')}
+          aria-label={backendRunning ? 'TabUI 백엔드 종료' : 'TabUI 백엔드 시동'}
         >
-          {serverRestarting ? <RefreshCw className="spin" size={17} /> : connected ? <Server size={17} /> : <WifiOff size={17} />}
-          <span>SERVER<strong>{serverRestarting ? 'RESTARTING' : serverActionError ? 'FAILED' : connected ? 'ONLINE' : 'OFFLINE'}</strong></span>
+          {backendPowerChanging ? <RefreshCw className="spin" size={17} /> : <Power size={17} />}
+          <span>BACKEND<strong>{backendPowerChanging ? backendRunning ? 'STOPPING' : 'STARTING' : backendPowerError ? 'FAILED' : !connected ? 'OFFLINE' : backendRunning ? 'RUNNING' : 'STOPPED'}</strong></span>
         </button>
         <button
           className={`status-block compact interactive ${hasDeviceError || controllerActionError ? 'warn' : deviceConnected ? 'ok' : 'warn'}`}
           type="button"
-          disabled={!connected || isMock || controllerRefreshing || serverRestarting}
+          disabled={!connected || !state.link.backendRunning || isMock || controllerRefreshing || backendPowerChanging}
           onClick={onRefreshController}
           title={controllerActionError ?? (isMock ? 'MOCK 모드에는 실제 ESP32_A 연결이 없습니다' : state.link.error ?? 'ESP32_A USB 연결 다시 탐색')}
           aria-label="ESP32_A USB 연결 갱신"

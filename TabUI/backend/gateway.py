@@ -37,12 +37,16 @@ class ESP32AGateway:
         self._last_manual_write_at: dict[int, float] = {}
         self._running = threading.Event()
         self._thread: threading.Thread | None = None
+        # A constructed gateway is enabled by default for compatibility with
+        # synchronous host use; start() attaches its background worker.
+        self._runtime_stopped = False
         self._last_telemetry_at: float | None = None
         self._last_command_seq = 0
         self._gateway_error: str | None = None
         self._camera_stream_requested = False
         self._camera_lock = threading.Lock()
         self._transport_lock = threading.RLock()
+        self._lifecycle_lock = threading.RLock()
         self._drop_commands_until_telemetry = False
 
     @classmethod
@@ -65,23 +69,71 @@ class ESP32AGateway:
     def diagnostics_enabled(self) -> bool:
         return self.transport.mode == "mock" or self.hil_enabled
 
-    def start(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
-        self._running.set()
-        self._thread = threading.Thread(target=self._run, name="esp32-a-gateway", daemon=True)
-        self._thread.start()
+    @property
+    def runtime_running(self) -> bool:
+        return not self._runtime_stopped and (
+            self._thread is None or self._thread.is_alive()
+        )
+
+    def start(self) -> bool:
+        """Start the ESP32_A gateway while the HTTP control shell stays alive."""
+
+        with self._lifecycle_lock:
+            if self._thread and self._thread.is_alive():
+                return False
+            changed = not self.runtime_running
+            self._runtime_stopped = False
+            self._last_telemetry_at = None
+            self._gateway_error = None
+            self._drop_commands_until_telemetry = self.transport.mode != "mock"
+            self.state.reset_firmware_handshake()
+            self.camera.clear()
+            with self._camera_lock:
+                self._camera_stream_requested = False
+            self._running.set()
+            self._thread = threading.Thread(target=self._run, name="esp32-a-gateway", daemon=True)
+            self._thread.start()
+            return changed
+
+    def stop(self) -> bool:
+        """Stop USB/MOCK gateway work without stopping the HTTP control shell."""
+
+        with self._lifecycle_lock:
+            was_running = self.runtime_running
+            self._runtime_stopped = True
+            self._running.clear()
+            thread = self._thread
+            if thread and thread is not threading.current_thread():
+                thread.join(timeout=1.0)
+            self._thread = None
+            with self._submit_lock:
+                self._pending_manual.clear()
+                self._last_manual_write_at.clear()
+                while True:
+                    try:
+                        self._outbox.get_nowait()
+                    except queue.Empty:
+                        break
+                    else:
+                        self._outbox.task_done()
+            with self._camera_lock:
+                self._camera_stream_requested = False
+            self.camera.clear()
+            self._gateway_error = None
+            self._drop_commands_until_telemetry = True
+            self.state.reset_firmware_handshake()
+            with self._transport_lock:
+                self.transport.close()
+            return was_running
 
     def close(self) -> None:
-        self._running.clear()
-        if self._thread:
-            self._thread.join(timeout=1.0)
-        with self._transport_lock:
-            self.transport.close()
+        self.stop()
 
     def reconnect_controller(self) -> dict[str, Any]:
         """Start a fresh ESP32_A USB session without changing the runtime mode."""
 
+        if not self.runtime_running:
+            raise CommandError("TabUI backend runtime is stopped", 409)
         if self.transport.mode != "usb":
             raise CommandError("ESP32_A reconnect is available only in LIVE USB mode", 409)
         with self._transport_lock:
@@ -98,6 +150,8 @@ class ESP32AGateway:
         }
 
     def submit(self, payload: dict[str, Any]) -> list[int]:
+        if not self.runtime_running:
+            raise CommandError("TabUI backend runtime is stopped", 503)
         messages = translate_ui_command(
             payload,
             self._next_seq,
@@ -141,9 +195,11 @@ class ESP32AGateway:
 
     def link_snapshot(self) -> dict[str, Any]:
         now = time.monotonic()
+        runtime_running = self.runtime_running
         hardware_connected = self._hardware_connected(now)
         downstream = self.state.snapshot()["downstreamDiagnostics"]
         return {
+            "backendRunning": runtime_running,
             "transport": self.transport.mode,
             "hardwareConnected": hardware_connected,
             "hilEnabled": self.diagnostics_enabled,
@@ -154,8 +210,14 @@ class ESP32AGateway:
             "lastAckCommand": self.state.last_ack_command,
             "lastAckOk": self.state.last_ack_ok,
             "lastAckError": self.state.last_ack_error,
-            "downstreamHealthy": self.state.downstream_healthy,
-            "downstreamError": self.state.downstream_error,
+            "downstreamHealthy": self.state.downstream_healthy if hardware_connected else None,
+            "downstreamError": (
+                self.state.downstream_error
+                if hardware_connected
+                else "WAITING_A_TELEMETRY"
+                if runtime_running
+                else "BACKEND_STOPPED"
+            ),
             "downstreamOperationalFault": downstream["operationalFault"],
             "downstreamBootId": downstream["bootId"],
             "downstreamStatusSeq": downstream["statusSeq"],
@@ -165,7 +227,11 @@ class ESP32AGateway:
             "downstreamDiagnostic": downstream["diagnostic"],
             "downstreamControlResult": downstream["controlResult"],
             "downstreamAdc": downstream["adc"],
-            "error": self.state.last_device_error or self._gateway_error or self.transport.error,
+            "error": (
+                self.state.last_device_error or self._gateway_error or self.transport.error
+                if runtime_running
+                else None
+            ),
         }
 
     def camera_snapshot(self) -> CameraFrame | None:
@@ -177,6 +243,7 @@ class ESP32AGateway:
         bad_frames = int(getattr(self.transport, "bad_camera_frames", 0))
         status = self.camera.status(requested=requested, bad_frames=bad_frames)
         status["hardwareConnected"] = self._hardware_connected()
+        status["backendRunning"] = self.runtime_running
         status["transport"] = self.transport.mode
         return status
 
@@ -249,6 +316,8 @@ class ESP32AGateway:
                     self.camera.update(frame)
 
     def _hardware_connected(self, now: float | None = None) -> bool:
+        if not self.runtime_running:
+            return False
         if not self.transport.connected:
             return False
         if self.transport.mode == "mock":

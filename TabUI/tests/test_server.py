@@ -37,13 +37,30 @@ class ServerDefaultsTests(unittest.TestCase):
 class FakeGateway:
     def __init__(self) -> None:
         self.reconnect_count = 0
+        self.runtime_running = True
+
+    def start(self) -> bool:
+        changed = not self.runtime_running
+        self.runtime_running = True
+        return changed
+
+    def stop(self) -> bool:
+        changed = self.runtime_running
+        self.runtime_running = False
+        return changed
 
     def reconnect_controller(self) -> dict[str, object]:
         self.reconnect_count += 1
         return {"requested": True, "portOpen": True, "link": {"hardwareConnected": False}}
 
     def snapshot(self) -> dict[str, object]:
-        return {"schemaVersion": 1, "link": {"hardwareConnected": False}}
+        return {
+            "schemaVersion": 1,
+            "link": {
+                "backendRunning": self.runtime_running,
+                "hardwareConnected": False,
+            },
+        }
 
 
 class FakeServer:
@@ -82,6 +99,19 @@ class MaintenanceEndpointTests(unittest.TestCase):
         self.assertTrue(payload["requested"])
         self.assertEqual(self.server.gateway.reconnect_count, 1)
         self.assertIn("state", payload)
+
+    def test_backend_power_endpoints_keep_http_shell_available(self) -> None:
+        status, payload = self.post("/api/backend/stop")
+        self.assertEqual(status, 202)
+        self.assertTrue(payload["changed"])
+        self.assertFalse(payload["running"])
+        self.assertFalse(payload["state"]["link"]["backendRunning"])
+
+        status, payload = self.post("/api/backend/start")
+        self.assertEqual(status, 202)
+        self.assertTrue(payload["changed"])
+        self.assertTrue(payload["running"])
+        self.assertTrue(payload["state"]["link"]["backendRunning"])
 
     def test_server_restart_endpoint_requests_shutdown_after_response(self) -> None:
         status, payload = self.post("/api/server/restart")

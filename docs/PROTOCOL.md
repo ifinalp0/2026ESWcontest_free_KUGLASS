@@ -97,7 +97,7 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
   유효 reset 시도 후 교체된다.
 - `ch[].mi`는 B가 실제 적용 중인 값이며 safe-off 시 0.0이다.
 - `FAULT_N` falling edge는 해당 채널 출력을 즉시 차단한다. 1 ms 출력 주기에서
-  3회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
+  5회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
   `ch[].fault`에 표시되고 그 채널의 `mi`만 0.0이 된다. 그 전에 HIGH로 복귀한
   glitch는 자동 복구한다. `fault_code`는 E-Stop, 통신과 명령 오류처럼
   controller-wide 차단 원인을 나타내며, 정상인 나머지 채널은 활성 command

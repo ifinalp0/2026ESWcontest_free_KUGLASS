@@ -10,10 +10,13 @@ export interface TabUIClient {
   connected: boolean;
   sendCommand: (command: ControlCommand) => void;
   refreshController: () => void;
+  toggleBackend: () => void;
   restartServer: () => void;
   controllerRefreshing: boolean;
+  backendPowerChanging: boolean;
   serverRestarting: boolean;
   controllerActionError: string | null;
+  backendPowerError: string | null;
   serverActionError: string | null;
 }
 
@@ -61,8 +64,10 @@ export function useTabUIClient(): TabUIClient {
   const [connected, setConnected] = useState(false);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [controllerRefreshing, setControllerRefreshing] = useState(false);
+  const [backendPowerChanging, setBackendPowerChanging] = useState(false);
   const [serverRestarting, setServerRestarting] = useState(false);
   const [controllerActionError, setControllerActionError] = useState<string | null>(null);
+  const [backendPowerError, setBackendPowerError] = useState<string | null>(null);
   const [serverActionError, setServerActionError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const requestInFlightRef = useRef(false);
@@ -142,7 +147,7 @@ export function useTabUIClient(): TabUIClient {
   };
 
   const refreshController = () => {
-    if (controllerRefreshing || serverRestarting) {
+    if (controllerRefreshing || backendPowerChanging || serverRestarting || !state.link.backendRunning) {
       return;
     }
     setControllerRefreshing(true);
@@ -172,6 +177,43 @@ export function useTabUIClient(): TabUIClient {
       .finally(() => {
         if (mountedRef.current) {
           setControllerRefreshing(false);
+        }
+      });
+  };
+
+  const toggleBackend = () => {
+    if (!connected || backendPowerChanging) {
+      return;
+    }
+    const nextRunning = !state.link.backendRunning;
+    setBackendPowerChanging(true);
+    setBackendPowerError(null);
+    void fetch(`${backendUrl}/api/backend/${nextRunning ? 'start' : 'stop'}`, { method: 'POST' })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as {
+          state?: Partial<SimulationState>;
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(result.error ?? `backend power HTTP ${response.status}`);
+        }
+        if (result.state && mountedRef.current) {
+          setState((current) => mergeSnapshot(current, result.state ?? {}));
+        }
+        if (mountedRef.current) {
+          setConnected(true);
+          setCommandError(null);
+        }
+        void refreshState();
+      })
+      .catch((error: unknown) => {
+        if (mountedRef.current) {
+          setBackendPowerError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (mountedRef.current) {
+          setBackendPowerChanging(false);
         }
       });
   };
@@ -213,10 +255,13 @@ export function useTabUIClient(): TabUIClient {
     connected,
     sendCommand,
     refreshController,
+    toggleBackend,
     restartServer,
     controllerRefreshing,
+    backendPowerChanging,
     serverRestarting,
     controllerActionError,
+    backendPowerError,
     serverActionError
   };
 }

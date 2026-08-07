@@ -126,6 +126,16 @@ class TabUIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = urlsplit(self.path).path
+        if route in {"/api/backend/start", "/api/backend/stop"}:
+            running = route.endswith("/start")
+            changed = self.server.gateway.start() if running else self.server.gateway.stop()
+            self._send_json({
+                "ok": True,
+                "running": self.server.gateway.runtime_running,
+                "changed": changed,
+                "state": self.server.gateway.snapshot(),
+            }, 202)
+            return
         if route == "/api/controller/reconnect":
             try:
                 result = self.server.gateway.reconnect_controller()

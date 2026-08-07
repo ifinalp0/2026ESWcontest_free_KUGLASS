@@ -36,7 +36,7 @@ ESP32_A GND       --- ESP32_B GND
 - A의 target/commanded MI와 B의 applied MI 분리
 - SERVER, ESP32_A, ESP32_B의 online·stale·Fault 분리
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
-- Topbar `SERVER` 버튼의 현재 실행 인자 유지 백엔드 재시작
+- Topbar `BACKEND` 전원 버튼의 ESP32_A gateway 런타임 시작·종료
 - `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
 - `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI·TTL 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
@@ -67,6 +67,13 @@ npm start
 사용하며, 잠금을 다시 닫으면 전체 `return_auto`를 요청합니다. ESP32_B status는
 적용 MI와 Fault를 회신하지만 적용 Enable을 직접 회신하지 않으므로 관리자 화면은
 이를 추정값으로 표시하지 않습니다.
+
+Topbar의 `BACKEND` 전원 버튼은 HTTP 화면을 제공하는 최소 제어 셸은 유지한 채
+ESP32_A USB gateway, 명령 queue와 카메라 lease를 함께 시작·종료합니다. 브라우저는
+완전히 종료된 로컬 프로세스를 다시 실행할 수 없으므로 최초 한 번은
+`npm run start:open`으로 TabUI를 실행해야 합니다. `STOPPED`에서 버튼을 다시 누르면
+같은 실행 설정으로 gateway를 재시동하고 새 ESP32_A telemetry가 올 때까지 명령을
+차단합니다. 이 동작은 ESP32_A의 AUTO 정책이나 A→B heartbeat를 중단하지 않습니다.
 
 ### 백엔드·화면·ESP32_A 통합 실행
 
@@ -165,6 +172,8 @@ MOCK에는 실제 frame이 없으므로 viewer 대기 상태만 확인할 수 �
 | `GET /api/camera/frame?after=<seq>` | 새 frame이 있을 때 JPEG 반환 |
 | `POST /api/command` | 고수준 UI 명령 |
 | `POST /api/controller/reconnect` | 현재 CDC handle을 닫고 ESP32_A USB 포트를 즉시 다시 탐색·연결 |
+| `POST /api/backend/start` | HTTP 제어 셸 안에서 ESP32_A gateway 런타임 시작 |
+| `POST /api/backend/stop` | HTTP 제어 셸은 유지하고 ESP32_A gateway 런타임 종료 |
 | `POST /api/server/restart` | 응답 후 현재 인자를 유지해 TabUI 백엔드 프로세스 재시작 |
 | `GET /demo` | 태블릿 HMI |
 | `GET /admin` | 통신·센서·출력 진단과 잠금형 관리자 수동 제어 화면 |
