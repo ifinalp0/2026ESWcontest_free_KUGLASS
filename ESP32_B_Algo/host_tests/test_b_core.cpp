@@ -191,25 +191,29 @@ int main() {
     channels.set_fault(0, true);
     channels.update(0.0f, true);
     assert(near(channels.channel(0)->applied_mi, 0.0f));
+    for (size_t i = 1; i < channels.count(); ++i) {
+        assert(near(channels.channel(i)->applied_mi, 0.0007f));
+        assert(!channels.channel(i)->faulted);
+    }
     channels.clear_faults();
 
     FaultManager fault;
     fault.begin();
     fault.note_command(100, 250);
-    fault.update(200, true, true);
+    fault.update(200, true);
     assert(!fault.faulted());
-    fault.update(351, true, true);
+    fault.update(351, true);
     assert(fault.code() == FaultCode::COMM_TIMEOUT);
     fault.reject_command();
     assert(fault.code() == FaultCode::INVALID_COMMAND);
     fault.note_command(400, 250);
     assert(!fault.faulted());
-    fault.update(450, false, true);
+    fault.update(450, false);
     assert(fault.code() == FaultCode::ESTOP);
-    fault.update(451, true, false);
+    fault.update(451, true);
     assert(fault.code() == FaultCode::ESTOP);
-    assert(!fault.clear_if_safe(false, true));
-    assert(fault.clear_if_safe(true, true));
+    assert(!fault.clear_if_safe(false));
+    assert(fault.clear_if_safe(true));
 
     AnalogMedianEwmaFilter filter;
     int filtered = 0;
@@ -262,6 +266,15 @@ int main() {
     assert(std::strstr(status, "\"raw_valid_mask\":255") != nullptr);
     assert(std::strstr(status, "\"id\":3") != nullptr);
     assert(std::strstr(status, "\"id\":4") == nullptr);
+    channels.set_fault(2, true);
+    assert(format_status_line(124, channels, fault, false, result_metadata,
+                              status, sizeof(status)));
+    assert(std::strstr(status,
+        "\"id\":1,\"mi\":0.0007,\"fault\":false") != nullptr);
+    assert(std::strstr(status,
+        "\"id\":2,\"mi\":0.0007,\"fault\":true") != nullptr);
+    assert(std::strstr(status, "\"fault_code\":\"NONE\"") != nullptr);
+    channels.clear_faults();
     assert(!format_status_line(124, channels, fault, false, result_metadata,
                                &analog, "bad-value", status, sizeof(status)));
     char small_status[32];
@@ -274,6 +287,20 @@ int main() {
     const StatusMetadata invalid_metadata = {0, 3004, nullptr};
     assert(!format_status_line(126, channels, fault, false, invalid_metadata,
                                status, sizeof(status)));
+
+    ChannelManager isolated_fault_channels;
+    isolated_fault_channels.begin();
+    assert(isolated_fault_channels.apply_command(maximum));
+    isolated_fault_channels.update(2.0f, true);
+    isolated_fault_channels.set_fault(2, true);
+    isolated_fault_channels.update(0.0f, true);
+    SpwmGenerator isolated_fault_waveform;
+    isolated_fault_waveform.begin(pinmap);
+    isolated_fault_waveform.tick(
+        isolated_fault_channels, 1.0f / 240.0f, true);
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        assert(isolated_fault_waveform.state(i)->enabled == (i != 2U));
+    }
 
     ChannelManager waveform_channels;
     waveform_channels.begin();

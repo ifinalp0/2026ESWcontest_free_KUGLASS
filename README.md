@@ -53,7 +53,7 @@ UART1은 115200 8-N-1이며 TX↔RX를 교차 연결합니다. TX끼리 또는 R
 | --- | --- | --- |
 | `TabUI/` | MacBook 백엔드, 브라우저 HMI, ESP32_A USB gateway | [TabUI README](TabUI/README.md) |
 | `ESP32_A_Algo/` | 카메라·온도, 정책, 목표 MI, A→B 통신 제품 펌웨어 | [ESP32_A README](ESP32_A_Algo/README.md) |
-| `ESP32_B_Algo/` | 4채널 SPWM, Fault/TTL safe-off 제품 펌웨어 | [ESP32_B README](ESP32_B_Algo/README.md) |
+| `ESP32_B_Algo/` | 4채널 SPWM, 채널별 Fault와 전역 TTL safe-off 제품 펌웨어 | [ESP32_B README](ESP32_B_Algo/README.md) |
 | `hardware/` | as-built 회로 원본, 기계 판독 계약, HIL 절차 | [hardware README](hardware/README.md) |
 | `docs/` | 시스템 구조, 통신, 검증 공통 문서 | [문서 안내](docs/README.md) |
 | `For_Test/` | 사용자가 대상을 지정할 때만 보는 독립 시험 코드 | [시험 영역 안내](For_Test/README.md) |
@@ -131,7 +131,8 @@ idf.py build
 현재 저장소에는 다음 항목이 구현되어 있습니다.
 
 - ESP32_A 카메라·DS18B20 입력, 정책, 수동 TTL, 20 Hz A→B heartbeat
-- ESP32_B strict full-frame 검증, 4채널 16 kHz/60 Hz SPWM, Fault/timeout safe-off
+- ESP32_B strict full-frame 검증, 4채널 16 kHz/60 Hz SPWM, 채널별 Fault 차단과
+  timeout 전체 safe-off
 - boot/session/challenge에 묶인 Fault reset과 결과 correlation
 - ESP32_B ADC 8채널 raw/mV 및 validity telemetry
 - TabUI LIVE/MOCK/REPLAY 상태 분리, 명령 gateway와 on-demand 카메라 영상

@@ -96,6 +96,9 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
 - `reset_challenge`는 nonzero u32 one-time reset 권한이다. safety trip 또는
   유효 reset 시도 후 교체된다.
 - `ch[].mi`는 B가 실제 적용 중인 값이며 safe-off 시 0.0이다.
+- Power Stage Fault는 해당 `ch[].fault`에만 표시되고 그 채널의 `mi`만 0.0이
+  된다. `fault_code`는 E-Stop, 통신과 명령 오류처럼 controller-wide 차단 원인을
+  나타내며, 정상인 나머지 채널은 활성 command lease를 계속 따른다.
 - `diagnostic`, `adc`, `control_result`는 선택 필드다.
 - canonical B formatter는 `adc`를 마지막 top-level field로 출력한다. A는 이
   순서를 포함해 유효한 JSON object field 순서에 의존하지 않는다.
@@ -116,8 +119,10 @@ ESP32_A는 부팅마다 nonzero u32 `source_session_id`를 만들고 최신 B st
 
 B는 대상 boot, one-time challenge, 실제 `EN_GLOBAL/FAULT_N` 상태와 새 safety
 event 부재를 확인한다. matching 요청이 안전하지 않아 실패하더라도 challenge를
-소비하여 같은 frame이 나중에 replay되어 fault를 지우지 못하게 한다. 성공 뒤에도
-새 actuator full frame을 받기 전까지 출력은 off다.
+소비하여 같은 frame이 나중에 replay되어 fault를 지우지 못하게 한다. E-Stop이나
+controller-wide fault reset 성공 뒤에는 새 actuator full frame 전까지 전체 출력이
+off다. 채널 Fault만 reset한 경우에는 정상 채널의 활성 lease를 유지하고, 복구된
+채널은 그 lease의 다음 출력 주기부터 다시 적용한다.
 
 결과는 다음 status의 `control_result`로 보고한다.
 

@@ -34,7 +34,7 @@ flowchart LR
 | --- | --- | --- |
 | TabUI | UI, 고수준 명령 검증, 상태 집계, replay snapshot, ESP32_A USB gateway | LIVE 자동 MI 계산, ESP32_B 직접 제어 |
 | ESP32_A | 카메라·온도 품질, 정책, LUT/MI servo, 수동 TTL, 권위 있는 목표 MI, A→B heartbeat | 전력 출력, 로컬 Power Stage 안전 차단 |
-| ESP32_B | full-frame 검증, 4채널 SPWM, E-Stop/Fault/timeout safe-off, 실제 적용 상태 | 센서 정책, 목표 MI 재계산 |
+| ESP32_B | full-frame 검증, 4채널 SPWM, E-Stop/timeout 전체 차단, 채널별 Fault 차단, 실제 적용 상태 | 센서 정책, 목표 MI 재계산 |
 | Logic Carrier | ESP32_B 탑재, `EN_GLOBAL AND ENABLE_CHx`, Fault pull-up, ADC filter, J7 분배 | complementary gate drive, 인증된 전원 차단 |
 | Power Stage ×4 | 채널별 H-Bridge, LC filter, `RUN_OK`, PDLC 출력, Fault/ADC feedback | 4채널 통합 제어, 목표 MI 결정 |
 

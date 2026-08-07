@@ -85,10 +85,17 @@ DRAM_ATTR volatile bool g_safety_outputs_ready = false;
 DRAM_ATTR volatile bool g_safety_trip_latched = false;
 DRAM_ATTR volatile uint32_t g_safety_trip_epoch = 0;
 DRAM_ATTR volatile uint32_t g_safety_trip_inflight = 0;
+DRAM_ATTR volatile bool
+    g_channel_trip_latched[KUGLASS_CHANNEL_COUNT] = {};
+DRAM_ATTR volatile uint32_t
+    g_channel_trip_epoch[KUGLASS_CHANNEL_COUNT] = {};
+DRAM_ATTR volatile uint32_t
+    g_channel_trip_inflight[KUGLASS_CHANNEL_COUNT] = {};
 DRAM_ATTR volatile uint32_t g_reset_challenge = 0;
 portMUX_TYPE g_safety_event_mux = portMUX_INITIALIZER_UNLOCKED;
 SafetyEventCounters g_acknowledged_events;
 uint32_t g_acknowledged_trip_epoch = 0;
+uint32_t g_acknowledged_channel_trip_epoch[KUGLASS_CHANNEL_COUNT] = {};
 
 uint32_t millis_now() {
     return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
@@ -104,6 +111,14 @@ void IRAM_ATTR disable_all_enables_from_isr() {
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
         (void)gpio_set_level(static_cast<gpio_num_t>(g_enable_gpios[i]), 0);
     }
+}
+
+void IRAM_ATTR disable_channel_enable_from_isr(size_t channel_index) {
+    if (!g_safety_outputs_ready || channel_index >= KUGLASS_CHANNEL_COUNT) {
+        return;
+    }
+    (void)gpio_set_level(
+        static_cast<gpio_num_t>(g_enable_gpios[channel_index]), 0);
 }
 
 uint32_t IRAM_ATTR atomic_add_safety_counter(volatile uint32_t* value,
@@ -151,14 +166,38 @@ void IRAM_ATTR finish_safety_trip_from_isr() {
     (void)atomic_add_safety_counter(&g_safety_trip_inflight, -1);
 }
 
+void IRAM_ATTR begin_channel_trip_from_isr(size_t channel_index) {
+    if (channel_index >= KUGLASS_CHANNEL_COUNT) return;
+    (void)atomic_add_safety_counter(
+        &g_channel_trip_inflight[channel_index], 1);
+    (void)atomic_add_safety_counter(
+        &g_channel_trip_epoch[channel_index], 1);
+    (void)rotate_reset_challenge();
+    g_channel_trip_latched[channel_index] = true;
+    __asm__ __volatile__("memw" ::: "memory");
+    disable_channel_enable_from_isr(channel_index);
+}
+
+void IRAM_ATTR finish_channel_trip_from_isr(size_t channel_index) {
+    if (channel_index >= KUGLASS_CHANNEL_COUNT) return;
+    (void)atomic_add_safety_counter(
+        &g_channel_trip_inflight[channel_index], -1);
+}
+
 void IRAM_ATTR latch_trip_and_disable_from_isr() {
     begin_safety_trip_from_isr();
     finish_safety_trip_from_isr();
 }
 
 void IRAM_ATTR safety_falling_edge_isr(void* argument) {
-    begin_safety_trip_from_isr();
     const uintptr_t event_index = reinterpret_cast<uintptr_t>(argument);
+    if (event_index == kEstopEventIndex) {
+        begin_safety_trip_from_isr();
+    } else if (event_index < KUGLASS_CHANNEL_COUNT) {
+        begin_channel_trip_from_isr(event_index);
+    } else {
+        return;
+    }
     portENTER_CRITICAL_ISR(&g_safety_event_mux);
     if (event_index == kEstopEventIndex) {
         g_estop_event_count = g_estop_event_count + 1U;
@@ -168,9 +207,17 @@ void IRAM_ATTR safety_falling_edge_isr(void* argument) {
     }
     // Cut again before releasing the lock. This also covers a commit that
     // started immediately before the lock-free trip became visible.
-    disable_all_enables_from_isr();
+    if (event_index == kEstopEventIndex) {
+        disable_all_enables_from_isr();
+    } else {
+        disable_channel_enable_from_isr(event_index);
+    }
     portEXIT_CRITICAL_ISR(&g_safety_event_mux);
-    finish_safety_trip_from_isr();
+    if (event_index == kEstopEventIndex) {
+        finish_safety_trip_from_isr();
+    } else {
+        finish_channel_trip_from_isr(event_index);
+    }
 }
 
 SafetyEventCounters safety_event_snapshot() {
@@ -193,16 +240,23 @@ bool safety_events_equal(const SafetyEventCounters& left,
     return true;
 }
 
-bool safety_events_pending(const SafetyEventCounters& events) {
+bool global_safety_event_pending(const SafetyEventCounters& events) {
     if (g_safety_trip_latched || g_safety_trip_inflight != 0U ||
         g_safety_trip_epoch != g_acknowledged_trip_epoch) {
         return true;
     }
-    if (events.estop != g_acknowledged_events.estop) return true;
-    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
-        if (events.channel[i] != g_acknowledged_events.channel[i]) return true;
-    }
-    return false;
+    return events.estop != g_acknowledged_events.estop;
+}
+
+bool channel_safety_event_pending(size_t channel_index,
+                                  const SafetyEventCounters& events) {
+    return channel_index >= KUGLASS_CHANNEL_COUNT ||
+        g_channel_trip_latched[channel_index] ||
+        g_channel_trip_inflight[channel_index] != 0U ||
+        g_channel_trip_epoch[channel_index] !=
+            g_acknowledged_channel_trip_epoch[channel_index] ||
+        events.channel[channel_index] !=
+            g_acknowledged_events.channel[channel_index];
 }
 
 bool commit_channel_enable_if_safe(size_t channel_index, void*) {
@@ -213,17 +267,22 @@ bool commit_channel_enable_if_safe(size_t channel_index, void*) {
     bool safe = false;
     portENTER_CRITICAL(&g_safety_event_mux);
     const uint32_t epoch_before = g_safety_trip_epoch;
+    const uint32_t channel_epoch_before =
+        g_channel_trip_epoch[channel_index];
     safe = !g_safety_trip_latched && g_safety_trip_inflight == 0U &&
         epoch_before == g_acknowledged_trip_epoch &&
         g_estop_event_count == g_acknowledged_events.estop &&
+        !g_channel_trip_latched[channel_index] &&
+        g_channel_trip_inflight[channel_index] == 0U &&
+        channel_epoch_before ==
+            g_acknowledged_channel_trip_epoch[channel_index] &&
+        g_channel_event_count[channel_index] ==
+            g_acknowledged_events.channel[channel_index] &&
         gpio_get_level(static_cast<gpio_num_t>(
-            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0;
-    for (size_t i = 0; safe && i < KUGLASS_CHANNEL_COUNT; ++i) {
-        safe = g_channel_event_count[i] ==
-                   g_acknowledged_events.channel[i] &&
-            gpio_get_level(static_cast<gpio_num_t>(
-                KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0;
-    }
+            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0 &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.channels[channel_index].fault_n_gpio)) !=
+            0;
     if (safe) {
         safe = gpio_set_level(static_cast<gpio_num_t>(
             KUGLASS_POWER_STAGE_PINMAP.channels[channel_index].enable_gpio),
@@ -234,20 +293,24 @@ bool commit_channel_enable_if_safe(size_t channel_index, void*) {
         if (g_safety_trip_latched || g_safety_trip_inflight != 0U ||
             g_safety_trip_epoch != epoch_before ||
             g_safety_trip_epoch != g_acknowledged_trip_epoch ||
-            g_estop_event_count != g_acknowledged_events.estop) {
+            g_estop_event_count != g_acknowledged_events.estop ||
+            g_channel_trip_latched[channel_index] ||
+            g_channel_trip_inflight[channel_index] != 0U ||
+            g_channel_trip_epoch[channel_index] != channel_epoch_before ||
+            g_channel_trip_epoch[channel_index] !=
+                g_acknowledged_channel_trip_epoch[channel_index] ||
+            g_channel_event_count[channel_index] !=
+                g_acknowledged_events.channel[channel_index]) {
             safe = false;
-        }
-        for (size_t i = 0; safe && i < KUGLASS_CHANNEL_COUNT; ++i) {
-            safe = g_channel_event_count[i] ==
-                       g_acknowledged_events.channel[i] &&
-                gpio_get_level(static_cast<gpio_num_t>(
-                    KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0;
         }
         if (safe) {
             safe = gpio_get_level(static_cast<gpio_num_t>(
-                KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0;
+                       KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0 &&
+                gpio_get_level(static_cast<gpio_num_t>(
+                    KUGLASS_POWER_STAGE_PINMAP.channels[channel_index]
+                        .fault_n_gpio)) != 0;
         }
-        if (!safe) disable_all_enables_from_isr();
+        if (!safe) disable_channel_enable_from_isr(channel_index);
     }
     portEXIT_CRITICAL(&g_safety_event_mux);
     return safe;
@@ -273,49 +336,83 @@ bool acknowledge_safety_events_if_inputs_high() {
     // the complete acknowledgement transaction.
     if (g_safety_trip_inflight != 0U) return false;
     const uint32_t candidate_epoch = g_safety_trip_epoch;
+    uint32_t candidate_channel_epoch[KUGLASS_CHANNEL_COUNT] = {};
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        if (g_channel_trip_inflight[i] != 0U) return false;
+        candidate_channel_epoch[i] = g_channel_trip_epoch[i];
+    }
     __asm__ __volatile__("memw" ::: "memory");
     if (g_safety_trip_inflight != 0U) return false;
     const SafetyEventCounters candidate = safety_event_snapshot();
     if (!physical_safety_inputs_high()) return false;
     portENTER_CRITICAL(&g_safety_event_mux);
+    const bool global_was_latched = g_safety_trip_latched;
+    bool channel_was_latched[KUGLASS_CHANNEL_COUNT] = {};
+    for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        channel_was_latched[i] = g_channel_trip_latched[i];
+    }
     bool accepted = g_safety_trip_inflight == 0U &&
         g_safety_trip_epoch == candidate_epoch &&
         g_estop_event_count == candidate.estop &&
         physical_safety_inputs_high();
     for (size_t i = 0; accepted && i < KUGLASS_CHANNEL_COUNT; ++i) {
-        accepted = g_channel_event_count[i] == candidate.channel[i];
+        accepted = g_channel_trip_inflight[i] == 0U &&
+            g_channel_trip_epoch[i] == candidate_channel_epoch[i] &&
+            g_channel_event_count[i] == candidate.channel[i];
     }
     if (accepted) {
         g_acknowledged_events = candidate;
         g_acknowledged_trip_epoch = candidate_epoch;
         g_safety_trip_latched = false;
+        for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+            g_acknowledged_channel_trip_epoch[i] =
+                candidate_channel_epoch[i];
+            g_channel_trip_latched[i] = false;
+        }
         __asm__ __volatile__("memw" ::: "memory");
         accepted = g_safety_trip_inflight == 0U &&
             g_safety_trip_epoch == candidate_epoch &&
             !g_safety_trip_latched && physical_safety_inputs_high();
+        for (size_t i = 0; accepted && i < KUGLASS_CHANNEL_COUNT; ++i) {
+            accepted = g_channel_trip_inflight[i] == 0U &&
+                g_channel_trip_epoch[i] == candidate_channel_epoch[i] &&
+                !g_channel_trip_latched[i];
+        }
     }
-    if (!accepted) g_safety_trip_latched = true;
+    if (!accepted) {
+        g_safety_trip_latched = global_was_latched ||
+            g_safety_trip_inflight != 0U ||
+            g_safety_trip_epoch != candidate_epoch ||
+            g_estop_event_count != candidate.estop ||
+            gpio_get_level(static_cast<gpio_num_t>(
+                KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) == 0;
+        for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+            g_channel_trip_latched[i] = channel_was_latched[i] ||
+                g_channel_trip_inflight[i] != 0U ||
+                g_channel_trip_epoch[i] != candidate_channel_epoch[i] ||
+                g_channel_event_count[i] != candidate.channel[i] ||
+                gpio_get_level(static_cast<gpio_num_t>(
+                    KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) == 0;
+        }
+    }
     portEXIT_CRITICAL(&g_safety_event_mux);
     return accepted;
 }
 
-bool inputs_ok(bool* estop_ok) {
-    if (estop_ok == nullptr) return false;
+void update_safety_inputs(bool* estop_ok) {
+    if (estop_ok == nullptr) return;
     const SafetyEventCounters events = safety_event_snapshot();
     *estop_ok =
         gpio_get_level(static_cast<gpio_num_t>(
             KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0 &&
-        events.estop == g_acknowledged_events.estop;
-    bool stages_ok = true;
+        !global_safety_event_pending(events);
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
         const bool channel_ok =
             gpio_get_level(static_cast<gpio_num_t>(
                 KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0 &&
-            events.channel[i] == g_acknowledged_events.channel[i];
+            !channel_safety_event_pending(i, events);
         g_channels.set_fault(i, !channel_ok);
-        stages_ok = stages_ok && channel_ok;
     }
-    return stages_ok;
 }
 
 bool estop_is_active() {
@@ -392,8 +489,6 @@ bool handle_reset_fault_line(const char* line) {
     if (!parse_reset_fault_line(line, &reset, &error)) return false;
 
     xSemaphoreTake(g_state_mutex, portMAX_DELAY);
-    g_spwm.force_safe();
-    g_channels.update(0.0f, false);
     const char* result_error = "NONE";
     bool cleared = false;
     if (reset.target_boot_id != g_boot_id) {
@@ -402,13 +497,18 @@ bool handle_reset_fault_line(const char* line) {
         result_error = "CHALLENGE_MISMATCH";
     } else if (acknowledge_safety_events_if_inputs_high()) {
         bool estop_ok = false;
-        const bool stages_ok = inputs_ok(&estop_ok);
-        cleared = g_fault.clear_if_safe(estop_ok, stages_ok);
+        update_safety_inputs(&estop_ok);
+        const bool global_fault_was_active = g_fault.faulted();
+        cleared = !global_fault_was_active || g_fault.clear_if_safe(estop_ok);
         if (cleared) {
             g_channels.clear_faults();
-            g_has_command = false;
-            g_last_command_ms = 0;
-            g_last_ttl_ms = KUGLASS_DEFAULT_TTL_MS;
+            if (global_fault_was_active) {
+                g_spwm.force_safe();
+                g_channels.update(0.0f, false);
+                g_has_command = false;
+                g_last_command_ms = 0;
+                g_last_ttl_ms = KUGLASS_DEFAULT_TTL_MS;
+            }
         }
     }
     if (!cleared && std::strcmp(result_error, "NONE") == 0) {
@@ -507,13 +607,13 @@ void output_task(void*) {
 
         xSemaphoreTake(g_state_mutex, portMAX_DELAY);
         bool estop_ok = false;
-        const bool stages_ok = inputs_ok(&estop_ok);
-        g_fault.update(now_ms, estop_ok, stages_ok);
+        update_safety_inputs(&estop_ok);
+        g_fault.update(now_ms, estop_ok);
         g_channels.update(dt_s, !g_fault.faulted());
 
         const SafetyEventCounters before_output = safety_event_snapshot();
         const bool pending_before_output =
-            safety_events_pending(before_output) || !stages_ok || !estop_ok;
+            global_safety_event_pending(before_output) || !estop_ok;
         if (pending_before_output) {
             g_channels.update(0.0f, false);
             g_spwm.force_safe();
@@ -524,10 +624,16 @@ void output_task(void*) {
             if (!safety_events_equal(before_output,
                                      safety_event_snapshot())) {
                 bool latest_estop_ok = false;
-                const bool latest_stages_ok = inputs_ok(&latest_estop_ok);
-                g_fault.update(now_ms, latest_estop_ok, latest_stages_ok);
-                g_channels.update(0.0f, false);
-                g_spwm.force_safe();
+                update_safety_inputs(&latest_estop_ok);
+                g_fault.update(now_ms, latest_estop_ok);
+                g_channels.update(0.0f, !g_fault.faulted());
+                if (!latest_estop_ok || g_fault.faulted()) {
+                    g_spwm.force_safe();
+                } else {
+                    // Re-apply the same phase without advancing it. Faulted
+                    // channels are forced low; healthy channels stay active.
+                    g_spwm.tick(g_channels, 0.0f, true);
+                }
             }
         }
         xSemaphoreGive(g_state_mutex);

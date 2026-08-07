@@ -26,19 +26,17 @@ void FaultManager::reject_command() {
     latch(FaultCode::INVALID_COMMAND);
 }
 
-void FaultManager::update(uint32_t now_ms, bool estop_ok, bool power_stages_ok) {
+void FaultManager::update(uint32_t now_ms, bool estop_ok) {
     if (!estop_ok) {
         latch(FaultCode::ESTOP);
-    } else if (!power_stages_ok) {
-        latch(FaultCode::POWER_STAGE_FAULT);
     } else if (!command_received_ ||
                static_cast<uint32_t>(now_ms - last_command_ms_) > ttl_ms_) {
         latch(FaultCode::COMM_TIMEOUT);
     }
 }
 
-bool FaultManager::clear_if_safe(bool estop_ok, bool power_stages_ok) {
-    if (!estop_ok || !power_stages_ok) return false;
+bool FaultManager::clear_if_safe(bool estop_ok) {
+    if (!estop_ok) return false;
     faulted_ = false;
     code_ = FaultCode::NONE;
     command_received_ = false;
@@ -51,7 +49,6 @@ const char* FaultManager::code_name() const {
         case FaultCode::COMM_TIMEOUT: return "COMM_TIMEOUT";
         case FaultCode::INVALID_COMMAND: return "INVALID_COMMAND";
         case FaultCode::ESTOP: return "ESTOP";
-        case FaultCode::POWER_STAGE_FAULT: return "POWER_STAGE_FAULT";
         default: return "UNKNOWN";
     }
 }
@@ -60,7 +57,6 @@ void FaultManager::latch(FaultCode code) {
     const auto priority = [](FaultCode value) {
         switch (value) {
             case FaultCode::ESTOP: return 4;
-            case FaultCode::POWER_STAGE_FAULT: return 3;
             case FaultCode::INVALID_COMMAND: return 2;
             case FaultCode::COMM_TIMEOUT: return 1;
             case FaultCode::NONE: return 0;

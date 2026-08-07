@@ -57,7 +57,9 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 - 펌웨어 초기화의 첫 출력이 `ENABLE LOW`와 `PWM force-low`인지 확인합니다.
 - J5 closed/open/disconnected에서 `EN_GLOBAL`과 네 U4 출력의 truth table을 확인합니다.
 - GPIO19의 reset/power-up waveform이 U4 enable에 미치는 영향을 측정합니다.
-- 각 `FAULT_N`을 LOW로 주입해 ISR latch, enable 차단, PWM force-low와 reset 전 재활성화 금지를 확인합니다.
+- 각 `FAULT_N_CHx`를 한 번에 하나씩 LOW로 주입해 ISR latch, 해당 채널의 enable
+  차단과 PWM force-low, reset 전 재활성화 금지를 확인합니다. 동시에 다른 세
+  채널의 enable/PWM과 활성 command lease가 중단되지 않는지 확인합니다.
 - GPIO3 temperature source가 연결된 cold boot를 반복하고 strapping failure 여부를 기록합니다.
 - GPIO38 RGB LED/RMT가 초기화되지 않는지 확인합니다.
 
@@ -70,7 +72,9 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
   확인합니다. ROM banner 자체를 malformed status로 세지 않습니다.
 - B reboot 때 `boot_id`와 `reset_challenge`, A reboot 때 `source_session_id`가 바뀌는지 확인합니다.
 - stale boot, stale challenge, replay, unsafe physical input에서 fault가 clear되지 않는지 확인합니다.
-- reset 성공 뒤 새 full actuator command 전까지 출력이 off인지 확인합니다.
+- E-Stop 등 전역 fault reset 성공 뒤 새 full actuator command 전까지 전체 출력이
+  off인지 확인합니다. 채널 Fault만 reset할 때 정상 채널은 계속 동작하고 복구
+  채널은 활성 lease의 다음 출력 주기부터 재적용되는지 확인합니다.
 - UART 단선, malformed/oversize JSON, stale sequence, TTL timeout과 task watchdog에서 safe-off를 확인합니다.
 
 ## 4. Power Stage logic-only 및 저전압

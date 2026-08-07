@@ -20,12 +20,12 @@
     {
       "id": "HW-004",
       "severity": "critical",
-      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a low level latches safe-off and a high level alone does not prove connector presence."
+      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a low level latches safe-off for that channel only, while a high level alone does not prove connector presence."
     },
     {
       "id": "HW-005",
       "severity": "critical",
-      "rule": "Output enable requires a valid full CH0-CH3 command, live TTL, EN_GLOBAL high, and every FAULT_N high."
+      "rule": "Output enable requires a valid full CH0-CH3 command, live TTL, and EN_GLOBAL high; each channel additionally requires its own FAULT_N high, independent of other channels."
     },
     {
       "id": "HW-006",

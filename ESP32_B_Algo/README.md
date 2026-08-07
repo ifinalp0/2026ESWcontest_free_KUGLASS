@@ -12,7 +12,8 @@ Carrier를 통해 단일 채널 Power Stage PCB 4장을 구동합니다.
 
 - A→B full-frame의 version, sequence, TTL, 채널 집합과 값 검증
 - CH0~CH3의 16 kHz carrier와 60 Hz polarity SPWM 생성
-- E-Stop, Power Stage Fault, invalid frame, timeout과 watchdog safe-off
+- E-Stop, invalid frame, timeout과 watchdog 전체 safe-off
+- Power Stage Fault의 채널별 latch와 해당 채널만 safe-off
 - 방향 전환 blanking과 MI slew
 - 실제 applied MI, Fault, ADC와 reset 결과 status 전송
 - boot/session/challenge에 묶인 latched Fault reset
@@ -23,9 +24,9 @@ Carrier를 통해 단일 채널 Power Stage PCB 4장을 구동합니다.
 | --- | --- |
 | `main/app_main.cpp` | 하드웨어 초기화, task와 link 조립 |
 | `main/control_protocol.*` | actuator/control frame 검증 |
-| `main/channel_manager.*` | full-frame 적용, MI slew와 출력 상태 |
+| `main/channel_manager.*` | full-frame 적용, 채널별 Fault 상태, MI slew와 출력 상태 |
 | `main/spwm_generator.*` | MCPWM, 60 Hz 위상과 방향 blanking |
-| `main/fault_manager.*` | E-Stop/Fault/timeout latch와 reset |
+| `main/fault_manager.*` | 전역 E-Stop/명령 오류/timeout latch와 reset |
 | `main/analog_monitor.*` | ADC1 8채널 sampling과 validity |
 | `main/status_reporter.*` | B status와 `control_result` |
 | `main/power_stage_pinmap.h` | Logic Carrier exact pin 계약 |
@@ -40,8 +41,9 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
 ```
 
 - 초기화 첫 단계에서 네 `ENABLE`을 LOW, MCPWM을 continuous force-low로 만듭니다.
-- `EN_GLOBAL`과 네 `FAULT_N` falling edge는 ISR에서 latch하고 software enable을
-  즉시 LOW로 내립니다.
+- `EN_GLOBAL` falling edge는 ISR에서 latch하고 네 software enable을 즉시 LOW로
+  내립니다. `FAULT_N_CHx` falling edge는 해당 채널의 enable만 즉시 LOW로 내리고
+  latch하며, 나머지 정상 채널은 활성 lease에 따라 계속 동작합니다.
 - invalid/oversize JSON, 불완전·중복 채널, 범위 밖 MI, 활성 lease의 stale
   sequence는 lease 전체를 무효화하고 safe-off합니다.
 - timeout과 output task watchdog도 `ENABLE LOW + PWM force-low + applied_mi=0`으로
@@ -101,7 +103,9 @@ Actuator command, B status와 Fault reset의 frame은
 - nonzero `boot_id`는 부팅 동안 유지되고, `reset_challenge`는 safety trip과 reset
   시도 후 교체됩니다.
 - E-Stop/Power Stage Fault는 입력이 HIGH로 돌아와도 latched 상태이며 안전 조건과
-  일치하는 reset이 필요합니다. 성공 뒤에도 새 full command 전까지 출력하지 않습니다.
+  일치하는 reset이 필요합니다. E-Stop 등 전역 fault reset 뒤에는 새 full command
+  전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상 채널 lease는 유지되고
+  복구 채널은 다음 출력 주기부터 다시 적용됩니다.
 - ADC는 5 ms마다 8채널을 scan하고 settling read, 5-sample median, EWMA 1/8을
   적용합니다. 100 ms보다 오래된 값은 invalid입니다.
 - current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
@@ -123,8 +127,8 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
-full frame, 0.95 clamp, hard safe-off, Fault priority, ADC filter/stale, status,
-direction blanking, ENABLE commit 거부와 JSONL 복구를 검사합니다.
+full frame, 0.95 clamp, 전역 hard safe-off, 채널별 Fault 격리, ADC filter/stale,
+status, direction blanking, ENABLE commit 거부와 JSONL 복구를 검사합니다.
 BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
 순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 

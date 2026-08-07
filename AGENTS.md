@@ -115,7 +115,7 @@ ESP32_A -> 상태·ACK·B 적용 MI/Fault -> TabUI -> 브라우저
   `ae_metadata_valid=false`로 보고하고 해당 정책 항에서 제외한다.
 - 카메라나 온도가 stale이면 결측으로 표시한다. 임의 기본값을 실제 측정값처럼
   사용하지 않는다.
-- 우선순위는 `E-Stop > latched Fault > Manual(TTL) > Demo/Auto`다.
+- 우선순위는 `E-Stop > 채널별 latched Fault > Manual(TTL) > Demo/Auto`다.
 - LIVE 연결이 끊기면 마지막 실제 상태를 `STALE/OFFLINE`으로 표시하고 명령을
   막는다. MOCK으로 자동 전환하지 않는다.
 - MOCK/REPLAY는 ESP32_A USB 장치를 열거나 ESP32_B 출력 명령을 만들지 않는다.
@@ -210,13 +210,14 @@ Logic Carrier 1장과 동일한 단일 채널 Power Stage 4장은 제작 완료�
 ### 안전 출력 순서
 
 - ESP32_B 부팅 시 네 `ENABLE=LOW`, PWM duty 0을 가장 먼저 보장한다.
-- 유효 full command와 TTL, `EN_GLOBAL=HIGH`, 모든 `FAULT_N=HIGH` 이전에는
-  enable하지 않는다.
+- 유효 full command와 TTL, `EN_GLOBAL=HIGH` 이전에는 어떤 채널도 enable하지
+  않는다. 각 채널은 자신의 `FAULT_N_CHx=HIGH`일 때만 enable한다.
 - 차단 시 enable LOW를 먼저 적용하고 PWM 0과 safe direction을 적용한다.
 - 방향 전환은 enable LOW, PWM force-low, blanking, DIR 변경, 안전 입력 재검사,
   재활성화 순서를 지킨다.
 - 최대 MI는 IRS2104 bootstrap refresh를 위해 0.95를 넘지 않는다.
-- E-Stop, latched Fault, 잘못된 frame, timeout, watchdog에서 safe-off한다.
+- E-Stop, 잘못된 frame, timeout, watchdog은 전체 safe-off한다. latched Power Stage
+  Fault는 해당 채널만 safe-off하고 나머지 정상 채널은 활성 lease를 계속 따른다.
 - Fault clear는 B가 target boot, one-time challenge와 실제 안전 입력을 확인한
   뒤에만 허용한다. unsafe matching 요청도 challenge를 소비해야 한다.
 - Power Stage/PDLC/HV는 외부 UART contention, ADC 입력·환산, Fault 차단을 HIL로
