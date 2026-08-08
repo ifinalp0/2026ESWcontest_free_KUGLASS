@@ -16,6 +16,13 @@
 static constexpr uint8_t KUGLASS_CHANNEL_COUNT = 4;
 static constexpr uint32_t KUGLASS_DEFAULT_TTL_MS = 250;
 static constexpr uint32_t KUGLASS_OUTPUT_UPDATE_MS = 1;
+// EN_GLOBAL always cuts CHx_ENABLE in hardware, and its falling-edge ISR
+// immediately lowers all MCU ENABLE requests. A reset-required ESTOP latch is
+// promoted only after ten consecutive output-task samples remain LOW. A
+// shorter event must then remain HIGH for ten consecutive samples before it
+// may be released as a glitch and wait for a fresh full command.
+static constexpr uint8_t KUGLASS_ESTOP_CONFIRM_SAMPLES = 10;
+static constexpr uint8_t KUGLASS_ESTOP_RELEASE_SAMPLES = 10;
 // A raw FAULT_N falling edge still cuts the channel immediately. Ten
 // consecutive output-task samples prevent brief or intermittent LOW noise
 // from becoming a reset-required latched fault. Any intervening HIGH restarts
@@ -38,5 +45,9 @@ static_assert(KUGLASS_MAX_MODULATION_INDEX > 0.0f &&
               "Bootstrap PWM requires a non-zero carrier off-time.");
 static_assert(KUGLASS_DIRECTION_BLANKING_MS >= KUGLASS_OUTPUT_UPDATE_MS,
               "Direction changes require at least one safe output update.");
+static_assert(KUGLASS_ESTOP_CONFIRM_SAMPLES >= 2,
+              "E-Stop qualification must reject one-sample LOW glitches.");
+static_assert(KUGLASS_ESTOP_RELEASE_SAMPLES >= 2,
+              "E-Stop glitch recovery requires a stable HIGH interval.");
 static_assert(KUGLASS_FAULT_CONFIRM_SAMPLES >= 2,
               "Fault qualification must reject at least one-sample glitches.");

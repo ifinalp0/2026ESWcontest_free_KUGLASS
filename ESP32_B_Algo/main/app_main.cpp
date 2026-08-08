@@ -1,6 +1,7 @@
 #include "analog_monitor.h"
 #include "channel_manager.h"
 #include "control_protocol.h"
+#include "estop_input_qualifier.h"
 #include "fault_manager.h"
 #include "fault_input_qualifier.h"
 #include "json_line_accumulator.h"
@@ -54,6 +55,7 @@ ChannelManager g_channels;
 FaultManager g_fault;
 [[maybe_unused]] SpwmGenerator g_spwm;
 AnalogMonitor g_analog;
+[[maybe_unused]] EstopInputQualifier g_estop_input_qualifier;
 [[maybe_unused]] FaultInputQualifier
     g_fault_input_qualifiers[KUGLASS_CHANNEL_COUNT];
 
@@ -74,6 +76,8 @@ uint32_t g_last_ttl_ms = KUGLASS_DEFAULT_TTL_MS;
 bool g_has_command = false;
 uint32_t g_status_seq = 0;
 uint32_t g_boot_id = 0;
+uint32_t g_estop_qualifier_event_count = 0;
+bool g_estop_rearm_pending = false;
 
 struct SafetyEventCounters {
     uint32_t estop = 0;
@@ -169,6 +173,19 @@ void IRAM_ATTR finish_safety_trip_from_isr() {
     (void)atomic_add_safety_counter(&g_safety_trip_inflight, -1);
 }
 
+void IRAM_ATTR begin_unqualified_estop_event_from_isr() {
+    // Raw EN_GLOBAL always cuts outputs immediately, but unlike watchdog and
+    // confirmed E-Stop trips this path does not yet rotate the reset challenge
+    // or create a reset-required latch. The output task qualifies its duration.
+    (void)atomic_add_safety_counter(&g_safety_trip_inflight, 1);
+    __asm__ __volatile__("memw" ::: "memory");
+    disable_all_enables_from_isr();
+}
+
+void IRAM_ATTR finish_unqualified_estop_event_from_isr() {
+    (void)atomic_add_safety_counter(&g_safety_trip_inflight, -1);
+}
+
 void IRAM_ATTR begin_channel_trip_from_isr(size_t channel_index) {
     if (channel_index >= KUGLASS_CHANNEL_COUNT) return;
     (void)atomic_add_safety_counter(
@@ -193,7 +210,7 @@ void IRAM_ATTR latch_trip_and_disable_from_isr() {
 void IRAM_ATTR safety_falling_edge_isr(void* argument) {
     const uintptr_t event_index = reinterpret_cast<uintptr_t>(argument);
     if (event_index == kEstopEventIndex) {
-        begin_safety_trip_from_isr();
+        begin_unqualified_estop_event_from_isr();
     } else if (event_index < KUGLASS_CHANNEL_COUNT) {
         begin_channel_trip_from_isr(event_index);
     } else {
@@ -215,7 +232,7 @@ void IRAM_ATTR safety_falling_edge_isr(void* argument) {
     }
     portEXIT_CRITICAL_ISR(&g_safety_event_mux);
     if (event_index == kEstopEventIndex) {
-        finish_safety_trip_from_isr();
+        finish_unqualified_estop_event_from_isr();
     } else {
         finish_channel_trip_from_isr(event_index);
     }
@@ -247,6 +264,72 @@ bool global_safety_event_pending(const SafetyEventCounters& events) {
         return true;
     }
     return events.estop != g_acknowledged_events.estop;
+}
+
+bool qualified_global_trip_pending() {
+    return g_safety_trip_latched ||
+        g_safety_trip_epoch != g_acknowledged_trip_epoch;
+}
+
+bool synthesize_estop_event_if_low() {
+    bool synthesized = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (!g_safety_trip_latched && g_safety_trip_inflight == 0U &&
+        g_estop_event_count == g_acknowledged_events.estop &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) == 0) {
+        // A LOW already present when interrupts were configured has no falling
+        // edge. Publish the same pending event that the ISR would have created.
+        g_estop_event_count = g_estop_event_count + 1U;
+        disable_all_enables_from_isr();
+        synthesized = true;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return synthesized;
+}
+
+bool confirm_estop_if_still_low(uint32_t expected_event_count) {
+    bool confirmed = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (g_safety_trip_inflight == 0U &&
+        g_estop_event_count == expected_event_count &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) == 0) {
+        if (!g_safety_trip_latched) {
+            (void)atomic_add_safety_counter(&g_safety_trip_epoch, 1);
+            (void)rotate_reset_challenge();
+            g_safety_trip_latched = true;
+            __asm__ __volatile__("memw" ::: "memory");
+        }
+        disable_all_enables_from_isr();
+        confirmed = true;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return confirmed;
+}
+
+bool release_unconfirmed_estop_event_if_high(
+        uint32_t expected_event_count) {
+    bool released = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (!g_safety_trip_latched && g_safety_trip_inflight == 0U &&
+        g_safety_trip_epoch == g_acknowledged_trip_epoch &&
+        g_estop_event_count == expected_event_count &&
+        gpio_get_level(static_cast<gpio_num_t>(
+            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0) {
+        const bool event_was_pending =
+            g_estop_event_count != g_acknowledged_events.estop;
+        g_acknowledged_events.estop = g_estop_event_count;
+        __asm__ __volatile__("memw" ::: "memory");
+        released = event_was_pending &&
+            !g_safety_trip_latched && g_safety_trip_inflight == 0U &&
+            g_safety_trip_epoch == g_acknowledged_trip_epoch &&
+            g_estop_event_count == expected_event_count &&
+            gpio_get_level(static_cast<gpio_num_t>(
+                KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return released;
 }
 
 bool channel_safety_event_pending(size_t channel_index,
@@ -329,6 +412,7 @@ bool commit_channel_enable_if_safe(size_t channel_index, void*) {
     const uint32_t channel_epoch_before =
         g_channel_trip_epoch[channel_index];
     safe = !g_safety_trip_latched && g_safety_trip_inflight == 0U &&
+        !g_estop_rearm_pending &&
         epoch_before == g_acknowledged_trip_epoch &&
         g_estop_event_count == g_acknowledged_events.estop &&
         !g_channel_trip_latched[channel_index] &&
@@ -350,6 +434,7 @@ bool commit_channel_enable_if_safe(size_t channel_index, void*) {
         // The ISR can publish a trip and cut GPIO without taking this mux.
         // Checking after the HIGH write closes the ISR-before-commit race.
         if (g_safety_trip_latched || g_safety_trip_inflight != 0U ||
+            g_estop_rearm_pending ||
             g_safety_trip_epoch != epoch_before ||
             g_safety_trip_epoch != g_acknowledged_trip_epoch ||
             g_estop_event_count != g_acknowledged_events.estop ||
@@ -411,6 +496,8 @@ bool acknowledge_safety_events_if_inputs_high() {
         channel_was_latched[i] = g_channel_trip_latched[i];
     }
     bool accepted = g_safety_trip_inflight == 0U &&
+        (candidate.estop == g_acknowledged_events.estop ||
+         g_safety_trip_latched) &&
         g_safety_trip_epoch == candidate_epoch &&
         g_estop_event_count == candidate.estop &&
         physical_safety_inputs_high();
@@ -423,6 +510,8 @@ bool acknowledge_safety_events_if_inputs_high() {
         g_acknowledged_events = candidate;
         g_acknowledged_trip_epoch = candidate_epoch;
         g_safety_trip_latched = false;
+        g_estop_input_qualifier.reset();
+        g_estop_qualifier_event_count = candidate.estop;
         for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
             g_acknowledged_channel_trip_epoch[i] =
                 candidate_channel_epoch[i];
@@ -461,11 +550,38 @@ bool acknowledge_safety_events_if_inputs_high() {
 
 void update_safety_inputs(bool* estop_ok) {
     if (estop_ok == nullptr) return;
-    SafetyEventCounters events = safety_event_snapshot();
-    *estop_ok =
+    const bool estop_n_high =
         gpio_get_level(static_cast<gpio_num_t>(
-            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0 &&
-        !global_safety_event_pending(events);
+            KUGLASS_POWER_STAGE_PINMAP.estop_n_gpio)) != 0;
+    if (!estop_n_high) (void)synthesize_estop_event_if_low();
+
+    SafetyEventCounters events = safety_event_snapshot();
+    if (events.estop != g_estop_qualifier_event_count) {
+        g_estop_input_qualifier.note_falling_edge();
+        g_estop_qualifier_event_count = events.estop;
+    }
+    const EstopInputQualification estop_qualification =
+        g_estop_input_qualifier.sample(estop_n_high);
+    if (estop_qualification == EstopInputQualification::CONFIRMED_LOW) {
+        (void)confirm_estop_if_still_low(events.estop);
+    } else if (estop_qualification ==
+               EstopInputQualification::RECOVERED_HIGH) {
+        if (release_unconfirmed_estop_event_if_high(events.estop)) {
+            // Do not resume an old command lease after a transient global cut.
+            // A fresh validated full frame explicitly rearms output.
+            g_estop_rearm_pending = true;
+            g_has_command = false;
+            g_last_command_ms = 0;
+            g_last_ttl_ms = KUGLASS_DEFAULT_TTL_MS;
+            g_channels.update(0.0f, false);
+            g_spwm.force_safe();
+        }
+    }
+    events = safety_event_snapshot();
+    // Raw or still-qualifying EN_GLOBAL events are handled by the hardware
+    // gate and global_safety_event_pending(). FaultManager receives false only
+    // after qualification has promoted the event to a reset-required trip.
+    *estop_ok = !qualified_global_trip_pending();
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
         const bool fault_n_high =
             gpio_get_level(static_cast<gpio_num_t>(
@@ -579,6 +695,7 @@ bool handle_reset_fault_line(const char* line) {
         if (cleared) {
             g_channels.clear_faults();
             if (global_fault_was_active) {
+                g_estop_rearm_pending = true;
                 g_spwm.force_safe();
                 g_channels.update(0.0f, false);
                 g_has_command = false;
@@ -636,6 +753,7 @@ void process_received_line(const char* line) {
     g_last_command_ms = now_ms;
     g_last_ttl_ms = command.ttl_ms;
     g_has_command = true;
+    g_estop_rearm_pending = false;
     xSemaphoreGive(g_state_mutex);
 }
 
@@ -689,7 +807,8 @@ void output_task(void*) {
 
         const SafetyEventCounters before_output = safety_event_snapshot();
         const bool pending_before_output =
-            global_safety_event_pending(before_output) || !estop_ok;
+            global_safety_event_pending(before_output) || !estop_ok ||
+            g_estop_rearm_pending;
         if (pending_before_output) {
             g_channels.update(0.0f, false);
             g_spwm.force_safe();

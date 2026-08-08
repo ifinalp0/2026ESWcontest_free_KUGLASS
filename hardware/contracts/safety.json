@@ -71,6 +71,11 @@
       "id": "HW-014",
       "severity": "high",
       "rule": "KiCad design files and physical pin contracts are not changed during software work unless the user explicitly requests a hardware design change."
+    },
+    {
+      "id": "HW-015",
+      "severity": "critical",
+      "rule": "An EN_GLOBAL falling edge immediately gates all CHx_ENABLE outputs in hardware and immediately lowers all MCU ENABLE requests in the GPIO ISR. Firmware promotes the event to a reset-required E-Stop latch only after ten consecutive 1 ms output samples remain low. A shorter LOW must remain high for ten consecutive samples, discard the prior command lease, and wait for a fresh valid full command before output may resume."
     }
   ]
 }

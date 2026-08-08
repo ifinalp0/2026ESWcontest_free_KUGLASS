@@ -57,6 +57,10 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 - 펌웨어 초기화의 첫 출력이 `ENABLE LOW`와 `PWM force-low`인지 확인합니다.
 - J5 closed/open/disconnected에서 `EN_GLOBAL`과 네 U4 출력의 truth table을 확인합니다.
 - GPIO19의 reset/power-up waveform이 U4 enable에 미치는 영향을 측정합니다.
+- `EN_GLOBAL`을 LOW로 주입해 falling edge에서 네 U4 출력과 MCU enable이 즉시
+  차단되는지 확인합니다. 1~9회 1 ms LOW 뒤 HIGH로 복귀한 경우에는 10회 연속
+  HIGH와 새 full command 전까지 off를 유지한 뒤 reset 없이 복구되는지 확인하고,
+  10회 연속 LOW에서는 E-Stop latch와 reset challenge 교체를 확인합니다.
 - 각 `FAULT_N_CHx`를 한 번에 하나씩 LOW로 주입해 falling edge의 즉시 enable
   차단, 1~9회 output sample 안에 HIGH로 복귀한 glitch의 자동 복구, 10회 연속
   LOW의 latch와 PWM force-low, reset 전 재활성화 금지를 확인합니다. 동시에 다른

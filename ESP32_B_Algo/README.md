@@ -27,6 +27,7 @@ Carrier를 통해 단일 채널 Power Stage PCB 4장을 구동합니다.
 | `main/channel_manager.*` | full-frame 적용, 채널별 Fault 상태, MI slew와 출력 상태 |
 | `main/spwm_generator.*` | MCPWM, 60 Hz 위상과 방향 blanking |
 | `main/fault_manager.*` | 전역 E-Stop/명령 오류/timeout latch와 reset |
+| `main/estop_input_qualifier.h` | E-Stop LOW 확인과 HIGH 안정화 상태 |
 | `main/analog_monitor.*` | ADC1 8채널 sampling과 validity |
 | `main/status_reporter.*` | B status와 `control_result` |
 | `main/power_stage_pinmap.h` | Logic Carrier exact pin 계약 |
@@ -41,9 +42,13 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
 ```
 
 - 초기화 첫 단계에서 네 `ENABLE`을 LOW, MCPWM을 continuous force-low로 만듭니다.
-- `EN_GLOBAL` falling edge는 ISR에서 latch하고 네 software enable을 즉시 LOW로
-  내립니다. `FAULT_N_CHx` falling edge도 해당 채널의 enable을 즉시 LOW로
-  내리지만, reset이 필요한 latch는 1 ms 출력 주기에서 10회 연속 LOW가 확인될 때
+- `EN_GLOBAL` falling edge는 Logic Carrier U4에서 네 `CHx_ENABLE`을 즉시
+  차단하고 ISR도 네 software enable을 즉시 LOW로 내립니다. reset이 필요한
+  E-Stop latch는 1 ms 출력 주기에서 10회 연속 LOW가 확인될 때 확정합니다. 그
+  전에 HIGH로 복귀한 glitch는 10회 연속 HIGH 안정화 뒤 해제하지만, 이전 command
+  lease는 재사용하지 않고 다음 유효 full frame까지 전체 출력을 LOW로 유지합니다.
+- `FAULT_N_CHx` falling edge도 해당 채널의 enable을 즉시 LOW로 내리지만,
+  reset이 필요한 latch는 1 ms 출력 주기에서 10회 연속 LOW가 확인될 때
   확정합니다. 그 전에 HIGH로 복귀한 짧은 glitch는 자동 복구하며, 나머지 정상
   채널은 활성 lease에 따라 계속 동작합니다.
 - invalid/oversize JSON, 불완전·중복 채널, 범위 밖 MI, 활성 lease의 stale
@@ -109,11 +114,13 @@ Actuator command, B status와 Fault reset의 frame은
 - B의 status `seq`는 command와 별개이며 100 ms마다 증가합니다.
 - nonzero `boot_id`는 부팅 동안 유지되고, `reset_challenge`는 safety trip과 reset
   시도 후 교체됩니다.
-- E-Stop과 10회 연속 LOW로 확정된 Power Stage Fault는 입력이 HIGH로 돌아와도
-  latched 상태이며 안전 조건과 일치하는 reset이 필요합니다. 1~9회 LOW sample
-  안에 복귀한 glitch는 즉시 차단 뒤 자동 복구합니다. E-Stop 등 전역 fault reset
-  뒤에는 새 full command 전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상
-  채널 lease는 유지되고 복구 채널은 다음 출력 주기부터 다시 적용됩니다.
+- E-Stop과 Power Stage Fault는 모두 10회 연속 LOW에서 reset-required latch로
+  확정되며, 입력이 HIGH로 돌아와도 안전 조건과 일치하는 reset이 필요합니다.
+  E-Stop의 1~9회 LOW glitch는 즉시 차단된 뒤 10회 연속 HIGH와 새 full command를
+  받아야 복구합니다. 채널 `FAULT_N`의 1~9회 LOW glitch는 해당 채널만 즉시 차단한
+  뒤 HIGH에서 활성 lease로 자동 복구합니다. E-Stop 등 전역 fault reset 뒤에는
+  새 full command 전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상 채널
+  lease는 유지되고 복구 채널은 다음 출력 주기부터 다시 적용됩니다.
 - ADC는 5 ms마다 8채널을 scan하고 settling read, 5-sample median, EWMA 1/8을
   적용합니다. 100 ms보다 오래된 값은 invalid입니다.
 - current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
@@ -135,9 +142,10 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
-full frame, 0.95 clamp, 전역 hard safe-off, `FAULT_N` 10-sample qualification과
-채널별 Fault 격리, ADC filter/stale, status, direction blanking 중 정적 ENABLE,
-ENABLE commit 거부와 JSONL 복구를 검사합니다.
+full frame, 0.95 clamp, 전역 hard safe-off, E-Stop LOW/HIGH 10-sample
+qualification, `FAULT_N` 10-sample qualification과 채널별 Fault 격리, ADC
+filter/stale, status, direction blanking 중 정적 ENABLE, ENABLE commit 거부와
+JSONL 복구를 검사합니다.
 BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
 순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 

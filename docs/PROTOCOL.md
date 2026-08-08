@@ -96,6 +96,14 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
 - `reset_challenge`는 nonzero u32 one-time reset 권한이다. safety trip 또는
   유효 reset 시도 후 교체된다.
 - `ch[].mi`는 B가 실제 적용 중인 값이며 safe-off 시 0.0이다.
+- `estop=true`는 raw LOW, LOW/HIGH qualification 또는 reset 대기 상태를 나타낼 수
+  있다. `fault_code="ESTOP"`은 10회 연속 LOW가 확인되어 reset-required latch가
+  확정된 상태를 나타낸다.
+- `EN_GLOBAL` falling edge는 Logic Carrier gate와 B ISR에서 전체 출력을 즉시
+  차단한다. B는 1 ms 출력 주기에서 10회 연속 LOW를 확인한 경우에만
+  reset-required E-Stop latch와 새 `reset_challenge`를 확정한다. 1~9회 LOW 안에
+  HIGH로 돌아온 glitch는 10회 연속 HIGH 안정화 뒤 해제되며, 이전 actuator command
+  lease를 재사용하지 않고 다음 유효 full frame까지 전체 출력을 off로 유지한다.
 - `FAULT_N` falling edge는 해당 채널 출력을 즉시 차단한다. 1 ms 출력 주기에서
   10회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
   `ch[].fault`에 표시되고 그 채널의 `mi`만 0.0이 된다. 그 전에 HIGH로 복귀한
@@ -121,11 +129,12 @@ ESP32_A는 부팅마다 nonzero u32 `source_session_id`를 만들고 최신 B st
 ```
 
 B는 대상 boot, one-time challenge, 실제 `EN_GLOBAL/FAULT_N` 상태와 새 safety
-event 부재를 확인한다. matching 요청이 안전하지 않아 실패하더라도 challenge를
-소비하여 같은 frame이 나중에 replay되어 fault를 지우지 못하게 한다. E-Stop이나
-controller-wide fault reset 성공 뒤에는 새 actuator full frame 전까지 전체 출력이
-off다. 채널 Fault만 reset한 경우에는 정상 채널의 활성 lease를 유지하고, 복구된
-채널은 그 lease의 다음 출력 주기부터 다시 적용한다.
+event 부재를 확인한다. 아직 HIGH 안정화를 마치지 않은 unqualified E-Stop
+glitch는 reset 대상으로 승인하지 않는다. matching 요청이 안전하지 않아
+실패하더라도 challenge를 소비하여 같은 frame이 나중에 replay되어 fault를 지우지
+못하게 한다. E-Stop이나 controller-wide fault reset 성공 뒤에는 새 actuator full
+frame 전까지 전체 출력이 off다. 채널 Fault만 reset한 경우에는 정상 채널의 활성
+lease를 유지하고, 복구된 채널은 그 lease의 다음 출력 주기부터 다시 적용한다.
 
 결과는 다음 status의 `control_result`로 보고한다.
 

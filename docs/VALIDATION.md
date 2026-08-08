@@ -57,8 +57,10 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 - command ACK, manual TTL, AUTO 복귀와 TabUI 단절 중 A의 AUTO 지속
 - A→B timeout, invalid frame, watchdog의 B safe-off
 - target/commanded/applied MI 분리
-- E-Stop, `FAULT_N` 1~9 sample glitch 자동 복구, 10회 연속 LOW Fault latch와 안전
-  조건 확인 후 reset
+- E-Stop falling edge 즉시 전체 차단, 1~9 sample LOW 뒤 10회 HIGH 안정화와 새
+  full command 복구, 10회 연속 LOW E-Stop latch와 안전 조건 확인 후 reset
+- `FAULT_N` falling edge 해당 채널 즉시 차단, 1~9 sample glitch 자동 복구와 10회
+  연속 LOW Fault latch
 - B reboot의 `boot_id`, A reboot의 `source_session_id`, one-time challenge와 replay 거부
 - 정확한 `control_result` correlation과 1,500 ms reset timeout
 - reset 직후 네 ENABLE LOW, PWM 0, 방향 blanking과 E-Stop hardware gate

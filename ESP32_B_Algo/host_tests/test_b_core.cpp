@@ -1,6 +1,7 @@
 #include "analog_monitor.h"
 #include "channel_manager.h"
 #include "control_protocol.h"
+#include "estop_input_qualifier.h"
 #include "fault_manager.h"
 #include "fault_input_qualifier.h"
 #include "json_line_accumulator.h"
@@ -52,6 +53,52 @@ bool probe_enable_commit(size_t channel_index, void* context) {
 }  // namespace
 
 int main() {
+    EstopInputQualifier estop_qualifier;
+    assert(estop_qualifier.sample(true) ==
+           EstopInputQualification::HEALTHY);
+    estop_qualifier.note_falling_edge();
+    for (uint8_t i = 1; i < KUGLASS_ESTOP_CONFIRM_SAMPLES; ++i) {
+        assert(estop_qualifier.sample(false) ==
+               EstopInputQualification::QUALIFYING_LOW);
+    }
+    assert(estop_qualifier.consecutive_low_samples() ==
+           KUGLASS_ESTOP_CONFIRM_SAMPLES - 1U);
+    assert(estop_qualifier.sample(false) ==
+           EstopInputQualification::CONFIRMED_LOW);
+    assert(estop_qualifier.sample(true) ==
+           EstopInputQualification::CONFIRMED_LOW);
+    assert(estop_qualifier.confirmed());
+
+    estop_qualifier.reset();
+    estop_qualifier.note_falling_edge();
+    for (uint8_t i = 1; i < KUGLASS_ESTOP_CONFIRM_SAMPLES; ++i) {
+        assert(estop_qualifier.sample(false) ==
+               EstopInputQualification::QUALIFYING_LOW);
+    }
+    for (uint8_t i = 1; i < KUGLASS_ESTOP_RELEASE_SAMPLES; ++i) {
+        assert(estop_qualifier.sample(true) ==
+               EstopInputQualification::QUALIFYING_HIGH);
+    }
+    assert(estop_qualifier.consecutive_high_samples() ==
+           KUGLASS_ESTOP_RELEASE_SAMPLES - 1U);
+    assert(estop_qualifier.sample(true) ==
+           EstopInputQualification::RECOVERED_HIGH);
+    assert(!estop_qualifier.pending());
+    assert(estop_qualifier.sample(true) ==
+           EstopInputQualification::HEALTHY);
+
+    estop_qualifier.note_falling_edge();
+    for (uint8_t i = 1; i < KUGLASS_ESTOP_RELEASE_SAMPLES; ++i) {
+        assert(estop_qualifier.sample(true) ==
+               EstopInputQualification::QUALIFYING_HIGH);
+    }
+    estop_qualifier.note_falling_edge();
+    assert(estop_qualifier.consecutive_high_samples() == 0U);
+    assert(estop_qualifier.sample(false) ==
+           EstopInputQualification::QUALIFYING_LOW);
+    assert(estop_qualifier.sample(true) ==
+           EstopInputQualification::QUALIFYING_HIGH);
+
     FaultInputQualifier fault_qualifier;
     assert(fault_qualifier.sample(true) ==
            FaultInputQualification::HEALTHY);
