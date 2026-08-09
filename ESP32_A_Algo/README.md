@@ -143,8 +143,8 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
 ### MI servo 응답
 
 - 정책 LUT와 수동 명령, A→B command 및 B status의 운용 MI 범위는
-  0.0~0.70입니다. LUT의 투과축 형상은 유지하면서 최대 출력점을 0.70으로
-  스케일하며, 범위 초과 frame은 거부합니다.
+  0.0~0.60입니다. MI 0.60을 완전 투명 운용점으로 정의하고 LUT의 투과축 형상은
+  유지하면서 최대 출력점을 0.60으로 스케일하며, 범위 초과 frame은 거부합니다.
 - AUTO에서 카메라 frame 변화가 만드는 0.01 MI 이하 목표 차이는 noise deadband로
   유지합니다. 관리자 지속 및 일반 TTL 수동 명령에는 이 deadband를 적용하지 않습니다.
 - 그보다 큰 변화는 20 Hz policy loop에서 감소 8.0 MI/s, 증가 4.0 MI/s의 제한과

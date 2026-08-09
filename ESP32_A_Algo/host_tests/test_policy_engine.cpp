@@ -96,6 +96,9 @@ int main() {
     PolicyEngine response_engine;
     response_engine.begin();
     const PolicyDecision clear = response_engine.update(SensorSnapshot{}, now);
+    assert(std::fabs(clear.channels[0].target_transmission - 1.0f) < 0.0001f);
+    assert(std::fabs(clear.channels[0].target_mi -
+                     KUGLASS_MAX_MODULATION_INDEX) < 0.0001f);
     assert(response_engine.apply_command(parse(
         "{\"v\":1,\"type\":\"ui_command\",\"seq\":2,\"command\":\"set_mode\","
         "\"mode\":\"camping\"}"), now + 1U).accepted);
@@ -104,7 +107,7 @@ int main() {
         fast_response = response_engine.update(SensorSnapshot{}, now + elapsed);
     }
     assert(clear.channels[0].applied_mi - fast_response.channels[0].applied_mi >
-           0.55f);
+           0.47f);
     assert(std::fabs(fast_response.channels[0].applied_mi -
                      fast_response.channels[0].target_mi) < 0.01f);
 

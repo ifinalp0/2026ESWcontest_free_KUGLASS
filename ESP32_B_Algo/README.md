@@ -70,7 +70,8 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
   아닙니다.
 - MI 0, disable, invalid frame, timeout, E-Stop, watchdog과 해당 채널 Fault는 정상
   slew보다 우선하며 `ENABLE LOW + PWM force-low + applied_mi=0`을 즉시 적용합니다.
-- IRS2104 bootstrap refresh와 현재 운용 정책을 위해 MI/duty는 최대 0.70입니다.
+- IRS2104 bootstrap refresh와 현재 운용 정책을 위해 MI/duty는 최대 0.60입니다.
+  이 상한은 시스템에서 완전 투명 운용점으로 취급합니다.
   범위 초과 full frame은 전체 거부합니다. 10 MHz MCPWM에서
   1 carrier tick보다 작은 duty는 PWM을 force-low로 유지합니다.
 - 물리 E-Stop과 Power Stage `RUN_OK`가 최종 차단 경로지만 인증된 안전 회로는
@@ -154,7 +155,7 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
-full frame, 0.70 범위 검사, 12.0/4.0 MI/s slew, 2 ms 지연 상한, MI 0과 전역 hard
+full frame, 0.60 범위 검사, 12.0/4.0 MI/s slew, 2 ms 지연 상한, MI 0과 전역 hard
 safe-off, E-Stop LOW/HIGH 10-sample
 qualification, `FAULT_N` LOW/HIGH 10-sample qualification, 5초 반복 event latch와
 채널별 Fault 격리, ADC filter/stale, status, direction blanking 중 정적 ENABLE,

@@ -87,7 +87,7 @@ def optical_state(mi: float) -> str:
 
 
 def estimated_transmittance(mi: float) -> float:
-    return round(0.12 + 0.83 * (normalized_mi(mi) ** 1.18), 3)
+    return round(0.12 + 0.88 * (normalized_mi(mi) ** 1.18), 3)
 
 
 def default_state() -> dict[str, Any]:

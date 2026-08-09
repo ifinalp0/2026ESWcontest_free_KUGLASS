@@ -11,7 +11,7 @@ host test가 검증한다. 계약을 변경할 때는 세 컴포넌트, 관련 �
 - JSON object의 field 순서는 의미가 없다. 중첩 object parser는 자신의 닫는
   delimiter만 소비하고 다음 상위 field 또는 상위 object 종료를 남겨야 한다.
 - 현재 protocol version은 `v=1`이다.
-- 채널 ID는 0~3, MI는 유한한 0.0~0.70, enable/fault는 JSON boolean이다.
+- 채널 ID는 0~3, MI는 유한한 0.0~0.60, enable/fault는 JSON boolean이다.
 - CH0~CH3를 요구하는 frame은 네 채널을 정확히 한 번씩 포함해야 한다.
 - 누락, 중복, 타입 오류, 범위 이탈 frame은 부분 적용하지 않고 전체 거부한다.
 - 각 링크의 sequence 소유자와 재설정 조건을 혼동하지 않는다.
@@ -60,7 +60,7 @@ freshness와 reset context를 무효화하며, 유효한 B status로 online을 �
 | --- | --- |
 | `set_mode` | `driving`, `stopped`, `camping`, `parked` |
 | `set_demo` | `none`, `hot_summer`, `camping`, `parked`, `camera_saturation` |
-| `manual_channel` | channel 0~3, MI 0.0~0.70, `enable` boolean, 일반 TTL 1~300초 또는 관리자 지속 `ttl_ms=0` |
+| `manual_channel` | channel 0~3, MI 0.0~0.60, `enable` boolean, 일반 TTL 1~300초 또는 관리자 지속 `ttl_ms=0` |
 | `return_auto` | 단일 채널 또는 전체 수동 override 해제 |
 | `reset_fault` | 최신 B boot/challenge context를 사용한 reset 요청 |
 | `camera_stream` | `enable`, 최대 15초 lease |
@@ -76,7 +76,7 @@ LIVE 자동 모드에서 TabUI는 저수준 `ch` 배열이나 목표 MI를 계�
 ESP32_A는 20 Hz heartbeat로 CH0~CH3 전체 목표를 보낸다. 기본 TTL은 250 ms다.
 
 ```json
-{"v":1,"type":"actuator_command","seq":5501,"ttl_ms":250,"ch":[[0,0.70,true],[1,0.68,true],[2,0.42,true],[3,0.55,true]]}
+{"v":1,"type":"actuator_command","seq":5501,"ttl_ms":250,"ch":[[0,0.60,true],[1,0.58,true],[2,0.36,true],[3,0.47,true]]}
 ```
 
 - `seq`는 A가 소유하며 활성 lease 동안 wrap-safe forward 값이어야 한다.
@@ -90,7 +90,7 @@ ESP32_A는 20 Hz heartbeat로 CH0~CH3 전체 목표를 보낸다. 기본 TTL은 
 B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
 
 ```json
-{"v":1,"type":"status","controller_id":"B","seq":101,"boot_id":305419896,"reset_challenge":2271560481,"estop":false,"fault_code":"NONE","ch":[{"id":0,"mi":0.70,"fault":false},{"id":1,"mi":0.68,"fault":false},{"id":2,"mi":0.42,"fault":false},{"id":3,"mi":0.55,"fault":false}],"adc":{"initialized":true,"i_cali":true,"t_cali":true,"raw_valid_mask":255,"mv_valid_mask":255,"i_raw":[120,121,119,122],"t_raw":[2010,2002,2021,1998],"i_mv":[28,29,28,29],"t_mv":[1620,1614,1628,1611]}}
+{"v":1,"type":"status","controller_id":"B","seq":101,"boot_id":305419896,"reset_challenge":2271560481,"estop":false,"fault_code":"NONE","ch":[{"id":0,"mi":0.60,"fault":false},{"id":1,"mi":0.58,"fault":false},{"id":2,"mi":0.36,"fault":false},{"id":3,"mi":0.47,"fault":false}],"adc":{"initialized":true,"i_cali":true,"t_cali":true,"raw_valid_mask":255,"mv_valid_mask":255,"i_raw":[120,121,119,122],"t_raw":[2010,2002,2021,1998],"i_mv":[28,29,28,29],"t_mv":[1620,1614,1628,1611]}}
 ```
 
 - `seq`는 actuator command sequence가 아니라 B status 자체의 순서다.

@@ -50,7 +50,7 @@
     {
       "id": "HW-010",
       "severity": "high",
-      "rule": "Maximum modulation index remains below 1.0 to preserve IRS2104 bootstrap refresh; firmware and the end-to-end protocol currently limit it to 0.70."
+      "rule": "Maximum modulation index remains below 1.0 to preserve IRS2104 bootstrap refresh; firmware and the end-to-end protocol currently limit it to 0.60, the configured fully transparent operating point."
     },
     {
       "id": "HW-011",

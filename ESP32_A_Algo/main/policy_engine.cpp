@@ -67,10 +67,11 @@ float visibility_weight(uint8_t channel) {
 float transmission_to_mi(float transmission) {
     struct LutPoint { float transmission; float mi; };
     // Preserve the previous 0.95-based curve shape while scaling its MI axis
-    // to the system-wide 0.70 operational maximum.
+    // to the system-wide 0.60 operational maximum, which represents fully
+    // transparent operation.
     constexpr LutPoint points[] = {
-        {0.00f, 0.0000f}, {0.15f, 0.1326f}, {0.35f, 0.2947f},
-        {0.65f, 0.5011f}, {0.85f, 0.6189f},
+        {0.00f, 0.0000f}, {0.15f, 0.1137f}, {0.35f, 0.2526f},
+        {0.65f, 0.4295f}, {0.85f, 0.5305f},
         {1.00f, KUGLASS_MAX_MODULATION_INDEX},
     };
     const float value = clamp01(transmission);

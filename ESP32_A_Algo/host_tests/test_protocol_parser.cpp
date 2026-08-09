@@ -12,7 +12,7 @@ int main() {
     ProtocolError error;
     const char* line =
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":1240,\"ttl_ms\":200,\"ch\":["
-        "[0,0.70,true],[1,0.55,false],[2,0.20,true],[3,0.30,true]]}";
+        "[0,0.60,true],[1,0.55,false],[2,0.20,true],[3,0.30,true]]}";
     assert(parse_command_line(line, &command, &error));
     assert(command.channel_count == 4);
     assert(command.channels[3].channel_id == 3);
@@ -21,7 +21,7 @@ int main() {
 
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":1,\"ttl_ms\":200,\"ch\":["
-        "[0,0.7001,true],[1,0.5,true],[2,0.5,true],[3,0.5,true]]}",
+        "[0,0.6001,true],[1,0.5,true],[2,0.5,true],[3,0.5,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_CHANNEL_ARRAY);
 

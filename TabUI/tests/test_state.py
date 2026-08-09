@@ -40,8 +40,8 @@ def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
 
 class StateStoreTests(unittest.TestCase):
     def test_operational_maximum_is_rendered_as_clear(self) -> None:
-        self.assertEqual(optical_state(0.7), "CLEAR")
-        self.assertEqual(estimated_transmittance(0.7), 0.95)
+        self.assertEqual(optical_state(0.6), "CLEAR")
+        self.assertEqual(estimated_transmittance(0.6), 1.0)
 
     def test_full_snake_case_state_is_normalized_for_simul_ui(self) -> None:
         store = StateStore()
@@ -113,11 +113,11 @@ class StateStoreTests(unittest.TestCase):
     def test_downstream_status_channel_telemetry_is_merged(self) -> None:
         store = StateStore()
         store.apply_record(b_status(
-            {"id": 3, "mi": 0.62, "target_mi": 0.55, "fault": True},
+            {"id": 3, "mi": 0.58, "target_mi": 0.55, "fault": True},
             seq=9,
         ))
         channel = store.snapshot()["channels"][3]
-        self.assertEqual(channel["appliedMi"], 0.62)
+        self.assertEqual(channel["appliedMi"], 0.58)
         self.assertTrue(channel["appliedKnown"])
         self.assertEqual(channel["targetMi"], 0.0)
         self.assertTrue(channel["fault"])
@@ -150,7 +150,7 @@ class StateStoreTests(unittest.TestCase):
         store = StateStore()
         store.apply_record({
             "type": "state",
-            "channels": [{"channel_id": 1, "target_mi": 0.7, "commanded_mi": 0.6, "applied_mi": 0.55}],
+            "channels": [{"channel_id": 1, "target_mi": 0.6, "commanded_mi": 0.55, "applied_mi": 0.5}],
         })
         self.assertEqual(store.snapshot()["channels"][1]["appliedMi"], 0.0)
 
@@ -169,7 +169,7 @@ class StateStoreTests(unittest.TestCase):
         store.apply_record(b_status({"id": 1, "mi": 0.0, "fault": True}))
         store.apply_record({
             "type": "state",
-            "channels": [{"channel_id": 1, "commanded_mi": 0.7, "fault": False}],
+            "channels": [{"channel_id": 1, "commanded_mi": 0.6, "fault": False}],
         })
         self.assertTrue(store.snapshot()["channels"][1]["fault"])
 
@@ -195,9 +195,9 @@ class StateStoreTests(unittest.TestCase):
             "type": "state",
             "channels": [{
                 "channel_id": 1,
-                "target_mi": 0.69,
-                "commanded_mi": 0.7,
-                "applied_mi": 0.68,
+                "target_mi": 0.59,
+                "commanded_mi": 0.6,
+                "applied_mi": 0.58,
                 "fault": False,
             }],
             "downstream": {
@@ -232,7 +232,7 @@ class StateStoreTests(unittest.TestCase):
     def test_downstream_status_rejects_mi_above_operational_maximum(self) -> None:
         store = StateStore()
         self.assertFalse(store.apply_record(
-            b_status({"id": 2, "mi": 0.7001, "fault": False})
+            b_status({"id": 2, "mi": 0.6001, "fault": False})
         ))
         self.assertFalse(store.snapshot()["channels"][2]["appliedKnown"])
 

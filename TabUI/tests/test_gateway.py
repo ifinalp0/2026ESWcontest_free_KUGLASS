@@ -60,7 +60,7 @@ class GatewayTests(unittest.TestCase):
         self.gateway.submit({
             "type": "setManualChannel",
             "channel": 1,
-            "mi": 0.7,
+            "mi": 0.6,
             "enable": False,
             "ttlSeconds": 30,
         })
@@ -260,15 +260,15 @@ class SequencingAndCoalescingTests(unittest.TestCase):
         )
         gateway.start()
         try:
-            gateway.submit({"type": "setManualChannel", "channel": 0, "mi": 0.7})
-            self.wait_for(lambda: len(transport.written) == 1)
             gateway.submit({"type": "setManualChannel", "channel": 0, "mi": 0.6})
+            self.wait_for(lambda: len(transport.written) == 1)
+            gateway.submit({"type": "setManualChannel", "channel": 0, "mi": 0.5})
             gateway.submit({"type": "setManualChannel", "channel": 0, "mi": 0.2})
             self.wait_for(lambda: len(transport.written) == 2)
             first_at, first_line = transport.written[0]
             second_at, second_line = transport.written[1]
             self.assertGreaterEqual(second_at - first_at, 0.05)
-            self.assertEqual(json.loads(first_line)["target_mi"], 0.7)
+            self.assertEqual(json.loads(first_line)["target_mi"], 0.6)
             self.assertEqual(json.loads(second_line)["target_mi"], 0.2)
             self.assertEqual(json.loads(second_line)["seq"], 103)
         finally:

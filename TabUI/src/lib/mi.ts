@@ -1,4 +1,5 @@
-export const MAX_MI = 0.7;
+// The current PDLC operating definition treats MI 0.60 as fully transparent.
+export const MAX_MI = 0.6;
 
 export function clampMi(value: number): number {
   return Math.max(0, Math.min(MAX_MI, Number.isFinite(value) ? value : 0));

@@ -80,7 +80,7 @@ class ProtocolTests(unittest.TestCase):
             {
                 "type": "setManualChannel",
                 "channel": 2,
-                "mi": 0.7,
+                "mi": 0.6,
                 "enable": False,
                 "ttlSeconds": 45,
             },
@@ -88,13 +88,13 @@ class ProtocolTests(unittest.TestCase):
             diagnostics_enabled=False,
         )
         self.assertFalse(message["enable"])
-        self.assertEqual(message["target_mi"], 0.7)
+        self.assertEqual(message["target_mi"], 0.6)
         self.assertEqual(message["ttl_ms"], 45000)
 
     def test_manual_command_rejects_mi_above_operational_maximum(self) -> None:
         with self.assertRaises(CommandError):
             translate_ui_command(
-                {"type": "setManualChannel", "channel": 0, "mi": 0.7001},
+                {"type": "setManualChannel", "channel": 0, "mi": 0.6001},
                 Sequence().next,
                 diagnostics_enabled=False,
             )

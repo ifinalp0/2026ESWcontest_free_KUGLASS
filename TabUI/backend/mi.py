@@ -4,7 +4,8 @@ import math
 from typing import Any
 
 
-MAX_MI = 0.70
+# The current PDLC operating definition treats MI 0.60 as fully transparent.
+MAX_MI = 0.60
 
 
 def clamp_mi(value: Any) -> float:

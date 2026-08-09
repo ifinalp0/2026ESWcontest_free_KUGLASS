@@ -184,31 +184,31 @@ int main() {
     assert(KUGLASS_A_UART_RX_GPIO == 44);
     assert(!kuglass_power_stage_owns_gpio(KUGLASS_A_UART_TX_GPIO));
     assert(!kuglass_power_stage_owns_gpio(KUGLASS_A_UART_RX_GPIO));
-    assert(near(KUGLASS_MAX_MODULATION_INDEX, 0.70f));
+    assert(near(KUGLASS_MAX_MODULATION_INDEX, 0.60f));
 
     ProtocolCommand command;
     ProtocolError error;
     assert(parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.7,true]]}",
+        "[2,0.5,true],[3,0.6,true]]}",
         &command, &error));
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.7001,true]]}",
+        "[2,0.5,true],[3,0.6001,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_CHANNEL_ARRAY);
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":8,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[0,0.4,true],"
-        "[2,0.6,true],[3,0.7,true]]}",
+        "[2,0.5,true],[3,0.6,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_CHANNEL_ARRAY);
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":8,"
         "\"ttl_ms\":49,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.7,true]]}",
+        "[2,0.5,true],[3,0.6,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_TTL);
 
@@ -262,7 +262,7 @@ int main() {
     assert(parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.7,true]]}",
+        "[2,0.5,true],[3,0.6,true]]}",
         &command, &error));
     ChannelManager channels;
     channels.begin();

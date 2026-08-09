@@ -295,10 +295,10 @@ class MockTransport:
 
     SCENARIO_TARGETS = {
         "none": [MAX_MI] * 4,
-        "hot_summer": [0.6042, 0.5895, 0.3832, 0.3832],
-        "camping": [0.0295] * 4,
-        "parked": [0.0221] * 4,
-        "camera_saturation": [0.3095, 0.56, 0.6337, 0.6337],
+        "hot_summer": [0.5179, 0.5053, 0.3284, 0.3284],
+        "camping": [0.0253] * 4,
+        "parked": [0.0189] * 4,
+        "camera_saturation": [0.2653, 0.48, 0.5432, 0.5432],
     }
 
     def __init__(self) -> None:
