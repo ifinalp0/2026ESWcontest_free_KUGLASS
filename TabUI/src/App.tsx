@@ -73,6 +73,7 @@ export default function App() {
           key={state.demoMode}
           channels={state.channels}
           environment={state.environment}
+          cameraInput={state.link.transport === 'mock' ? state.environment : state.cameraMetrics}
           demoMode={state.demoMode}
           selectedChannel={selectedChannel}
           sendCommand={sendCommand}

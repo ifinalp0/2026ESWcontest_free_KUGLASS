@@ -5,9 +5,18 @@ import { MAX_MI, normalizedMi } from '../lib/mi';
 import { displayedInternalTemperature, randomExternalDemoTemperature } from '../lib/temperature';
 import type { ChannelState, ControlCommand, DemoMode, EnvironmentInput } from '../types';
 
+type CameraEnvironmentKey = 'frontLeftSaturation' | 'frontRightSaturation' | 'edgeDensity';
+
+interface CameraInput {
+  frontLeftSaturation: number;
+  frontRightSaturation: number;
+  edgeDensity: number;
+}
+
 interface Props {
   channels: ChannelState[];
   environment: EnvironmentInput;
+  cameraInput: CameraInput;
   demoMode: DemoMode;
   selectedChannel: number;
   sendCommand: (command: ControlCommand) => void;
@@ -15,7 +24,7 @@ interface Props {
   diagnosticsEnabled: boolean;
 }
 
-export function ControlPanel({ channels, environment, demoMode, selectedChannel, sendCommand, controlsEnabled, diagnosticsEnabled }: Props) {
+export function ControlPanel({ channels, environment, cameraInput, demoMode, selectedChannel, sendCommand, controlsEnabled, diagnosticsEnabled }: Props) {
   const selected = channels[selectedChannel];
   const interactionActive = useRef(false);
   const pendingManual = useRef<{ channel: number; mi: number } | null>(null);
@@ -29,6 +38,8 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
   const [externalTemperature, setExternalTemperature] = useState(
     Math.round(environment.internalTemp ?? 39)
   );
+  const [cameraDraft, setCameraDraft] = useState<CameraInput>(cameraInput);
+  const pendingCamera = useRef<Partial<Record<CameraEnvironmentKey, number>>>({});
 
   useEffect(() => {
     if (manualDraft.channel !== selected.channel) {
@@ -65,6 +76,36 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
       setExternalTemperature(Math.round(environment.internalTemp));
     }
   }, [environment.internalTemp, externalTemperatureDemo]);
+
+  useEffect(() => {
+    setCameraDraft((current) => {
+      const next = { ...current };
+      const keys: CameraEnvironmentKey[] = [
+        'frontLeftSaturation',
+        'frontRightSaturation',
+        'edgeDensity'
+      ];
+
+      for (const key of keys) {
+        const pending = pendingCamera.current[key];
+        if (diagnosticsEnabled && pending !== undefined) {
+          if (Math.abs(cameraInput[key] - pending) <= 0.005) {
+            delete pendingCamera.current[key];
+            next[key] = cameraInput[key];
+          }
+          continue;
+        }
+        delete pendingCamera.current[key];
+        next[key] = cameraInput[key];
+      }
+      return next;
+    });
+  }, [
+    cameraInput.edgeDensity,
+    cameraInput.frontLeftSaturation,
+    cameraInput.frontRightSaturation,
+    diagnosticsEnabled
+  ]);
 
   const setManual = (value: number) => {
     if (!controlsEnabled || selected.fault) {
@@ -115,6 +156,16 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
     const temperature = Math.max(15, Math.min(50, Math.round(value)));
     setExternalTemperature(temperature);
     setEnvironmentValue('internalTemp', temperature);
+  };
+
+  const updateCameraInput = (key: CameraEnvironmentKey, value: number) => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
+    const normalized = Math.max(0, Math.min(1, value / 100));
+    pendingCamera.current[key] = normalized;
+    setCameraDraft((current) => ({ ...current, [key]: normalized }));
+    setEnvironmentValue(key, normalized);
   };
 
   const temperatureText = `${displayedInternalTemperature(environment).toFixed(1)} °C`;
@@ -240,9 +291,9 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
             <span>카메라 입력 · HIL</span>
             <small>{diagnosticsEnabled ? '시험 override 활성' : '실측 센서 보호'}</small>
           </div>
-          <EnvSlider disabled={!diagnosticsEnabled} label="운전석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontLeftSaturation * 100} onChange={(value) => setEnvironmentValue('frontLeftSaturation', value / 100)} />
-          <EnvSlider disabled={!diagnosticsEnabled} label="조수석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontRightSaturation * 100} onChange={(value) => setEnvironmentValue('frontRightSaturation', value / 100)} />
-          <EnvSlider disabled={!diagnosticsEnabled} label="Edge Density" unit="%" min={0} max={100} value={environment.edgeDensity * 100} onChange={(value) => setEnvironmentValue('edgeDensity', value / 100)} />
+          <EnvSlider disabled={!diagnosticsEnabled} label="운전석측 ROI 포화" unit="%" min={0} max={100} value={cameraDraft.frontLeftSaturation * 100} onChange={(value) => updateCameraInput('frontLeftSaturation', value)} />
+          <EnvSlider disabled={!diagnosticsEnabled} label="조수석측 ROI 포화" unit="%" min={0} max={100} value={cameraDraft.frontRightSaturation * 100} onChange={(value) => updateCameraInput('frontRightSaturation', value)} />
+          <EnvSlider disabled={!diagnosticsEnabled} label="Edge Density" unit="%" min={0} max={100} value={cameraDraft.edgeDensity * 100} onChange={(value) => updateCameraInput('edgeDensity', value)} />
         </div>
       ) : null}
 
