@@ -24,7 +24,8 @@ flowchart LR
 ```
 
 - 입력: 카메라 1대, YwRobot SEN050007 DS18B20 내부온도센서 모듈 1개
-- 출력: PDLC CH0~CH3
+- 출력: PDLC CH0 운전석 창문, CH1 조수석 창문·선루프, CH2 운전석 옆 창문,
+  CH3 조수석 옆 창문
 - MI 의미: 값이 클수록 CLEAR이며 현재 운용 상한 0.60이 완전 투명 방향입니다.
   0.0 또는 disable은 safe-off·강산란 방향입니다.
 - 제어 우선순위: `E-Stop > latched Fault > Manual(관리자 지속/일반 TTL) > Demo/Auto`

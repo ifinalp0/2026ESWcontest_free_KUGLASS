@@ -88,6 +88,15 @@ const windowParts: WindowPart[] = [
     projectionDirection: [0, -0.58, -0.81]
   },
   {
+    // The sunroof is physically tied to the passenger-window CH1 output.
+    channel: 1,
+    position: [0, 0.96, -0.2],
+    points: [[-0.52, -0.4], [0.52, -0.4], [0.48, 0.6], [-0.48, 0.6]],
+    rotation: [-Math.PI / 2, 0, 0],
+    projectionDirection: [0, -1, 0],
+    maxProjectionDistance: 0.55
+  },
+  {
     channel: 3,
     position: [-1.012, 0.56, 0.44],
     points: [[-0.67, -0.08], [0.35, -0.08], [0.39, 0.1], [0.03, 0.25], [-0.63, 0.27], [-0.72, 0.12]],
@@ -475,11 +484,11 @@ function VehicleAssembly({ channels, onSelectChannel, selectedChannel }: Omit<Ca
   return (
     <>
       <primitive object={model} />
-      {fittedParts.map((part) => {
+      {fittedParts.map((part, partIndex) => {
         const channel = channels[part.channel];
         return (
           <PdlcFilmSurface
-            key={part.channel}
+            key={`${part.channel}-${partIndex}`}
             part={part}
             channel={channel}
             selected={selectedChannel === part.channel}

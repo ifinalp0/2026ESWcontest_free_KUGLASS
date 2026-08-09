@@ -38,8 +38,8 @@ export function EvidencePanel({ state, connected }: Props) {
             <strong>ROI</strong>
           </div>
           <div className="road-line" />
-          <div className="roi left">L {pct(cameraMetrics.frontLeftSaturation)}</div>
-          <div className="roi right">R {pct(cameraMetrics.frontRightSaturation)}</div>
+          <div className="roi left">운전석 L {pct(cameraMetrics.frontLeftSaturation)}</div>
+          <div className="roi right">조수석 R {pct(cameraMetrics.frontRightSaturation)}</div>
           <div className="glare-spot" style={{ opacity: Math.min(0.92, cameraMetrics.glare + 0.05) }} />
           <button
             className="camera-view-button"

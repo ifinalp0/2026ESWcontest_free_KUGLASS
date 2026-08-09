@@ -21,18 +21,20 @@ int main() {
         }
     }
 
-    CameraRoiMetrics left;
-    CameraRoiMetrics right;
-    assert(analyze_rgb565_frame(frame.data(), frame.size(), width, height, &left, &right));
-    assert(left.mean_brightness > 0.99f);
-    assert(left.saturation_ratio > 0.99f);
-    assert(left.highlight_area > 0.99f);
-    assert(left.edge_density < 0.01f);
-    assert(right.mean_brightness < 0.01f);
-    assert(right.saturation_ratio < 0.01f);
-    assert(right.highlight_area < 0.01f);
-    assert(right.edge_density < 0.01f);
-    assert(!analyze_rgb565_frame(frame.data(), frame.size() - 1, width, height, &left, &right));
+    CameraRoiMetrics driver_left;
+    CameraRoiMetrics passenger_right;
+    assert(analyze_rgb565_frame(frame.data(), frame.size(), width, height,
+                                &driver_left, &passenger_right));
+    assert(driver_left.mean_brightness > 0.99f);
+    assert(driver_left.saturation_ratio > 0.99f);
+    assert(driver_left.highlight_area > 0.99f);
+    assert(driver_left.edge_density < 0.01f);
+    assert(passenger_right.mean_brightness < 0.01f);
+    assert(passenger_right.saturation_ratio < 0.01f);
+    assert(passenger_right.highlight_area < 0.01f);
+    assert(passenger_right.edge_density < 0.01f);
+    assert(!analyze_rgb565_frame(frame.data(), frame.size() - 1, width, height,
+                                 &driver_left, &passenger_right));
 
     // Verify byte order with colors that are not invariant under byte swap.
     std::vector<uint8_t> endian_frame = {
@@ -40,8 +42,8 @@ int main() {
         0xf8, 0x00, 0xf8, 0x00, 0x00, 0xf8, 0x00, 0xf8,
     };
     assert(analyze_rgb565_frame(endian_frame.data(), endian_frame.size(),
-                                width, height, &left, &right));
-    assert(left.mean_brightness > right.mean_brightness);
+                                width, height, &driver_left, &passenger_right));
+    assert(driver_left.mean_brightness > passenger_right.mean_brightness);
 
     std::vector<uint8_t> checkerboard(frame.size());
     for (uint16_t y = 0; y < height; ++y) {
@@ -53,9 +55,9 @@ int main() {
         }
     }
     assert(analyze_rgb565_frame(checkerboard.data(), checkerboard.size(),
-                                width, height, &left, &right));
-    assert(left.edge_density > 0.99f);
-    assert(right.edge_density > 0.99f);
+                                width, height, &driver_left, &passenger_right));
+    assert(driver_left.edge_density > 0.99f);
+    assert(passenger_right.edge_density > 0.99f);
 
     assert(timestamp_fresh(1000U, 0U, 1000U));
     assert(!timestamp_fresh(1001U, 0U, 1000U));

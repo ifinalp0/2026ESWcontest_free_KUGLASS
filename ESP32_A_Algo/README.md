@@ -10,7 +10,7 @@ ESP-IDF 프로젝트입니다. 카메라와 내부온도를 처리하고 CH0~CH3
 
 ## 책임
 
-- OV2640 카메라의 좌/우 ROI 밝기·포화·highlight·Edge Density 계산
+- OV2640 카메라의 운전석측/조수석측 ROI 밝기·포화·highlight·Edge Density 계산
 - YwRobot SEN050007 DS18B20 내부온도의 CRC·범위·stale 검사
 - 상황 모드, privacy, thermal, camera glare 정책과 LUT/MI servo
 - CH0~CH3 관리자 지속/일반 TTL 수동 override와 AUTO 복귀
@@ -105,6 +105,9 @@ pull-down을 권장합니다. 데이터·sync 배선은 가능하면 10 cm 이�
 
 - 초기화 직후 horizontal mirror와 vertical flip을 적용해 180° 장착 방향을
   보정합니다. ROI 계산과 TabUI 영상은 같은 정방향 frame을 사용합니다.
+- TabUI에 보이는 좌표를 기준으로 `x < width/2`는 운전석측 ROI,
+  `x >= width/2`는 조수석측 ROI입니다. TabUI JPEG에는 별도 mirror/flip을
+  적용하지 않으며 실시간 영상 위의 ROI 경계가 실제 분석 범위와 같습니다.
 - 캡처는 VGA 640×480 RGB565이고, 요청 시 품질 90 JPEG로 변환합니다.
 - `KUGLCAM1` header, JPEG marker와 FNV-1a 검사를 사용하는 frame을 기존 USB
   Serial/JTAG byte stream에 JSON Lines와 함께 다중화합니다.
@@ -119,6 +122,19 @@ pull-down을 권장합니다. 데이터·sync 배선은 가능하면 10 cm 이�
 카메라 driver는 `main/idf_component.yml`과 `dependencies.lock`으로 고정합니다.
 `ESP32_A_Algo/` 밖의 source, symlink나 시험 프로젝트를 빌드 입력으로 사용하지
 않습니다.
+
+### ROI와 채널 정책 연결
+
+| 채널 | PDLC 영역 | 방향 ROI | 정책 특성 |
+| --- | --- | --- | --- |
+| CH0 | 운전석 창문 | 운전석측(화면 왼쪽) | 카메라 응답·주행 시야 하한·fast attack |
+| CH1 | 조수석 창문·선루프 | 조수석측(화면 오른쪽) | 두 PDLC 영역이 같은 목표 MI와 카메라 응답을 공유 |
+| CH2 | 운전석 옆 창문 | 운전석측(화면 왼쪽) | 방향별 카메라 보조 응답·thermal/privacy |
+| CH3 | 조수석 옆 창문 | 조수석측(화면 오른쪽) | 방향별 카메라 보조 응답·thermal/privacy |
+
+단일 카메라는 각 PDLC 면을 직접 개별 측정하지 않습니다. 두 ROI는 운전석측과
+조수석측 입사광의 방향별 대리 지표이며, CH1의 선루프도 별도 ROI나 독립 목표를
+만들지 않고 조수석 창문과 동일한 CH1 목표를 적용합니다.
 
 ## 통신과 상태
 
@@ -149,7 +165,7 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
   유지합니다. 관리자 지속 및 일반 TTL 수동 명령에는 이 deadband를 적용하지 않습니다.
 - 그보다 큰 변화는 20 Hz policy loop에서 감소 8.0 MI/s, 증가 4.0 MI/s의 제한과
   0.8 응답 계수를 사용합니다. 일반 조건의 실효 상한은 각각 약 6.4 MI/s와
-  3.2 MI/s이며, 전면 강광 fast-attack은 ESP32_B의 로컬 slew를 남긴 채 A측
+  3.2 MI/s이며, 방향별 강광 fast-attack은 ESP32_B의 로컬 slew를 남긴 채 A측
   감소 제한을 우회할 수 있습니다.
 - 이 servo는 카메라 sensor 값을 보정하거나 실측 노이즈 크기를 확정하지 않습니다.
   작은 AUTO 목표 chatter가 A→B 명령에 전달되는 것을 제한하는 정책 출력 단계입니다.

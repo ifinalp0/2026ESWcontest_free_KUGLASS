@@ -46,11 +46,25 @@ int main() {
     assert(glare.strong_front_light);
     assert(glare.glare_left > glare.glare_right);
     assert(glare.channels[0].target_mi < glare.channels[1].target_mi);
+    // Display-left is the driver side, so both driver-side channels must use
+    // the left ROI rather than the old shared max(left, right) value.
+    assert(glare.channels[2].target_mi < glare.channels[3].target_mi);
     assert(glare.channels[0].target_transmission >= 0.45f);
     for (const PolicyChannelTarget& channel : glare.channels) {
         assert(channel.target_mi <= KUGLASS_MAX_MODULATION_INDEX);
         assert(channel.applied_mi <= KUGLASS_MAX_MODULATION_INDEX);
     }
+
+    PolicyEngine passenger_glare_engine;
+    passenger_glare_engine.begin();
+    SensorSnapshot passenger_glare = fresh_camera(now);
+    passenger_glare.front_right = passenger_glare.front_left;
+    passenger_glare.front_left = CameraRoiMetrics{};
+    passenger_glare.front_left.edge_density = 0.18f;
+    PolicyDecision passenger = passenger_glare_engine.update(passenger_glare, now);
+    assert(passenger.glare_right > passenger.glare_left);
+    assert(passenger.channels[1].target_mi < passenger.channels[0].target_mi);
+    assert(passenger.channels[3].target_mi < passenger.channels[2].target_mi);
 
     PolicyEngine thermal_engine;
     thermal_engine.begin();

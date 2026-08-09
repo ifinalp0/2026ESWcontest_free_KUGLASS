@@ -24,7 +24,7 @@ int main() {
     decision.demo_mode = DemoMode::CAMERA_SATURATION;
     decision.thermal_risk = 0.42f;
     decision.glare_total = 0.73f;
-    decision.decision_reason = "camera glare: front fast response";
+    decision.decision_reason = "camera glare: directional fast response";
     for (size_t i = 0; i < KUGLASS_TOTAL_CHANNELS; ++i) {
         PolicyChannelTarget& channel = decision.channels[i];
         channel.channel_id = static_cast<uint8_t>(i);

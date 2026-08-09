@@ -160,8 +160,8 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
           <small>{diagnosticsEnabled ? '시험 override 활성' : '실측 센서 보호'}</small>
         </div>
         <EnvSlider disabled={!diagnosticsEnabled} label="내부온도" unit="°C" min={15} max={48} value={environment.internalTemp ?? 27} onChange={(value) => setEnvironmentValue('internalTemp', value)} />
-        <EnvSlider disabled={!diagnosticsEnabled} label="좌측 ROI 포화" unit="%" min={0} max={100} value={environment.frontLeftSaturation * 100} onChange={(value) => setEnvironmentValue('frontLeftSaturation', value / 100)} />
-        <EnvSlider disabled={!diagnosticsEnabled} label="우측 ROI 포화" unit="%" min={0} max={100} value={environment.frontRightSaturation * 100} onChange={(value) => setEnvironmentValue('frontRightSaturation', value / 100)} />
+        <EnvSlider disabled={!diagnosticsEnabled} label="운전석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontLeftSaturation * 100} onChange={(value) => setEnvironmentValue('frontLeftSaturation', value / 100)} />
+        <EnvSlider disabled={!diagnosticsEnabled} label="조수석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontRightSaturation * 100} onChange={(value) => setEnvironmentValue('frontRightSaturation', value / 100)} />
         <EnvSlider disabled={!diagnosticsEnabled} label="Edge Density" unit="%" min={0} max={100} value={environment.edgeDensity * 100} onChange={(value) => setEnvironmentValue('edgeDensity', value / 100)} />
       </div>
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.state import StateStore, estimated_transmittance, optical_state
+from backend.state import CHANNEL_NAMES, StateStore, estimated_transmittance, optical_state
 
 
 def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
@@ -39,6 +39,14 @@ def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
 
 
 class StateStoreTests(unittest.TestCase):
+    def test_channel_names_match_the_physical_pdlc_layout(self) -> None:
+        self.assertEqual(CHANNEL_NAMES, [
+            "CH0 운전석 창문",
+            "CH1 조수석 창문·선루프",
+            "CH2 운전석 옆 창문",
+            "CH3 조수석 옆 창문",
+        ])
+
     def test_operational_maximum_is_rendered_as_clear(self) -> None:
         self.assertEqual(optical_state(0.6), "CLEAR")
         self.assertEqual(estimated_transmittance(0.6), 1.0)

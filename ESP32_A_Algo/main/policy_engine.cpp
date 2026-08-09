@@ -8,6 +8,35 @@ namespace {
 
 constexpr float kStrongGlareThreshold = 0.46f;
 
+enum class CameraSide : uint8_t {
+    DRIVER_LEFT,
+    PASSENGER_RIGHT,
+};
+
+struct ChannelPolicyProfile {
+    CameraSide camera_side;
+    float thermal_weight;
+    float camera_weight;
+    float visibility_weight;
+    float visibility_penalty;
+    bool driving_visibility_floor;
+    bool fast_glare_attack;
+};
+
+// The camera x-axis is the same one shown by TabUI: display-left is the
+// driver's side and display-right is the passenger's side. CH1 drives both
+// the passenger window and sunroof, so they intentionally share one target.
+constexpr ChannelPolicyProfile kChannelProfiles[KUGLASS_TOTAL_CHANNELS] = {
+    {CameraSide::DRIVER_LEFT,     0.22f, 0.82f, 0.34f, 0.68f, true,  true }, // CH0 driver window
+    {CameraSide::PASSENGER_RIGHT, 0.24f, 0.82f, 0.34f, 0.68f, true,  true }, // CH1 passenger + sunroof
+    {CameraSide::DRIVER_LEFT,     0.58f, 0.08f, 0.10f, 0.18f, false, false}, // CH2 driver-side window
+    {CameraSide::PASSENGER_RIGHT, 0.58f, 0.08f, 0.10f, 0.18f, false, false}, // CH3 passenger-side window
+};
+
+static_assert(sizeof(kChannelProfiles) / sizeof(kChannelProfiles[0]) ==
+                  KUGLASS_TOTAL_CHANNELS,
+              "Every channel needs an explicit physical policy profile.");
+
 float clamp01(float value) {
     if (value < 0.0f) return 0.0f;
     if (value > 1.0f) return 1.0f;
@@ -46,22 +75,16 @@ float roi_glare_score(const CameraRoiMetrics& roi,
                    0.08f * gain_pressure + edge_penalty);
 }
 
-float thermal_weight(uint8_t channel) {
-    constexpr float values[KUGLASS_TOTAL_CHANNELS] = {0.22f, 0.24f, 0.58f, 0.58f};
-    return values[channel];
-}
-
-float camera_weight(uint8_t channel) {
-    return channel < 2U ? 0.82f : 0.08f;
-}
-
-float visibility_penalty(uint8_t channel, VehicleMode mode) {
+float visibility_penalty(const ChannelPolicyProfile& profile, VehicleMode mode) {
     if (mode == VehicleMode::CAMPING || mode == VehicleMode::PARKED) return 0.0f;
-    return channel < 2U ? 0.68f : 0.18f;
+    return profile.visibility_penalty;
 }
 
-float visibility_weight(uint8_t channel) {
-    return channel < 2U ? 0.34f : 0.10f;
+float directional_glare(const ChannelPolicyProfile& profile,
+                        const PolicyDecision& decision) {
+    return profile.camera_side == CameraSide::DRIVER_LEFT
+               ? decision.glare_left
+               : decision.glare_right;
 }
 
 float transmission_to_mi(float transmission) {
@@ -359,18 +382,18 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             any_manual = true;
             any_persistent_manual = any_persistent_manual || manual.persistent;
         } else {
-            const float camera = channel == 0U
-                ? decision.glare_left
-                : channel == 1U ? decision.glare_right : decision.glare_total;
+            const ChannelPolicyProfile& profile = kChannelProfiles[channel];
+            const float camera = directional_glare(profile, decision);
             const float score = clamp01(
                 0.22f * mode_need +
-                thermal_weight(channel) * decision.thermal_risk +
-                camera_weight(channel) * camera +
+                profile.thermal_weight * decision.thermal_risk +
+                profile.camera_weight * camera +
                 0.90f * privacy_need -
-                visibility_weight(channel) * visibility_penalty(channel, vehicle_mode_));
+                profile.visibility_weight * visibility_penalty(profile, vehicle_mode_));
 
             float transmission = clamp01(1.0f - 0.82f * score);
-            if (vehicle_mode_ == VehicleMode::DRIVING && channel < 2U &&
+            if (vehicle_mode_ == VehicleMode::DRIVING &&
+                profile.driving_visibility_floor &&
                 transmission < 0.45f) {
                 transmission = 0.45f;
             }
@@ -385,7 +408,7 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             target.target_mi = transmission_to_mi(transmission);
             target.optical_state = optical_state_for_transmission(transmission);
             if (privacy_need > 0.0f) target.reason = "privacy mode";
-            else if (channel < 2U && camera_fresh && camera > 0.2f) {
+            else if (camera_fresh && profile.camera_weight > 0.0f && camera > 0.2f) {
                 target.reason = "camera glare response";
             } else if (temperature_fresh && decision.thermal_risk > 0.2f) {
                 target.reason = "internal temperature response";
@@ -405,7 +428,10 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             const bool hold_camera_noise =
                 !target.manual && camera_fresh && target.enable && !target.fault &&
                 std::fabs(desired_mi - previous) <= KUGLASS_MI_AUTO_DEADBAND;
-            const bool fast_attack = channel < 2U && decision.strong_front_light &&
+            const ChannelPolicyProfile& profile = kChannelProfiles[channel];
+            const bool fast_attack = profile.fast_glare_attack &&
+                                     directional_glare(profile, decision) >=
+                                         kStrongGlareThreshold &&
                                      desired_mi < previous - 0.18f;
             float limited = hold_camera_noise ? previous : desired_mi;
             if (!hold_camera_noise && !fast_attack && desired_mi < previous) {
@@ -428,7 +454,7 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
     else if (any_manual) decision.decision_reason = "manual TTL override";
     else if (privacy_need > 0.0f) decision.decision_reason = "privacy mode";
     else if (decision.strong_front_light) {
-        decision.decision_reason = "camera glare: front fast response";
+        decision.decision_reason = "camera glare: directional fast response";
     } else if (decision.thermal_risk > 0.2f) {
         decision.decision_reason = "internal temperature: thermal load response";
     } else if (!camera_fresh && !temperature_fresh) {

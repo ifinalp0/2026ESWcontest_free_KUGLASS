@@ -28,13 +28,14 @@ ESP32_A GND       --- ESP32_B GND
 
 ## 제공 기능
 
-- IONIQ 5 3D 모형과 CH0~CH3 선택
+- IONIQ 5 3D 모형과 CH0 운전석 창문, CH1 조수석 창문·선루프,
+  CH2 운전석 옆 창문, CH3 조수석 옆 창문 선택
 - 기본, 열부하, 차박, 주차, 카메라 역광 시나리오
 - 일반 운용 화면의 채널별 15초 수동 MI와 AUTO 복귀
 - 운용 MI 0.0~0.60 검증과 MI 0.60을 완전 투명·추정 투과도 100%·산란 0%로
   정규화한 표시
-- 카메라 좌/우 ROI 포화, Edge Density와 내부온도 표시
-- on-demand ESP32_A OV2640 영상
+- 카메라 운전석측/조수석측 ROI 포화, Edge Density와 내부온도 표시
+- 실제 분석 경계를 겹쳐 보여주는 on-demand ESP32_A OV2640 영상
 - A의 target/commanded MI와 B의 applied MI 분리
 - SERVER, ESP32_A, ESP32_B의 online·stale·Fault 분리
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결

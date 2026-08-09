@@ -547,8 +547,8 @@ export function AdminPage() {
           <dl className="admin-card-body">
             <DataRow label="Internal temp" value={state.environment.internalTemp === null ? '결측' : `${state.environment.internalTemp.toFixed(2)} °C`} mono />
             <DataRow label="AE metadata" value={boolLabel(state.cameraMetrics.aeMetadataValid, 'VALID', 'EXCLUDED')} />
-            <DataRow label="Left saturation" value={`${(state.cameraMetrics.frontLeftSaturation * 100).toFixed(1)}%`} mono />
-            <DataRow label="Right saturation" value={`${(state.cameraMetrics.frontRightSaturation * 100).toFixed(1)}%`} mono />
+            <DataRow label="Driver-left saturation" value={`${(state.cameraMetrics.frontLeftSaturation * 100).toFixed(1)}%`} mono />
+            <DataRow label="Passenger-right saturation" value={`${(state.cameraMetrics.frontRightSaturation * 100).toFixed(1)}%`} mono />
             <DataRow label="Edge density" value={`${(state.cameraMetrics.edgeDensity * 100).toFixed(1)}%`} mono />
             <DataRow label="Glare" value={state.cameraMetrics.glare.toFixed(4)} mono />
             <DataRow label="Frame ID" value={numeric(state.cameraMetrics.frameId)} mono />

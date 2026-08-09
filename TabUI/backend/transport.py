@@ -476,7 +476,7 @@ class MockTransport:
             "hot_summer": "MOCK ESP32_A: 내부온도에 따라 4채널 열부하 제어를 적용합니다.",
             "camping": "MOCK ESP32_A: 차박 프라이버시를 위해 전 채널을 강산란으로 전환합니다.",
             "parked": "MOCK ESP32_A: 주차 도난방지와 열부하 저감을 위해 전 채널을 보호합니다.",
-            "camera_saturation": "MOCK ESP32_A: 전면 ROI 강광을 감지해 CH0/CH1 fast-attack을 적용합니다.",
+            "camera_saturation": "MOCK ESP32_A: 운전석측 ROI는 CH0/CH2, 조수석측 ROI는 CH1/CH3에 연결합니다.",
         }
         self._state["decisionReason"] = reasons[demo_mode]
         self._update_camera()

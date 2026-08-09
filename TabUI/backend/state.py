@@ -12,10 +12,10 @@ from .mi import MAX_MI, clamp_mi, normalized_mi
 
 
 CHANNEL_NAMES = [
-    "CH0 전면 좌측",
-    "CH1 전면 우측",
-    "CH2 좌측 전방 도어",
-    "CH3 우측 전방 도어",
+    "CH0 운전석 창문",
+    "CH1 조수석 창문·선루프",
+    "CH2 운전석 옆 창문",
+    "CH3 조수석 옆 창문",
 ]
 
 SAFE_TOKEN = re.compile(r"^[A-Z0-9_]{1,48}$")

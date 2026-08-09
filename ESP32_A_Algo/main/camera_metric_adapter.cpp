@@ -110,9 +110,10 @@ bool analyze_rgb565_frame(const uint8_t* data,
                           size_t data_size,
                           uint16_t width,
                           uint16_t height,
-                          CameraRoiMetrics* left,
-                          CameraRoiMetrics* right) {
-    if (data == nullptr || left == nullptr || right == nullptr || width < 2 || height < 2) {
+                          CameraRoiMetrics* driver_left,
+                          CameraRoiMetrics* passenger_right) {
+    if (data == nullptr || driver_left == nullptr || passenger_right == nullptr ||
+        width < 2 || height < 2) {
         return false;
     }
     const size_t expected_size = static_cast<size_t>(width) * height * 2U;
@@ -161,8 +162,11 @@ bool analyze_rgb565_frame(const uint8_t* data,
         }
     }
 
-    *left = finish(accumulators[0]);
-    *right = finish(accumulators[1]);
+    // camera_service applies the sensor's 180-degree mounting correction
+    // before capture. Therefore x=0 is the same left edge the operator sees
+    // in TabUI: driver side on the Korean left-hand-drive model.
+    *driver_left = finish(accumulators[0]);
+    *passenger_right = finish(accumulators[1]);
     std::free(previous_row);
     return true;
 }
@@ -210,16 +214,16 @@ bool CameraMetricAdapter::sample(SensorSnapshot* snapshot, CameraJpegFrame* jpeg
     const uint64_t capture_timestamp_ms =
         static_cast<uint64_t>(frame->timestamp.tv_sec) * 1000ULL +
         static_cast<uint64_t>(frame->timestamp.tv_usec) / 1000ULL;
-    CameraRoiMetrics left;
-    CameraRoiMetrics right;
+    CameraRoiMetrics driver_left;
+    CameraRoiMetrics passenger_right;
     const bool valid = frame->format == PIXFORMAT_RGB565 &&
                        frame->width <= UINT16_MAX && frame->height <= UINT16_MAX &&
                        analyze_rgb565_frame(frame->buf,
                                             frame->len,
                                             static_cast<uint16_t>(frame->width),
                                             static_cast<uint16_t>(frame->height),
-                                            &left,
-                                            &right);
+                                            &driver_left,
+                                            &passenger_right);
     if (valid && jpeg_frame != nullptr) {
         (void)encode_camera_jpeg(frame, jpeg_frame);
     }
@@ -227,8 +231,11 @@ bool CameraMetricAdapter::sample(SensorSnapshot* snapshot, CameraJpegFrame* jpeg
     if (!valid) {
         return false;
     }
-    snapshot->front_left = left;
-    snapshot->front_right = right;
+    // Keep the established wire-field names while making their physical
+    // meaning explicit: front_left is driver/display-left and front_right is
+    // passenger/display-right.
+    snapshot->front_left = driver_left;
+    snapshot->front_right = passenger_right;
     snapshot->camera_valid = true;
     snapshot->camera_frame_id = ++frame_id_;
     snapshot->camera_timestamp_ms = static_cast<uint32_t>(capture_timestamp_ms);

@@ -5,15 +5,17 @@
 #include <cstddef>
 #include <cstdint>
 
-// Converts the ESP32_A-owned RGB565 VGA frame into the scalar metrics
-// consumed by the policy engine. RGB565 bytes are big-endian, matching the
-// validated standalone camera reference capture path.
+// Converts the display-correct ESP32_A RGB565 VGA frame into the scalar
+// metrics consumed by the policy engine. The first half of each row is the
+// driver's side as shown on the left of TabUI; the second half is the
+// passenger's side as shown on the right. RGB565 bytes are big-endian,
+// matching the validated standalone camera reference capture path.
 bool analyze_rgb565_frame(const uint8_t* data,
                           size_t data_size,
                           uint16_t width,
                           uint16_t height,
-                          CameraRoiMetrics* left,
-                          CameraRoiMetrics* right);
+                          CameraRoiMetrics* driver_left,
+                          CameraRoiMetrics* passenger_right);
 
 struct CameraJpegFrame {
     uint8_t* data = nullptr;

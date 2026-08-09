@@ -183,7 +183,13 @@ export function CameraViewer({ onClose }: Props) {
           </button>
         </header>
         <div className="camera-viewer-stage">
-          <canvas ref={canvasRef} width={640} height={480} aria-label="ESP32_A 실시간 카메라 영상" />
+          <div className="camera-viewer-frame">
+            <canvas ref={canvasRef} width={640} height={480} aria-label="ESP32_A 실시간 카메라 영상" />
+            <div className="camera-roi-overlay" aria-hidden="true">
+              <span>운전석 ROI · CH0/CH2</span>
+              <span>조수석 ROI · CH1/CH3</span>
+            </div>
+          </div>
           {!frameLive ? (
             <div className="camera-viewer-waiting">
               {error || status?.transport === 'mock' ? <CircleAlert size={25} /> : <LoaderCircle className="spin" size={25} />}
