@@ -65,6 +65,7 @@ static constexpr uint32_t KUGLASS_B_RESET_TIMEOUT_MS = 1500;
 static constexpr float KUGLASS_CARRIER_HZ = 16000.0f;
 static constexpr float KUGLASS_FUNDAMENTAL_HZ = 60.0f;
 static constexpr float KUGLASS_DC_LINK_NOMINAL_V = 72.0f;
+static constexpr float KUGLASS_MAX_MODULATION_INDEX = 0.70f;
 // ESP32_A smooths policy noise; ESP32_B remains the authoritative actuator
 // slew limiter.  Keep this stage fast enough that it does not dominate the
 // physical response while rejecting sub-1% AUTO target chatter.
@@ -77,3 +78,5 @@ static_assert(KUGLASS_MI_SERVO_RESPONSE > 0.0f &&
               KUGLASS_MI_SERVO_RESPONSE <= 1.0f);
 static_assert(KUGLASS_MI_AUTO_DEADBAND >= 0.0f &&
               KUGLASS_MI_AUTO_DEADBAND < 0.05f);
+static_assert(KUGLASS_MAX_MODULATION_INDEX > 0.0f &&
+              KUGLASS_MAX_MODULATION_INDEX < 1.0f);

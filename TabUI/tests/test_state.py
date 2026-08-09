@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.state import StateStore
+from backend.state import StateStore, estimated_transmittance, optical_state
 
 
 def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
@@ -39,6 +39,10 @@ def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
 
 
 class StateStoreTests(unittest.TestCase):
+    def test_operational_maximum_is_rendered_as_clear(self) -> None:
+        self.assertEqual(optical_state(0.7), "CLEAR")
+        self.assertEqual(estimated_transmittance(0.7), 0.95)
+
     def test_full_snake_case_state_is_normalized_for_simul_ui(self) -> None:
         store = StateStore()
         accepted = store.apply_record({
@@ -165,7 +169,7 @@ class StateStoreTests(unittest.TestCase):
         store.apply_record(b_status({"id": 1, "mi": 0.0, "fault": True}))
         store.apply_record({
             "type": "state",
-            "channels": [{"channel_id": 1, "commanded_mi": 0.8, "fault": False}],
+            "channels": [{"channel_id": 1, "commanded_mi": 0.7, "fault": False}],
         })
         self.assertTrue(store.snapshot()["channels"][1]["fault"])
 
@@ -191,9 +195,9 @@ class StateStoreTests(unittest.TestCase):
             "type": "state",
             "channels": [{
                 "channel_id": 1,
-                "target_mi": 0.8,
+                "target_mi": 0.69,
                 "commanded_mi": 0.7,
-                "applied_mi": 0.9,
+                "applied_mi": 0.68,
                 "fault": False,
             }],
             "downstream": {
@@ -224,6 +228,13 @@ class StateStoreTests(unittest.TestCase):
         self.assertTrue(store.downstream_healthy)
         self.assertEqual(store.downstream_error, "NONE")
         self.assertEqual(store.snapshot()["channels"][2]["appliedMi"], 0.31)
+
+    def test_downstream_status_rejects_mi_above_operational_maximum(self) -> None:
+        store = StateStore()
+        self.assertFalse(store.apply_record(
+            b_status({"id": 2, "mi": 0.7001, "fault": False})
+        ))
+        self.assertFalse(store.snapshot()["channels"][2]["appliedKnown"])
 
     def test_downstream_diagnostics_adc_masks_and_control_result_are_normalized(self) -> None:
         store = StateStore(time_fn=lambda: 1234.0)

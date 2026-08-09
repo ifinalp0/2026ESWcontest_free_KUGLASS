@@ -184,25 +184,31 @@ int main() {
     assert(KUGLASS_A_UART_RX_GPIO == 44);
     assert(!kuglass_power_stage_owns_gpio(KUGLASS_A_UART_TX_GPIO));
     assert(!kuglass_power_stage_owns_gpio(KUGLASS_A_UART_RX_GPIO));
-    assert(near(KUGLASS_MAX_MODULATION_INDEX, 0.95f));
+    assert(near(KUGLASS_MAX_MODULATION_INDEX, 0.70f));
 
     ProtocolCommand command;
     ProtocolError error;
     assert(parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.8,true]]}",
+        "[2,0.6,true],[3,0.7,true]]}",
         &command, &error));
+    assert(!parse_command_line(
+        "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
+        "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
+        "[2,0.6,true],[3,0.7001,true]]}",
+        &command, &error));
+    assert(error == ProtocolError::BAD_CHANNEL_ARRAY);
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":8,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[0,0.4,true],"
-        "[2,0.6,true],[3,0.8,true]]}",
+        "[2,0.6,true],[3,0.7,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_CHANNEL_ARRAY);
     assert(!parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":8,"
         "\"ttl_ms\":49,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.8,true]]}",
+        "[2,0.6,true],[3,0.7,true]]}",
         &command, &error));
     assert(error == ProtocolError::BAD_TTL);
 
@@ -256,19 +262,23 @@ int main() {
     assert(parse_command_line(
         "{\"v\":1,\"type\":\"actuator_command\",\"seq\":7,"
         "\"ttl_ms\":250,\"ch\":[[0,0.2,true],[1,0.4,true],"
-        "[2,0.6,true],[3,0.8,true]]}",
+        "[2,0.6,true],[3,0.7,true]]}",
         &command, &error));
     ChannelManager channels;
     channels.begin();
     assert(channels.apply_command(command));
     advance_channels(channels, 0.25f);
     assert(channels.count() == 4);
-    assert(near(channels.channel(3)->applied_mi, 0.8f));
+    assert(near(channels.channel(3)->applied_mi,
+                KUGLASS_MAX_MODULATION_INDEX));
 
-    ProtocolCommand maximum = make_full_command(1.0f);
+    ProtocolCommand maximum = make_full_command(KUGLASS_MAX_MODULATION_INDEX);
     assert(channels.apply_command(maximum));
     assert(near(channels.channel(0)->target_mi,
                 KUGLASS_MAX_MODULATION_INDEX));
+    ProtocolCommand over_maximum =
+        make_full_command(KUGLASS_MAX_MODULATION_INDEX + 0.0001f);
+    assert(!channels.apply_command(over_maximum));
     ProtocolCommand duplicate = maximum;
     duplicate.channels[0].mi = 0.1f;
     duplicate.channels[1].channel_id = 0;

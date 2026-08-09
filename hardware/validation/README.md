@@ -91,7 +91,7 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 - `PWM_MAG`, `DIR`, `CHx_ENABLE`의 J7-J10 연속성과 10 kohm input pulldown을 확인합니다.
 - `FAULT_N` open-collector와 Logic Carrier pull-up 조합을 확인합니다.
 - `RUN_OK = CHx_ENABLE AND FAULT_N`이 두 IRS2104 shutdown을 제어하는지 확인합니다.
-- 16 kHz carrier, 60 Hz polarity, 최대 0.95 duty와 direction blanking을 확인합니다.
+- 16 kHz carrier, 60 Hz polarity, 최대 0.70 duty와 direction blanking을 확인합니다.
 - 정상 MI 감소 12.0 MI/s와 증가 4.0 MI/s, 출력 task 지연 시 2 ms를 넘지 않는
   단일 slew step을 확인합니다. 이 값은 logic-level 파형 확인 뒤 저전압 dummy
   load에서 과도전류와 ringing을 통과해야 하는 firmware 후보입니다.
@@ -113,7 +113,7 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 앞 단계가 모두 PASS인 보드만 별도 HV 안전 절차와 enclosure/interlock 아래에서 진행합니다.
 
 - current-limited DC bus와 dummy load에서 한 채널씩 시작합니다.
-- `0 -> 0.95`, `0.95 -> 중간 MI`, `중간 MI -> 0` 전환에서 bridge node, filtered
+- `0 -> 0.70`, `0.70 -> 중간 MI`, `중간 MI -> 0` 전환에서 bridge node, filtered
   output의 peak current·overshoot·ringing, rail droop와 Fault pulse를 확인하고
   MOSFET/driver/inductor 온도를 확인합니다.
 - 네 채널 동시 시험에서 ground bounce, cross-channel fault/ADC coupling과 connector 온도를 측정합니다.

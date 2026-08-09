@@ -14,6 +14,14 @@ float clamp01(float value) {
     return value;
 }
 
+float clamp_mi(float value) {
+    if (value < 0.0f) return 0.0f;
+    if (value > KUGLASS_MAX_MODULATION_INDEX) {
+        return KUGLASS_MAX_MODULATION_INDEX;
+    }
+    return value;
+}
+
 float roi_glare_score(const CameraRoiMetrics& roi,
                       bool ae_metadata_valid,
                       float exposure_us,
@@ -58,16 +66,20 @@ float visibility_weight(uint8_t channel) {
 
 float transmission_to_mi(float transmission) {
     struct LutPoint { float transmission; float mi; };
+    // Preserve the previous 0.95-based curve shape while scaling its MI axis
+    // to the system-wide 0.70 operational maximum.
     constexpr LutPoint points[] = {
-        {0.00f, 0.00f}, {0.15f, 0.18f}, {0.35f, 0.40f},
-        {0.65f, 0.68f}, {0.85f, 0.84f}, {1.00f, 0.95f},
+        {0.00f, 0.0000f}, {0.15f, 0.1326f}, {0.35f, 0.2947f},
+        {0.65f, 0.5011f}, {0.85f, 0.6189f},
+        {1.00f, KUGLASS_MAX_MODULATION_INDEX},
     };
     const float value = clamp01(transmission);
     for (size_t i = 1; i < sizeof(points) / sizeof(points[0]); ++i) {
         if (value <= points[i].transmission) {
             const float ratio = (value - points[i - 1].transmission) /
                                 (points[i].transmission - points[i - 1].transmission);
-            return clamp01(points[i - 1].mi + ratio * (points[i].mi - points[i - 1].mi));
+            return clamp_mi(points[i - 1].mi +
+                            ratio * (points[i].mi - points[i - 1].mi));
         }
     }
     return points[sizeof(points) / sizeof(points[0]) - 1].mi;
@@ -159,7 +171,7 @@ PolicyApplyResult PolicyEngine::apply_command(const UiCommand& command, uint32_t
         case UiCommandType::MANUAL_CHANNEL: {
             ManualState& manual = manual_[command.channel_id];
             manual.active = true;
-            manual.target_mi = clamp01(command.target_mi);
+            manual.target_mi = clamp_mi(command.target_mi);
             manual.enable = command.enable;
             manual.expires_ms = now_ms + command.ttl_ms;
             return {true, nullptr};
@@ -397,8 +409,8 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             }
             servo_mi_[channel] = fast_attack
                 ? desired_mi
-                : clamp01(previous +
-                          KUGLASS_MI_SERVO_RESPONSE * (limited - previous));
+                : clamp_mi(previous +
+                           KUGLASS_MI_SERVO_RESPONSE * (limited - previous));
         }
         target.applied_mi = servo_mi_[channel];
     }

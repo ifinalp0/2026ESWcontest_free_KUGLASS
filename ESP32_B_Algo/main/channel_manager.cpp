@@ -31,7 +31,8 @@ bool ChannelManager::apply_command(const ProtocolCommand& command) {
     for (size_t i = 0; i < command.channel_count; ++i) {
         const ProtocolChannelCommand& item = command.channels[i];
         if (item.channel_id >= KUGLASS_CHANNEL_COUNT ||
-            !std::isfinite(item.mi) || item.mi < 0.0f || item.mi > 1.0f) {
+            !std::isfinite(item.mi) || item.mi < 0.0f ||
+            item.mi > KUGLASS_MAX_MODULATION_INDEX) {
             return false;
         }
         const uint8_t bit = static_cast<uint8_t>(1U << item.channel_id);

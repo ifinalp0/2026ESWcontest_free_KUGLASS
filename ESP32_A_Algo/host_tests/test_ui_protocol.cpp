@@ -23,6 +23,17 @@ int main() {
     assert(!command.enable);
 
     assert(parse_ui_command_line(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":111,\"command\":\"manual_channel\","
+        "\"channel_id\":0,\"target_mi\":0.7,\"ttl_ms\":30000,\"enable\":true}",
+        &command, &error));
+    assert(std::fabs(command.target_mi - 0.7f) < 0.0001f);
+    assert(!parse_ui_command_line(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":112,\"command\":\"manual_channel\","
+        "\"channel_id\":0,\"target_mi\":0.7001,\"ttl_ms\":30000,\"enable\":true}",
+        &command, &error));
+    assert(error == UiProtocolError::OUT_OF_RANGE);
+
+    assert(parse_ui_command_line(
         "{\"v\":1,\"type\":\"ui_command\",\"seq\":12,\"command\":\"set_demo\","
         "\"demo_mode\":\"camera_saturation\"}", &command, &error));
     assert(command.demo_mode == DemoMode::CAMERA_SATURATION);

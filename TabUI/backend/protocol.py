@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .mi import MAX_MI
+
 
 SCENARIOS = {
     "none": "driving",
@@ -76,8 +78,8 @@ def translate_ui_command(
         ]
     elif command_type == "setManualChannel":
         mi = _number(payload.get("mi"), "mi")
-        if not 0.0 <= mi <= 1.0:
-            raise CommandError("mi must be between 0 and 1")
+        if not 0.0 <= mi <= MAX_MI:
+            raise CommandError(f"mi must be between 0 and {MAX_MI:.2f}")
         enable = payload.get("enable", True)
         if not isinstance(enable, bool):
             raise CommandError("enable must be a boolean")

@@ -20,12 +20,13 @@ import {
   TriangleAlert
 } from 'lucide-react';
 import { channelDisplayName } from '../lib/labels';
+import { MAX_MI } from '../lib/mi';
 import { useTabUIClient } from '../lib/socket';
 import type { ChannelState, DownstreamAdcChannel } from '../types';
 import '../styles/admin.css';
 
 const backendUrl = (import.meta.env.VITE_BACKEND_URL ?? '').replace(/\/$/, '');
-const MAX_ADMIN_MI = 0.95;
+const MAX_ADMIN_MI = MAX_MI;
 
 interface CameraStatus {
   requested: boolean;

@@ -265,7 +265,8 @@ bool parse_channel(JsonCursor* cursor,
         } else if (std::strcmp(key, "mi") == 0) {
             if (have_mi) { *error = DownstreamStatusError::DUPLICATE_FIELD; return false; }
             if (!cursor->parse_float(&channel->applied_mi) ||
-                channel->applied_mi < 0.0f || channel->applied_mi > 1.0f) {
+                channel->applied_mi < 0.0f ||
+                channel->applied_mi > KUGLASS_MAX_MODULATION_INDEX) {
                 *error = DownstreamStatusError::BAD_CHANNEL;
                 return false;
             }

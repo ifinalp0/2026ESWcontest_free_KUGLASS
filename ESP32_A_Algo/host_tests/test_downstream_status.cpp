@@ -221,6 +221,15 @@ int main() {
         "{\"id\":0,\"mi\":0.1,\"fault\":false},"
         "{\"id\":1,\"mi\":0.2,\"fault\":false}]}",
         DownstreamStatusError::INCOMPLETE_CHANNELS));
+    assert(rejects(
+        "{\"v\":1,\"type\":\"status\",\"controller_id\":\"B\",\"seq\":1,"
+        "\"boot_id\":1,\"reset_challenge\":2,\"estop\":false,"
+        "\"fault_code\":\"NONE\",\"ch\":["
+        "{\"id\":0,\"mi\":0.7001,\"fault\":false},"
+        "{\"id\":1,\"mi\":0.2,\"fault\":false},"
+        "{\"id\":2,\"mi\":0.3,\"fault\":false},"
+        "{\"id\":3,\"mi\":0.4,\"fault\":false}]}",
+        DownstreamStatusError::BAD_CHANNEL));
 
     Esp32BLink link;
     assert(link.note_valid_status(1000, 7001, 100));

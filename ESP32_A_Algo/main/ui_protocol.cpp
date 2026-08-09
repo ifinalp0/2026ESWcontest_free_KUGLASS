@@ -255,7 +255,8 @@ bool parse_ui_command_line(const char* line, UiCommand* out, UiProtocolError* er
                     *error = UiProtocolError::INVALID_FIELD;
                     return false;
                 }
-                if (out->target_mi < 0.0f || out->target_mi > 1.0f) {
+                if (out->target_mi < 0.0f ||
+                    out->target_mi > KUGLASS_MAX_MODULATION_INDEX) {
                     *error = UiProtocolError::OUT_OF_RANGE;
                     return false;
                 }

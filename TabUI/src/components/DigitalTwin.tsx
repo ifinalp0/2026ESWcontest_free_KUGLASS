@@ -27,6 +27,7 @@ import {
 import type { Material, Texture } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { channelDisplayName } from '../lib/labels';
+import { MAX_MI, normalizedMi } from '../lib/mi';
 import type { ChannelState } from '../types';
 
 interface Props {
@@ -112,7 +113,7 @@ const FILM_SURFACE_GAP = 0.006;
 const FILM_SUBDIVISIONS = 3;
 
 function frostAmount(mi: number) {
-  const frost = 1 - mi;
+  const frost = 1 - normalizedMi(mi);
   return frost * frost * (3 - 2 * frost);
 }
 
@@ -296,7 +297,7 @@ function PdlcFilmSurface({ part, channel, selected, onSelectChannel }: {
   selected: boolean;
   onSelectChannel?: (channel: number) => void;
 }) {
-  const visualMiRef = useRef(channel.appliedKnown ? channel.appliedMi : 0.5);
+  const visualMiRef = useRef(channel.appliedKnown ? channel.appliedMi : MAX_MI / 2);
   const filmMaterialRef = useRef<MeshPhysicalMaterial>(null);
   const hazeMaterialRef = useRef<MeshBasicMaterial>(null);
   const edgeMaterialRef = useRef<LineBasicMaterial>(null);

@@ -41,9 +41,9 @@ static constexpr uint32_t KUGLASS_ANALOG_SCAN_PERIOD_MS = 5;
 static constexpr float KUGLASS_CARRIER_HZ = 16000.0f;
 static constexpr float KUGLASS_FUNDAMENTAL_HZ = 60.0f;
 // The IRS2104 high-side supplies on the referenced Power Stage are
-// bootstrapped. Keep at least 5% of every carrier period available for
-// refresh until the production stage is characterized on the bench.
-static constexpr float KUGLASS_MAX_MODULATION_INDEX = 0.95f;
+// bootstrapped. The system-wide operational cap leaves 30% of every carrier
+// period available for refresh while the production stage awaits bench data.
+static constexpr float KUGLASS_MAX_MODULATION_INDEX = 0.70f;
 // B is the sole authoritative actuator slew limiter.  De-energizing changes
 // are faster than energizing changes, while both remain bounded per 1 ms
 // output update.  These are firmware candidate rates pending Power Stage HIL.

@@ -25,7 +25,8 @@ flowchart LR
 
 - 입력: 카메라 1대, YwRobot SEN050007 DS18B20 내부온도센서 모듈 1개
 - 출력: PDLC CH0~CH3
-- MI 의미: 1.0에 가까울수록 CLEAR, 0.0 또는 disable은 safe-off·강산란 방향
+- MI 의미: 값이 클수록 CLEAR이며 현재 운용 상한 0.70이 최대 투명 방향입니다.
+  0.0 또는 disable은 safe-off·강산란 방향입니다.
 - 제어 우선순위: `E-Stop > latched Fault > Manual(TTL) > Demo/Auto`
 
 ESP32_A가 권위 있는 목표 MI를 계산합니다. ESP32_B는 목표를 다시 계산하지 않고

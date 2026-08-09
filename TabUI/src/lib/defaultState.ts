@@ -1,5 +1,6 @@
 import type { DownstreamAdc, SimulationState } from '../types';
 import { channelLabels } from './labels';
+import { MAX_MI } from './mi';
 
 function defaultDownstreamAdc(): DownstreamAdc {
   return {
@@ -31,14 +32,14 @@ export const defaultState: SimulationState = {
   channels: channelLabels.map((name, channel) => ({
     channel,
     name,
-    targetMi: 0.95,
-    commandedMi: 0.95,
+    targetMi: MAX_MI,
+    commandedMi: MAX_MI,
     commandedEnable: false,
     commandedEnableKnown: false,
     appliedMi: 0,
     appliedKnown: false,
-    estimatedTransmittance: 0.92,
-    opticalState: 'CLEAR',
+    estimatedTransmittance: 0.12,
+    opticalState: 'FROST',
     policyEstimatedTransmittance: null,
     policyOpticalState: null,
     appliedSource: null,

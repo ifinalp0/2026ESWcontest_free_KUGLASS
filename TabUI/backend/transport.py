@@ -15,6 +15,7 @@ from .camera import (
     CameraFrame,
     fnv1a,
 )
+from .mi import MAX_MI, clamp_mi
 from .state import clamp, default_state, estimated_transmittance, optical_state
 
 
@@ -36,6 +37,9 @@ class Transport(Protocol):
 AUTO_USB_PORT = "auto"
 USB_CDC_LINE_CODING_BAUD = 115200
 CAMERA_HEADER = struct.Struct("<8sIHHB3xII")
+# Preserve the original MOCK camera-response curve after scaling its MI axis
+# from 0.95 to the system-wide operational maximum.
+CAMERA_DIMMING_MI_SPAN_FRACTION = 0.75 / 0.95
 
 
 def discover_esp32_usb_ports(port_infos: Iterable[Any] | None = None) -> list[str]:
@@ -290,11 +294,11 @@ class MockTransport:
     error = None
 
     SCENARIO_TARGETS = {
-        "none": [0.95] * 4,
-        "hot_summer": [0.82, 0.80, 0.52, 0.52],
-        "camping": [0.04] * 4,
-        "parked": [0.03] * 4,
-        "camera_saturation": [0.42, 0.76, 0.86, 0.86],
+        "none": [MAX_MI] * 4,
+        "hot_summer": [0.6042, 0.5895, 0.3832, 0.3832],
+        "camping": [0.0295] * 4,
+        "parked": [0.0221] * 4,
+        "camera_saturation": [0.3095, 0.56, 0.6337, 0.6337],
     }
 
     def __init__(self) -> None:
@@ -309,7 +313,7 @@ class MockTransport:
         self._source_session_id = 3001
         self._pending_control_result: dict[str, Any] | None = None
         self._manual_targets: dict[int, tuple[float, bool, float]] = {}
-        self._auto_targets = [0.95] * 4
+        self._auto_targets = [MAX_MI] * 4
         self._state["environment"].update({
             "internalTemp": 27.0,
             "frontLeftSaturation": 0.08,
@@ -326,7 +330,7 @@ class MockTransport:
             "thermalRisk": 0.0,
         })
         for channel in self._state["channels"]:
-            self._set_channel(channel, 0.95, 0.95, enabled=True)
+            self._set_channel(channel, MAX_MI, MAX_MI, enabled=True)
         self._state["decisionReason"] = "개발용 MOCK ESP32_A가 기본 자동 정책을 보고합니다."
 
     def write_line(self, line: str) -> None:
@@ -385,7 +389,7 @@ class MockTransport:
                 self._set_scenario(demo_mode)
         elif command == "manual_channel":
             channel_id = int(record["channel_id"])
-            mi = clamp(record["target_mi"])
+            mi = clamp_mi(record["target_mi"])
             enable = bool(record.get("enable", True))
             expires = time.time() + max(0.0, float(record.get("ttl_ms", 30000))) / 1000.0
             self._manual_targets[channel_id] = (mi, enable, expires)
@@ -494,7 +498,9 @@ class MockTransport:
     def _update_camera(self) -> None:
         environment = self._state["environment"]
         front_mi = (self._state["channels"][0]["appliedMi"] + self._state["channels"][1]["appliedMi"]) / 2
-        dimming = clamp((0.95 - front_mi) / 0.75)
+        dimming = clamp(
+            (MAX_MI - front_mi) / (MAX_MI * CAMERA_DIMMING_MI_SPAN_FRACTION)
+        )
         left = clamp((environment["frontLeftSaturation"] or 0) * (1 - 0.52 * dimming))
         right = clamp((environment["frontRightSaturation"] or 0) * (1 - 0.52 * dimming))
         edge = clamp((environment["edgeDensity"] or 0) - 0.1 * dimming)
@@ -515,7 +521,7 @@ class MockTransport:
         *,
         enabled: bool,
     ) -> None:
-        target, applied = clamp(target), clamp(applied)
+        target, applied = clamp_mi(target), clamp_mi(applied)
         channel.update({
             "targetMi": round(target, 4),
             "commandedMi": round(target, 4),

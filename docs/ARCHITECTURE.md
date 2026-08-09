@@ -43,8 +43,8 @@ flowchart LR
 1. ESP32_A가 카메라와 내부온도의 유효성·stale 여부를 판단한다.
 2. 상황 모드, thermal, camera glare와 수동 TTL을 결합해 CH0~CH3
    `target_mi`를 계산한다.
-3. LUT, AUTO 0.01 MI deadband와 빠른 policy servo를 적용한 `commanded_mi` 전체를
-   ESP32_B에 20 Hz로 보낸다.
+3. 운용 상한 0.70으로 스케일한 LUT, AUTO 0.01 MI deadband와 빠른 policy servo를
+   적용한 `commanded_mi` 전체를 ESP32_B에 20 Hz로 보낸다.
 4. ESP32_B가 version, sequence, TTL, 채널 집합과 범위를 검사한다.
 5. ESP32_B가 정상 명령을 감소 12.0 MI/s, 증가 4.0 MI/s로 최종 제한하고 안전
    입력이 모두 정상일 때만 Logic Carrier를 통해 출력을 적용한다. 이 변화율은
@@ -96,7 +96,7 @@ ESP32_B를 Power Stage에 직접 연결하지 않는다. 상세 핀과 커넥터
 | `target_mi` | ESP32_A 정책이 원하는 값 |
 | `commanded_mi` | ESP32_A가 rate limit 등을 적용해 ESP32_B에 보낸 값 |
 | `applied_mi` | ESP32_B가 실제 출력에 적용하고 status로 보고한 값 |
-| CLEAR | MI가 1.0에 가까운 상태 |
+| CLEAR | 현재 운용 상한 MI 0.70에 가까운 최대 투명 방향 상태 |
 | safe-off | enable 해제와 MI 0.0. 전원 rail 전체가 차단됐다는 뜻은 아님 |
 
 TabUI는 A와 B의 online/stale 상태를 따로 표시한다. B status를 받기 전에는

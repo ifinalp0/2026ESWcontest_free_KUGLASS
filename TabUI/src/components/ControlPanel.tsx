@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { channelDisplayName } from '../lib/labels';
+import { MAX_MI, normalizedMi } from '../lib/mi';
 import type { ChannelState, ControlCommand, EnvironmentInput } from '../types';
 
 interface Props {
@@ -17,7 +18,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
   const interactionActive = useRef(false);
   const pendingManual = useRef<{ channel: number; mi: number } | null>(null);
   const controlMi = Number.isFinite(selected.commandedMi) ? selected.commandedMi : selected.targetMi;
-  const controllerFrostStrength = Math.round((1 - controlMi) * 100);
+  const controllerFrostStrength = Math.round((1 - normalizedMi(controlMi)) * 100);
   const [manualDraft, setManualDraft] = useState({ channel: selected.channel, frostStrength: controllerFrostStrength });
   const frostStrength = manualDraft.channel === selected.channel ? manualDraft.frostStrength : controllerFrostStrength;
   const manualRemaining = selected.manualUntil ? Math.max(0, Math.round(selected.manualUntil - Date.now() / 1000)) : null;
@@ -57,7 +58,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
       return;
     }
     const frost = Math.max(0, Math.min(100, Math.round(value)));
-    const mi = Number((1 - frost / 100).toFixed(3));
+    const mi = Number((MAX_MI * (1 - frost / 100)).toFixed(3));
     setManualDraft({ channel: selected.channel, frostStrength: frost });
     pendingManual.current = { channel: selected.channel, mi };
     sendCommand({ type: 'setManualChannel', channel: selected.channel, mi, ttlSeconds: 30 });

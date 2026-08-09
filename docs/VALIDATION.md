@@ -57,6 +57,8 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 - command ACK, manual TTL, AUTO 복귀와 TabUI 단절 중 A의 AUTO 지속
 - A→B timeout, invalid frame, watchdog의 B safe-off
 - target/commanded/applied MI 분리
+- TabUI→A 수동 명령, A→B full frame과 B→A status가 MI 0.0~0.70만 수락하고
+  0.70 초과 frame을 전체 거부하는지 확인
 - A AUTO 0.01 MI deadband와 20 Hz 빠른 servo가 작은 카메라 목표 chatter는
   유지하면서 큰 target 변화에는 지연 없이 수렴하는지 확인
 - B의 감소 12.0 MI/s·증가 4.0 MI/s와 2 ms slew `dt` 상한을 확인하고, 저전압

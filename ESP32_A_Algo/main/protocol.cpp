@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include "kuglass_config.h"
 #include "strict_json.h"
 
 #include <cstdarg>
@@ -61,7 +62,8 @@ bool parse_channel_array(StrictJsonCursor* cursor,
             return false;
         }
         float mi = 0.0f;
-        if (!cursor->parse_number(&mi) || mi < 0.0f || mi > 1.0f ||
+        if (!cursor->parse_number(&mi) || mi < 0.0f ||
+            mi > KUGLASS_MAX_MODULATION_INDEX ||
             !cursor->consume(',')) {
             *error = ProtocolError::BAD_CHANNEL_ARRAY;
             return false;
@@ -193,7 +195,8 @@ bool format_command_line(const ProtocolCommand& command, char* output, size_t ou
     for (size_t i = 0; i < command.channel_count; ++i) {
         const ProtocolChannelCommand& channel = command.channels[i];
         if (channel.channel_id >= KUGLASS_MAX_COMMAND_CHANNELS ||
-            !std::isfinite(channel.mi) || channel.mi < 0.0f || channel.mi > 1.0f) {
+            !std::isfinite(channel.mi) || channel.mi < 0.0f ||
+            channel.mi > KUGLASS_MAX_MODULATION_INDEX) {
             return false;
         }
         const uint8_t bit = static_cast<uint8_t>(1U << channel.channel_id);

@@ -57,6 +57,14 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(message["target_mi"], 0.7)
         self.assertEqual(message["ttl_ms"], 45000)
 
+    def test_manual_command_rejects_mi_above_operational_maximum(self) -> None:
+        with self.assertRaises(CommandError):
+            translate_ui_command(
+                {"type": "setManualChannel", "channel": 0, "mi": 0.7001},
+                Sequence().next,
+                diagnostics_enabled=False,
+            )
+
     def test_manual_enable_requires_json_boolean(self) -> None:
         with self.assertRaises(CommandError):
             translate_ui_command(

@@ -8,6 +8,8 @@ import time
 from collections import deque
 from typing import Any, Callable
 
+from .mi import MAX_MI, clamp_mi, normalized_mi
+
 
 CHANNEL_NAMES = [
     "CH0 전면 좌측",
@@ -76,15 +78,16 @@ def clamp(value: Any, lower: float = 0.0, upper: float = 1.0) -> float:
 
 
 def optical_state(mi: float) -> str:
-    if mi >= 0.72:
+    normalized = normalized_mi(mi)
+    if normalized >= 0.72:
         return "CLEAR"
-    if mi >= 0.30:
+    if normalized >= 0.30:
         return "DIM"
     return "FROST"
 
 
 def estimated_transmittance(mi: float) -> float:
-    return round(0.12 + 0.83 * (clamp(mi) ** 1.18), 3)
+    return round(0.12 + 0.83 * (normalized_mi(mi) ** 1.18), 3)
 
 
 def default_state() -> dict[str, Any]:
@@ -408,13 +411,13 @@ class StateStore:
             commanded_value = item.get("commandedMi", item.get("commanded_mi"))
             if source == "master":
                 if target_value is not None:
-                    current["targetMi"] = round(clamp(target_value), 4)
+                    current["targetMi"] = round(clamp_mi(target_value), 4)
                 elif commanded_value is not None:
-                    current["targetMi"] = round(clamp(commanded_value), 4)
+                    current["targetMi"] = round(clamp_mi(commanded_value), 4)
                 if commanded_value is not None:
-                    current["commandedMi"] = round(clamp(commanded_value), 4)
+                    current["commandedMi"] = round(clamp_mi(commanded_value), 4)
                 elif target_value is not None:
-                    current["commandedMi"] = round(clamp(target_value), 4)
+                    current["commandedMi"] = round(clamp_mi(target_value), 4)
                 enable_value = item.get("commandedEnable", item.get("enable"))
                 if isinstance(enable_value, bool):
                     current["commandedEnable"] = enable_value
@@ -442,7 +445,7 @@ class StateStore:
             if source == "downstream":
                 applied_value = item.get("appliedMi", item.get("applied_mi", item.get("mi")))
                 if applied_value is not None:
-                    applied_mi = round(clamp(applied_value), 4)
+                    applied_mi = round(clamp_mi(applied_value), 4)
                     applied_known = True
             master_fault = current["masterFault"]
             downstream_fault = current["downstreamFault"]
@@ -617,7 +620,7 @@ def _normalize_downstream_status(record: dict[str, Any]) -> dict[str, Any] | Non
             or isinstance(mi, bool)
             or not isinstance(mi, (int, float))
             or not math.isfinite(float(mi))
-            or not 0.0 <= float(mi) <= 1.0
+            or not 0.0 <= float(mi) <= MAX_MI
             or not isinstance(fault, bool)
         ):
             return None

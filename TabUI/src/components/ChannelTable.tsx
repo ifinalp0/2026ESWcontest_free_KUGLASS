@@ -1,4 +1,5 @@
 import { channelDisplayName, opticalStateLabels } from '../lib/labels';
+import { normalizedMi } from '../lib/mi';
 import type { ChannelState, DownstreamAdc } from '../types';
 
 interface Props {
@@ -32,6 +33,7 @@ export function ChannelTable({ channels, adc, selectedChannel, onSelectChannel }
       <div className="channel-table">
         {channels.map((channel) => {
           const appliedMi = channel.appliedKnown ? Math.round(channel.appliedMi * 100) : null;
+          const appliedRangePercent = channel.appliedKnown ? Math.round(normalizedMi(channel.appliedMi) * 100) : 0;
           const stateLabel = channel.fault
             ? '구동기 고장'
             : channel.appliedKnown
@@ -63,7 +65,7 @@ export function ChannelTable({ channels, adc, selectedChannel, onSelectChannel }
               <span className="channel-row-name">{displayName}</span>
               <strong className="channel-mi-value">{appliedMi === null ? '—' : <>{appliedMi}<small>%</small></>}</strong>
               <span className="channel-mi-track" aria-hidden="true">
-                <i style={{ width: `${appliedMi ?? 0}%` }} />
+                <i style={{ width: `${appliedRangePercent}%` }} />
               </span>
               <span className="channel-sense" aria-label="Power Stage ADC sense 전압 또는 원시값">
                 <small>I SENSE<strong>{currentSense}</strong></small>

@@ -75,7 +75,8 @@ ESP32_A -> 상태·ACK·B 적용 MI/Fault -> TabUI -> 브라우저
 - TabUI는 화면, API, 명령 검증, 상태 집계, replay snapshot과 USB gateway를
   담당한다. LIVE에서 자동 MI를 계산하지 않는다.
 - `target_mi`, A가 전송한 `commanded_mi`, B가 보고한 `applied_mi`를 구분한다.
-- MI는 1.0에 가까울수록 CLEAR다. 0.0 또는 disable은 전원 차단·강산란 방향이다.
+- MI는 값이 클수록 CLEAR이며 현재 운용 상한 0.70이 최대 투명 방향이다.
+  0.0 또는 disable은 전원 차단·강산란 방향이다.
 
 ## 4. 런타임과 통신 불변조건
 
@@ -88,7 +89,7 @@ ESP32_A -> 상태·ACK·B 적용 MI/Fault -> TabUI -> 브라우저
   실제 `mi`/`fault`, `estop`, `fault_code`를 사용한다.
 - 모든 B status에는 nonzero u32 `boot_id`와 `reset_challenge`가 필요하다.
   `diagnostic`, `adc`, `control_result`는 정의된 용도에서만 추가한다.
-- 채널 ID는 0~3, MI는 유한한 0.0~1.0, enable/fault는 JSON boolean이다.
+- 채널 ID는 0~3, MI는 유한한 0.0~0.70, enable/fault는 JSON boolean이다.
   누락, 중복, 타입 오류, 범위 이탈 frame은 부분 적용하지 않고 전체 거부한다.
 - B status `seq`는 B가 소유하는 독립 sequence다. A는 같은 `boot_id` 안에서만
   비교하며 새 `boot_id`를 받으면 sequence 기준을 즉시 재설정한다.
@@ -219,7 +220,7 @@ Logic Carrier 1장과 동일한 단일 채널 Power Stage 4장은 제작 완료�
   정적 HIGH를 유지한다. 방향 전환은 PWM force-low, blanking, DIR 변경, 안전 입력
   재검사, PWM 재개 순서를 지키며 disable 또는 안전 조건에서는 enable을 LOW로
   내린다.
-- 최대 MI는 IRS2104 bootstrap refresh를 위해 0.95를 넘지 않는다.
+- 최대 MI는 IRS2104 bootstrap refresh와 현재 운용 정책을 위해 0.70을 넘지 않는다.
 - E-Stop, 잘못된 frame, timeout, watchdog은 전체 safe-off한다. latched Power Stage
   Fault는 해당 채널만 safe-off하고 나머지 정상 채널은 활성 lease를 계속 따른다.
 - Fault clear는 B가 target boot, one-time challenge와 실제 안전 입력을 확인한

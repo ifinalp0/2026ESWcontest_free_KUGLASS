@@ -47,6 +47,10 @@ int main() {
     assert(glare.glare_left > glare.glare_right);
     assert(glare.channels[0].target_mi < glare.channels[1].target_mi);
     assert(glare.channels[0].target_transmission >= 0.45f);
+    for (const PolicyChannelTarget& channel : glare.channels) {
+        assert(channel.target_mi <= KUGLASS_MAX_MODULATION_INDEX);
+        assert(channel.applied_mi <= KUGLASS_MAX_MODULATION_INDEX);
+    }
 
     PolicyEngine thermal_engine;
     thermal_engine.begin();
@@ -100,7 +104,7 @@ int main() {
         fast_response = response_engine.update(SensorSnapshot{}, now + elapsed);
     }
     assert(clear.channels[0].applied_mi - fast_response.channels[0].applied_mi >
-           0.75f);
+           0.55f);
     assert(std::fabs(fast_response.channels[0].applied_mi -
                      fast_response.channels[0].target_mi) < 0.01f);
 
