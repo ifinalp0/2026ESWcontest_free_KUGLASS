@@ -49,8 +49,10 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
   lease는 재사용하지 않고 다음 유효 full frame까지 전체 출력을 LOW로 유지합니다.
 - `FAULT_N_CHx` falling edge도 해당 채널의 enable을 즉시 LOW로 내리지만,
   reset이 필요한 latch는 1 ms 출력 주기에서 10회 연속 LOW가 확인될 때
-  확정합니다. 그 전에 HIGH로 복귀한 짧은 glitch는 자동 복구하며, 나머지 정상
-  채널은 활성 lease에 따라 계속 동작합니다.
+  확정합니다. 첫 짧은 pulse는 10회 연속 HIGH 안정화 뒤 자동 복구할 수 있지만,
+  5초 안에 두 번째 falling edge가 발생하면 self-clearing fault의 반복 재인가로
+  판단해 해당 채널을 latch합니다. 나머지 정상 채널은 활성 lease에 따라 계속
+  동작합니다.
 - invalid/oversize JSON, 불완전·중복 채널, 범위 밖 MI, 활성 lease의 stale
   sequence는 lease 전체를 무효화하고 safe-off합니다.
 - timeout과 output task watchdog도 `ENABLE LOW + PWM force-low + applied_mi=0`으로
@@ -117,10 +119,13 @@ Actuator command, B status와 Fault reset의 frame은
 - E-Stop과 Power Stage Fault는 모두 10회 연속 LOW에서 reset-required latch로
   확정되며, 입력이 HIGH로 돌아와도 안전 조건과 일치하는 reset이 필요합니다.
   E-Stop의 1~9회 LOW glitch는 즉시 차단된 뒤 10회 연속 HIGH와 새 full command를
-  받아야 복구합니다. 채널 `FAULT_N`의 1~9회 LOW glitch는 해당 채널만 즉시 차단한
-  뒤 HIGH에서 활성 lease로 자동 복구합니다. E-Stop 등 전역 fault reset 뒤에는
-  새 full command 전까지 출력하지 않습니다. 채널 Fault만 reset하면 정상 채널
-  lease는 유지되고 복구 채널은 다음 출력 주기부터 다시 적용됩니다.
+  받아야 복구합니다. 채널 `FAULT_N`의 첫 1~9회 LOW pulse는 해당 채널만 즉시
+  차단한 뒤 10회 연속 HIGH에서 활성 lease로 자동 복구할 수 있습니다. 그러나
+  5초 이내 두 번째 pulse는 latch하여 `차단 → 재상승 → 재차단` 반복을 막습니다.
+  이때 status `fault_code`는 `POWER_STAGE_FAULT`이고 해당 `ch[].fault`만 true입니다.
+  E-Stop 등 전역 fault reset 뒤에는 새 full command 전까지 출력하지 않습니다.
+  채널 Fault만 reset하면 정상 채널 lease는 유지되고 복구 채널은 다음 출력
+  주기부터 다시 적용됩니다.
 - ADC는 5 ms마다 8채널을 scan하고 settling read, 5-sample median, EWMA 1/8을
   적용합니다. 100 ms보다 오래된 값은 invalid입니다.
 - current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
@@ -143,9 +148,9 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
 full frame, 0.95 clamp, 전역 hard safe-off, E-Stop LOW/HIGH 10-sample
-qualification, `FAULT_N` 10-sample qualification과 채널별 Fault 격리, ADC
-filter/stale, status, direction blanking 중 정적 ENABLE, ENABLE commit 거부와
-JSONL 복구를 검사합니다.
+qualification, `FAULT_N` LOW/HIGH 10-sample qualification, 5초 반복 event latch와
+채널별 Fault 격리, ADC filter/stale, status, direction blanking 중 정적 ENABLE,
+ENABLE commit 거부와 JSONL 복구를 검사합니다.
 BAD_JSON regression은 B formatter의 실제 ADC 포함 status를 A parser가 field
 순서와 ROM boot banner에 관계없이 수신하는지 교차 검사합니다.
 

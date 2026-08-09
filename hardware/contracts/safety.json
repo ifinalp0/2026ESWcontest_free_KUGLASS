@@ -20,7 +20,7 @@
     {
       "id": "HW-004",
       "severity": "critical",
-      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a falling edge immediately cuts that channel, while a reset-required firmware latch is confirmed after ten consecutive 1 ms output samples remain low. A shorter or intermittent low may auto-recover, and a high level alone does not prove connector presence."
+      "rule": "FAULT_N_CH0 through FAULT_N_CH3 are active-low inputs; a falling edge immediately cuts that channel, while a reset-required firmware latch is confirmed after ten consecutive 1 ms output samples remain low. One shorter pulse may auto-recover only after ten consecutive HIGH samples, but a second falling edge within five seconds must latch the channel to prevent repeated self-clearing fault retries. A high level alone does not prove connector presence."
     },
     {
       "id": "HW-005",

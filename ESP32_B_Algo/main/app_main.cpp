@@ -78,6 +78,7 @@ uint32_t g_status_seq = 0;
 uint32_t g_boot_id = 0;
 uint32_t g_estop_qualifier_event_count = 0;
 bool g_estop_rearm_pending = false;
+uint32_t g_fault_qualifier_event_count[KUGLASS_CHANNEL_COUNT] = {};
 
 struct SafetyEventCounters {
     uint32_t estop = 0;
@@ -371,6 +372,31 @@ bool confirm_channel_fault_if_still_low(size_t channel_index) {
     return confirmed;
 }
 
+bool latch_repeated_channel_fault(size_t channel_index,
+                                  uint32_t expected_event_count) {
+    if (channel_index >= KUGLASS_CHANNEL_COUNT) return false;
+    bool latched = false;
+    portENTER_CRITICAL(&g_safety_event_mux);
+    if (!g_channel_trip_latched[channel_index] &&
+        g_channel_trip_inflight[channel_index] == 0U &&
+        expected_event_count != g_acknowledged_events.channel[channel_index] &&
+        g_channel_event_count[channel_index] == expected_event_count) {
+        // Repeated short pulses are not harmless: the first electrical cut can
+        // remove the current that asserted the open-collector comparator, so a
+        // persistent-LOW-only policy would retry forever. Latch the captured
+        // event even if FAULT_N has already returned HIGH.
+        (void)atomic_add_safety_counter(
+            &g_channel_trip_epoch[channel_index], 1);
+        (void)rotate_reset_challenge();
+        g_channel_trip_latched[channel_index] = true;
+        __asm__ __volatile__("memw" ::: "memory");
+        disable_channel_enable_from_isr(channel_index);
+        latched = true;
+    }
+    portEXIT_CRITICAL(&g_safety_event_mux);
+    return latched;
+}
+
 bool release_unconfirmed_channel_event_if_high(size_t channel_index) {
     if (channel_index >= KUGLASS_CHANNEL_COUNT) return false;
     bool released = false;
@@ -517,6 +543,7 @@ bool acknowledge_safety_events_if_inputs_high() {
                 candidate_channel_epoch[i];
             g_channel_trip_latched[i] = false;
             g_fault_input_qualifiers[i].reset();
+            g_fault_qualifier_event_count[i] = candidate.channel[i];
         }
         __asm__ __volatile__("memw" ::: "memory");
         accepted = g_safety_trip_inflight == 0U &&
@@ -583,6 +610,14 @@ void update_safety_inputs(bool* estop_ok) {
     // after qualification has promoted the event to a reset-required trip.
     *estop_ok = !qualified_global_trip_pending();
     for (size_t i = 0; i < KUGLASS_CHANNEL_COUNT; ++i) {
+        events = safety_event_snapshot();
+        if (events.channel[i] != g_fault_qualifier_event_count[i]) {
+            g_fault_qualifier_event_count[i] = events.channel[i];
+            if (!g_channel_trip_latched[i] &&
+                g_fault_input_qualifiers[i].note_falling_edge(millis_now())) {
+                (void)latch_repeated_channel_fault(i, events.channel[i]);
+            }
+        }
         const bool fault_n_high =
             gpio_get_level(static_cast<gpio_num_t>(
                 KUGLASS_POWER_STAGE_PINMAP.channels[i].fault_n_gpio)) != 0;
@@ -590,11 +625,13 @@ void update_safety_inputs(bool* estop_ok) {
             g_fault_input_qualifiers[i].sample(fault_n_high);
         if (qualification == FaultInputQualification::CONFIRMED_LOW) {
             (void)confirm_channel_fault_if_still_low(i);
-        } else if (qualification == FaultInputQualification::HEALTHY) {
+        } else if (qualification ==
+                   FaultInputQualification::RECOVERED_HIGH) {
             // A LOW that recovered before confirmation caused an immediate
-            // electrical cut but does not require an external reset. Reset the
-            // cached SPWM state so the next tick performs a guarded ENABLE
-            // commit instead of assuming the ISR-lowered GPIO is still HIGH.
+            // electrical cut. Only release it after a stable HIGH interval;
+            // a repeated falling edge in the guard window is latched above.
+            // Reset cached SPWM state so the next tick performs a guarded
+            // ENABLE commit instead of assuming the ISR-lowered GPIO is HIGH.
             if (release_unconfirmed_channel_event_if_high(i)) {
                 g_spwm.force_channel_safe(i);
             }

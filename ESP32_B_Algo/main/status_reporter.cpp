@@ -28,6 +28,18 @@ bool token_is_json_safe(const char* token) {
     return true;
 }
 
+const char* reported_fault_code(const ChannelManager& channels,
+                                const FaultManager& fault) {
+    if (fault.faulted()) return fault.code_name();
+    for (size_t i = 0; i < channels.count(); ++i) {
+        const ChannelRuntime* channel = channels.channel(i);
+        if (channel != nullptr && channel->faulted) {
+            return "POWER_STAGE_FAULT";
+        }
+    }
+    return "NONE";
+}
+
 }  // namespace
 
 bool format_status_line(uint32_t seq,
@@ -55,7 +67,8 @@ bool format_status_line(uint32_t seq,
                 static_cast<unsigned long>(seq),
                 static_cast<unsigned long>(metadata.boot_id),
                 static_cast<unsigned long>(metadata.reset_challenge),
-                estop_active ? "true" : "false", fault.code_name())) return false;
+                estop_active ? "true" : "false",
+                reported_fault_code(channels, fault))) return false;
     if (diagnostic != nullptr) {
         if (!token_is_json_safe(diagnostic) ||
             !append(output, output_size, &used, ",\"diagnostic\":\"%s\"",

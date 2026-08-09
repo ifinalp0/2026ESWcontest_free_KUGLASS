@@ -102,21 +102,34 @@ int main() {
     FaultInputQualifier fault_qualifier;
     assert(fault_qualifier.sample(true) ==
            FaultInputQualification::HEALTHY);
+    assert(!fault_qualifier.note_falling_edge(100U));
     assert(fault_qualifier.sample(false) ==
            FaultInputQualification::QUALIFYING_LOW);
     assert(fault_qualifier.sample(false) ==
            FaultInputQualification::QUALIFYING_LOW);
     assert(fault_qualifier.consecutive_low_samples() == 2U);
-    assert(fault_qualifier.sample(true) ==
-           FaultInputQualification::HEALTHY);
-    for (uint8_t burst = 0; burst < 3U; ++burst) {
-        for (uint8_t i = 1; i < KUGLASS_FAULT_CONFIRM_SAMPLES; ++i) {
-            assert(fault_qualifier.sample(false) ==
-                   FaultInputQualification::QUALIFYING_LOW);
-        }
+    for (uint8_t i = 1; i < KUGLASS_FAULT_RELEASE_SAMPLES; ++i) {
         assert(fault_qualifier.sample(true) ==
-               FaultInputQualification::HEALTHY);
+               FaultInputQualification::QUALIFYING_HIGH);
     }
+    assert(fault_qualifier.consecutive_high_samples() ==
+           KUGLASS_FAULT_RELEASE_SAMPLES - 1U);
+    assert(fault_qualifier.sample(true) ==
+           FaultInputQualification::RECOVERED_HIGH);
+    assert(!fault_qualifier.pending());
+    assert(fault_qualifier.repeat_event_count() == 1U);
+
+    // A second self-clearing FAULT_N pulse inside the guard window must latch
+    // instead of creating an endless cut/ramp/retry cycle.
+    assert(fault_qualifier.note_falling_edge(
+        100U + KUGLASS_FAULT_REPEAT_WINDOW_MS));
+    fault_qualifier.reset();
+    assert(!fault_qualifier.note_falling_edge(100U));
+    assert(!fault_qualifier.note_falling_edge(
+        101U + KUGLASS_FAULT_REPEAT_WINDOW_MS));
+    assert(fault_qualifier.repeat_event_count() == 1U);
+
+    fault_qualifier.reset();
     for (uint8_t i = 1; i < KUGLASS_FAULT_CONFIRM_SAMPLES; ++i) {
         assert(fault_qualifier.sample(false) ==
                FaultInputQualification::QUALIFYING_LOW);
@@ -349,7 +362,8 @@ int main() {
         "\"id\":1,\"mi\":0.0007,\"fault\":false") != nullptr);
     assert(std::strstr(status,
         "\"id\":2,\"mi\":0.0007,\"fault\":true") != nullptr);
-    assert(std::strstr(status, "\"fault_code\":\"NONE\"") != nullptr);
+    assert(std::strstr(status,
+                       "\"fault_code\":\"POWER_STAGE_FAULT\"") != nullptr);
     channels.clear_faults();
     assert(!format_status_line(124, channels, fault, false, result_metadata,
                                &analog, "bad-value", status, sizeof(status)));
