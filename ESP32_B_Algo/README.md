@@ -64,6 +64,12 @@ ESP32_A -> ESP32_B -> Logic Carrier -> Power Stage PCB ×4 -> PDLC CH0~CH3
 - 방향 반전 순서는 `PWM force-low -> 1 ms blanking -> DIR 변경 -> 안전 입력 재검사
   -> PWM 재개`입니다. 정상 채널의 `ENABLE_CHx`는 이 과정에서도 HIGH를
   유지합니다.
+- 정상 명령의 MI 감소는 12.0 MI/s, 증가는 4.0 MI/s로 B에서만 최종 제한합니다.
+  출력 task 지연이 큰 단일 변화로 누적되지 않도록 slew 계산의 `dt`는 최대 2 ms로
+  제한합니다. 이 값은 software/HIL 후보이며 Power Stage·PDLC·72 V 실측 완료값이
+  아닙니다.
+- MI 0, disable, invalid frame, timeout, E-Stop, watchdog과 해당 채널 Fault는 정상
+  slew보다 우선하며 `ENABLE LOW + PWM force-low + applied_mi=0`을 즉시 적용합니다.
 - IRS2104 bootstrap refresh를 위해 MI/duty는 최대 0.95입니다. 10 MHz MCPWM에서
   1 carrier tick보다 작은 duty는 PWM을 force-low로 유지합니다.
 - 물리 E-Stop과 Power Stage `RUN_OK`가 최종 차단 경로지만 인증된 안전 회로는
@@ -147,7 +153,8 @@ sh ../hardware/validation/BAD_JSON/host_tests/run_tests.sh
 ```
 
 Host test는 exact pin/ADC, strict reset parser, result correlation, transactional
-full frame, 0.95 clamp, 전역 hard safe-off, E-Stop LOW/HIGH 10-sample
+full frame, 0.95 clamp, 12.0/4.0 MI/s slew, 2 ms 지연 상한, MI 0과 전역 hard
+safe-off, E-Stop LOW/HIGH 10-sample
 qualification, `FAULT_N` LOW/HIGH 10-sample qualification, 5초 반복 event latch와
 채널별 Fault 격리, ADC filter/stale, status, direction blanking 중 정적 ENABLE,
 ENABLE commit 거부와 JSONL 복구를 검사합니다.

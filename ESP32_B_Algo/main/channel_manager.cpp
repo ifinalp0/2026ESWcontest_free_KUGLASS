@@ -52,8 +52,10 @@ bool ChannelManager::apply_command(const ProtocolCommand& command) {
 
 void ChannelManager::update(float dt_s, bool global_enable) {
     if (!std::isfinite(dt_s) || dt_s < 0.0f) dt_s = 0.0f;
+    if (dt_s > KUGLASS_MAX_SLEW_DT_S) dt_s = KUGLASS_MAX_SLEW_DT_S;
     for (ChannelRuntime& item : channels_) {
-        if (!global_enable || !item.enable || item.faulted) {
+        if (!global_enable || !item.enable || item.faulted ||
+            item.target_mi <= 0.0f) {
             // Safe-off is a hard electrical stop, not a cosmetic ramp.  This
             // also keeps reported applied_mi equal to the actual output.
             item.applied_mi = 0.0f;

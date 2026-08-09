@@ -37,6 +37,16 @@ ProtocolCommand make_full_command(float mi, bool enable = true) {
     return command;
 }
 
+void advance_channels(ChannelManager& channels,
+                      float duration_s,
+                      bool global_enable = true) {
+    constexpr float step_s = 0.001f;
+    const size_t steps = static_cast<size_t>(std::ceil(duration_s / step_s));
+    for (size_t i = 0; i < steps; ++i) {
+        channels.update(step_s, global_enable);
+    }
+}
+
 struct EnableCommitProbe {
     size_t calls = 0;
     bool allow = false;
@@ -251,9 +261,9 @@ int main() {
     ChannelManager channels;
     channels.begin();
     assert(channels.apply_command(command));
-    channels.update(1.0f, true);
+    advance_channels(channels, 0.25f);
     assert(channels.count() == 4);
-    assert(near(channels.channel(3)->applied_mi, 0.7f));
+    assert(near(channels.channel(3)->applied_mi, 0.8f));
 
     ProtocolCommand maximum = make_full_command(1.0f);
     assert(channels.apply_command(maximum));
@@ -266,7 +276,7 @@ int main() {
     assert(near(channels.channel(0)->target_mi,
                 KUGLASS_MAX_MODULATION_INDEX));
 
-    channels.update(2.0f, true);
+    advance_channels(channels, 0.25f);
     for (size_t i = 0; i < channels.count(); ++i) {
         assert(near(channels.channel(i)->applied_mi,
                     KUGLASS_MAX_MODULATION_INDEX));
@@ -276,15 +286,33 @@ int main() {
         assert(near(channels.channel(i)->applied_mi, 0.0f));
     }
     channels.update(0.001f, true);
-    assert(near(channels.channel(0)->applied_mi, 0.0007f));
+    assert(near(channels.channel(0)->applied_mi, 0.004f));
     channels.set_fault(0, true);
     channels.update(0.0f, true);
     assert(near(channels.channel(0)->applied_mi, 0.0f));
     for (size_t i = 1; i < channels.count(); ++i) {
-        assert(near(channels.channel(i)->applied_mi, 0.0007f));
+        assert(near(channels.channel(i)->applied_mi, 0.004f));
         assert(!channels.channel(i)->faulted);
     }
     channels.clear_faults();
+
+    ChannelManager delayed_channels;
+    delayed_channels.begin();
+    assert(delayed_channels.apply_command(maximum));
+    delayed_channels.update(1.0f, true);
+    assert(near(delayed_channels.channel(0)->applied_mi,
+                KUGLASS_MI_RELEASE_PER_S * KUGLASS_MAX_SLEW_DT_S));
+    advance_channels(delayed_channels, 0.25f);
+    assert(near(delayed_channels.channel(0)->applied_mi,
+                KUGLASS_MAX_MODULATION_INDEX));
+    assert(delayed_channels.apply_command(make_full_command(0.5f)));
+    delayed_channels.update(0.001f, true);
+    assert(near(delayed_channels.channel(0)->applied_mi,
+                KUGLASS_MAX_MODULATION_INDEX -
+                    KUGLASS_MI_ATTACK_PER_S * 0.001f));
+    assert(delayed_channels.apply_command(make_full_command(0.0f)));
+    delayed_channels.update(0.001f, true);
+    assert(near(delayed_channels.channel(0)->applied_mi, 0.0f));
 
     FaultManager fault;
     fault.begin();
@@ -359,9 +387,9 @@ int main() {
     assert(format_status_line(124, channels, fault, false, result_metadata,
                               status, sizeof(status)));
     assert(std::strstr(status,
-        "\"id\":1,\"mi\":0.0007,\"fault\":false") != nullptr);
+        "\"id\":1,\"mi\":0.0040,\"fault\":false") != nullptr);
     assert(std::strstr(status,
-        "\"id\":2,\"mi\":0.0007,\"fault\":true") != nullptr);
+        "\"id\":2,\"mi\":0.0040,\"fault\":true") != nullptr);
     assert(std::strstr(status,
                        "\"fault_code\":\"POWER_STAGE_FAULT\"") != nullptr);
     channels.clear_faults();
@@ -381,7 +409,7 @@ int main() {
     ChannelManager isolated_fault_channels;
     isolated_fault_channels.begin();
     assert(isolated_fault_channels.apply_command(maximum));
-    isolated_fault_channels.update(2.0f, true);
+    advance_channels(isolated_fault_channels, 0.25f);
     isolated_fault_channels.set_fault(2, true);
     isolated_fault_channels.update(0.0f, true);
     SpwmGenerator isolated_fault_waveform;
@@ -395,7 +423,7 @@ int main() {
     ChannelManager waveform_channels;
     waveform_channels.begin();
     assert(waveform_channels.apply_command(maximum));
-    waveform_channels.update(2.0f, true);
+    advance_channels(waveform_channels, 0.25f);
     SpwmGenerator waveform;
     waveform.begin(pinmap);
     waveform.tick(waveform_channels, 0.008f, true);
@@ -435,7 +463,7 @@ int main() {
     ChannelManager sub_tick_channels;
     sub_tick_channels.begin();
     assert(sub_tick_channels.apply_command(make_full_command(0.001f)));
-    sub_tick_channels.update(2.0f, true);
+    sub_tick_channels.update(0.001f, true);
     SpwmGenerator sub_tick_waveform;
     sub_tick_waveform.begin(pinmap);
     sub_tick_waveform.tick(sub_tick_channels, 1.0f / 240.0f, true);

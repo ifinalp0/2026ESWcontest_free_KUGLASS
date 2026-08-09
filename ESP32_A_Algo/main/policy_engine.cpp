@@ -382,19 +382,23 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             servo_initialized_[channel] = true;
         } else {
             const float previous = servo_mi_[channel];
+            const bool hold_camera_noise =
+                !target.manual && camera_fresh && target.enable && !target.fault &&
+                std::fabs(desired_mi - previous) <= KUGLASS_MI_AUTO_DEADBAND;
             const bool fast_attack = channel < 2U && decision.strong_front_light &&
                                      desired_mi < previous - 0.18f;
-            float limited = desired_mi;
-            if (!fast_attack && desired_mi < previous) {
+            float limited = hold_camera_noise ? previous : desired_mi;
+            if (!hold_camera_noise && !fast_attack && desired_mi < previous) {
                 limited = previous - KUGLASS_MI_ATTACK_PER_S * dt_s;
                 if (limited < desired_mi) limited = desired_mi;
-            } else if (desired_mi > previous) {
+            } else if (!hold_camera_noise && desired_mi > previous) {
                 limited = previous + KUGLASS_MI_RELEASE_PER_S * dt_s;
                 if (limited > desired_mi) limited = desired_mi;
             }
             servo_mi_[channel] = fast_attack
                 ? desired_mi
-                : clamp01(previous + 0.35f * (limited - previous));
+                : clamp01(previous +
+                          KUGLASS_MI_SERVO_RESPONSE * (limited - previous));
         }
         target.applied_mi = servo_mi_[channel];
     }

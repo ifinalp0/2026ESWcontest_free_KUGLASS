@@ -44,14 +44,21 @@ static constexpr float KUGLASS_FUNDAMENTAL_HZ = 60.0f;
 // bootstrapped. Keep at least 5% of every carrier period available for
 // refresh until the production stage is characterized on the bench.
 static constexpr float KUGLASS_MAX_MODULATION_INDEX = 0.95f;
-static constexpr float KUGLASS_MI_ATTACK_PER_S = 2.4f;
-static constexpr float KUGLASS_MI_RELEASE_PER_S = 0.7f;
+// B is the sole authoritative actuator slew limiter.  De-energizing changes
+// are faster than energizing changes, while both remain bounded per 1 ms
+// output update.  These are firmware candidate rates pending Power Stage HIL.
+static constexpr float KUGLASS_MI_ATTACK_PER_S = 12.0f;
+static constexpr float KUGLASS_MI_RELEASE_PER_S = 4.0f;
+static constexpr float KUGLASS_MAX_SLEW_DT_S = 0.002f;
 
 static_assert(KUGLASS_MAX_MODULATION_INDEX > 0.0f &&
                   KUGLASS_MAX_MODULATION_INDEX < 1.0f,
               "Bootstrap PWM requires a non-zero carrier off-time.");
 static_assert(KUGLASS_DIRECTION_BLANKING_MS >= KUGLASS_OUTPUT_UPDATE_MS,
               "Direction changes require at least one safe output update.");
+static_assert(KUGLASS_MAX_SLEW_DT_S >=
+                  static_cast<float>(KUGLASS_OUTPUT_UPDATE_MS) / 1000.0f,
+              "Normal output updates must retain their configured slew.");
 static_assert(KUGLASS_ESTOP_CONFIRM_SAMPLES >= 2,
               "E-Stop qualification must reject one-sample LOW glitches.");
 static_assert(KUGLASS_ESTOP_RELEASE_SAMPLES >= 2,

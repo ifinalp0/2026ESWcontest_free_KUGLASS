@@ -24,6 +24,17 @@ SensorSnapshot fresh_camera(uint32_t now_ms) {
     return sensors;
 }
 
+SensorSnapshot moderate_camera(uint32_t now_ms, float saturation) {
+    SensorSnapshot sensors;
+    sensors.camera_valid = true;
+    sensors.camera_timestamp_ms = now_ms;
+    sensors.front_left.saturation_ratio = saturation;
+    sensors.front_left.highlight_area = 0.2f;
+    sensors.front_left.edge_density = 0.18f;
+    sensors.front_right = sensors.front_left;
+    return sensors;
+}
+
 }  // namespace
 
 int main() {
@@ -57,6 +68,41 @@ int main() {
         assert(channel.target_mi < 0.12f);
         assert(channel.enable);
     }
+
+    PolicyEngine noise_engine;
+    noise_engine.begin();
+    const PolicyDecision noise_baseline =
+        noise_engine.update(moderate_camera(now, 0.50f), now);
+    const PolicyDecision small_camera_change =
+        noise_engine.update(moderate_camera(now + 50U, 0.52f), now + 50U);
+    const float small_target_delta = std::fabs(
+        small_camera_change.channels[0].target_mi -
+        noise_baseline.channels[0].target_mi);
+    assert(small_target_delta > 0.0f);
+    assert(small_target_delta < KUGLASS_MI_AUTO_DEADBAND);
+    assert(std::fabs(small_camera_change.channels[0].applied_mi -
+                     noise_baseline.channels[0].applied_mi) < 0.00001f);
+
+    const PolicyDecision material_camera_change =
+        noise_engine.update(moderate_camera(now + 100U, 0.70f), now + 100U);
+    assert(std::fabs(material_camera_change.channels[0].applied_mi -
+                     noise_baseline.channels[0].applied_mi) >
+           KUGLASS_MI_AUTO_DEADBAND);
+
+    PolicyEngine response_engine;
+    response_engine.begin();
+    const PolicyDecision clear = response_engine.update(SensorSnapshot{}, now);
+    assert(response_engine.apply_command(parse(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":2,\"command\":\"set_mode\","
+        "\"mode\":\"camping\"}"), now + 1U).accepted);
+    PolicyDecision fast_response;
+    for (uint32_t elapsed = 50U; elapsed <= 250U; elapsed += 50U) {
+        fast_response = response_engine.update(SensorSnapshot{}, now + elapsed);
+    }
+    assert(clear.channels[0].applied_mi - fast_response.channels[0].applied_mi >
+           0.75f);
+    assert(std::fabs(fast_response.channels[0].applied_mi -
+                     fast_response.channels[0].target_mi) < 0.01f);
 
     PolicyEngine manual_engine;
     manual_engine.begin();

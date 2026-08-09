@@ -57,6 +57,11 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 - command ACK, manual TTL, AUTO 복귀와 TabUI 단절 중 A의 AUTO 지속
 - A→B timeout, invalid frame, watchdog의 B safe-off
 - target/commanded/applied MI 분리
+- A AUTO 0.01 MI deadband와 20 Hz 빠른 servo가 작은 카메라 목표 chatter는
+  유지하면서 큰 target 변화에는 지연 없이 수렴하는지 확인
+- B의 감소 12.0 MI/s·증가 4.0 MI/s와 2 ms slew `dt` 상한을 확인하고, 저전압
+  dummy load에서 peak current·ringing·rail droop를 계측하기 전에는 이 값을
+  Power Stage/HV 검증 완료로 간주하지 않음
 - E-Stop falling edge 즉시 전체 차단, 1~9 sample LOW 뒤 10회 HIGH 안정화와 새
   full command 복구, 10회 연속 LOW E-Stop latch와 안전 조건 확인 후 reset
 - `FAULT_N` falling edge 해당 채널 즉시 차단, 첫 1~9 sample pulse 뒤 10회 연속

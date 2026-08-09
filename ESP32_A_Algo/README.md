@@ -140,6 +140,17 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
 - `set_environment`와 `set_channel_fault`는
   `KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1`인 격리 HIL build에서만 허용합니다.
 
+### MI servo 응답
+
+- AUTO에서 카메라 frame 변화가 만드는 0.01 MI 이하 목표 차이는 noise deadband로
+  유지합니다. 수동 TTL 명령에는 이 deadband를 적용하지 않습니다.
+- 그보다 큰 변화는 20 Hz policy loop에서 감소 8.0 MI/s, 증가 4.0 MI/s의 제한과
+  0.8 응답 계수를 사용합니다. 일반 조건의 실효 상한은 각각 약 6.4 MI/s와
+  3.2 MI/s이며, 전면 강광 fast-attack은 ESP32_B의 로컬 slew를 남긴 채 A측
+  감소 제한을 우회할 수 있습니다.
+- 이 servo는 카메라 sensor 값을 보정하거나 실측 노이즈 크기를 확정하지 않습니다.
+  작은 AUTO 목표 chatter가 A→B 명령에 전달되는 것을 제한하는 정책 출력 단계입니다.
+
 ## 빌드와 플래시
 
 ESP-IDF 6.0.2, ESP32-S3 N8R8 profile과 component registry/cache가 필요합니다.
