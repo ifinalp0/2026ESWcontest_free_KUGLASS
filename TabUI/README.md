@@ -44,6 +44,7 @@ ESP32_A GND       --- ESP32_B GND
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
 - Topbar `BACKEND` 전원 버튼의 ESP32_A gateway 런타임 시작·종료
 - `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
+- Power Stage `I_sense`·`T_sense` ADC 정보는 일반 운영 화면에서 숨기고 `/admin`에서만 표시
 - `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI 변경 즉시 지속 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
 
@@ -169,7 +170,8 @@ TabUI↔A 명령, ACK, A state, B status와 Fault reset은
 - B `protocol_error`는 즉시 표시하지만, 다음 A `state.downstream`이 현재 link
   error를 갱신합니다. 과거 오류 한 건을 현재 상태처럼 영구 latch하지 않습니다.
 - A/B 통신 상태와 E-Stop/Fault operational 상태를 분리합니다.
-- ADC는 validity가 있는 raw 또는 mV만 표시하고 A/°C로 임의 변환하지 않습니다.
+- `I_sense`·`T_sense` ADC는 관리자 화면에서만 validity가 있는 raw 또는
+  mV로 표시하고 A/°C로 임의 변환하지 않습니다.
 - Fault reset은 B `control_result`와 최종 A ACK가 일치할 때만 성공으로 표시합니다.
 
 ## 카메라 영상

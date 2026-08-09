@@ -81,7 +81,6 @@ export default function App() {
         />
         <ChannelTable
           channels={state.channels}
-          adc={state.downstreamDiagnostics.adc}
           selectedChannel={selectedChannel}
           onSelectChannel={setSelectedChannel}
         />

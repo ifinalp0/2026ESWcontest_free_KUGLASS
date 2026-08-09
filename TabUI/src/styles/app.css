@@ -1888,33 +1888,6 @@ input[type="range"]::-moz-range-thumb {
   color: var(--danger);
 }
 
-.channel-sense {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-  margin-top: 3px;
-  padding-top: 5px;
-  border-top: 1px solid var(--line);
-}
-
-.channel-sense small {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-  color: var(--muted);
-  font-family: var(--font-data);
-  font-size: 0.48rem;
-  letter-spacing: 0.02em;
-}
-
-.channel-sense strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 0.56rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
