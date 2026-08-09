@@ -1768,6 +1768,11 @@ input[type="range"]::-moz-range-thumb {
   .scenario-options {
     display: flex;
     overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .scenario-options::-webkit-scrollbar {
+    display: none;
   }
 
   .scenario-option {
