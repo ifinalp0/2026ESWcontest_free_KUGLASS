@@ -41,8 +41,9 @@ ESP-IDF 프로젝트입니다. 카메라와 내부온도를 처리하고 CH0~CH3
 - 격리 HIL build에서는 TabUI의 `외부 온도 시연`이 합성 온도를 같은 thermal policy
   입력에 임시 적용할 수 있습니다. `internal_temp_c=null` 또는 새 시나리오 선택은
   override를 해제하고 물리 DS18B20 입력으로 복귀합니다.
-- 차박과 주차는 CH0~CH3 모두 `enable=true`를 유지하고, ESP32_B가 MI 0을
-  safe-off로 해석하지 않도록 비영(非零) MI의 강산란 목표를 전송합니다.
+- 차박과 주차는 CH0~CH3 모두 `enable=false`, `target_mi=0.0`을 전송해
+  ESP32_B의 hard safe-off로 PDLC 출력을 완전히 끕니다. 무전원 상태의 PDLC는
+  강산란 방향이며, 전원 rail 전체가 차단된다는 뜻은 아닙니다.
 - 합성 외부 온도는 MOCK/HIL 시연 입력일 뿐 production 센서 구성에 외부 온도
   센서를 추가하지 않습니다.
 

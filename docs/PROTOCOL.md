@@ -81,6 +81,13 @@ ESP32_A는 20 Hz heartbeat로 CH0~CH3 전체 목표를 보낸다. 기본 TTL은 
 {"v":1,"type":"actuator_command","seq":5501,"ttl_ms":250,"ch":[[0,0.60,true],[1,0.58,true],[2,0.36,true],[3,0.47,true]]}
 ```
 
+차박·주차의 의도된 전체 출력 차단 frame은 네 채널 모두 MI 0.0과
+`enable=false`를 함께 사용한다.
+
+```json
+{"v":1,"type":"actuator_command","seq":5502,"ttl_ms":250,"ch":[[0,0.0,false],[1,0.0,false],[2,0.0,false],[3,0.0,false]]}
+```
+
 - `seq`는 A가 소유하며 활성 lease 동안 wrap-safe forward 값이어야 한다.
 - B의 `ttl_ms` 허용 범위는 50~1000 ms다.
 - 활성 lease의 duplicate/stale `seq`는 heartbeat로 인정하지 않는다.

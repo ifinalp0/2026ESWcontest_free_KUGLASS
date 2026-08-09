@@ -61,7 +61,8 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
   0.60 초과 frame을 전체 거부하는지 확인
 - TabUI의 산란·3D 표현과 추정 투과도가 MI 0.60에서 각각 0%·완전 투명·100%로
   일치하는지 확인
-- 차박·주차의 CH0~CH3가 `enable=true`와 비영(非零) 강산란 MI를 함께 유지하는지 확인
+- 차박·주차의 CH0~CH3가 `enable=false`, target/commanded/applied MI 0.0으로
+  전환되고 TabUI가 이를 `전원 OFF`로 표시하는지 확인
 - 열부하에서 실제 DS18B20 온도 변화가 목표를 바꾸고, MOCK/HIL 외부 온도 시연값과
   `null` 해제 뒤 물리 센서 복귀가 같은 thermal policy 경로에서 동작하는지 확인
 - A AUTO 0.01 MI deadband와 20 Hz 빠른 servo가 작은 카메라 목표 chatter는

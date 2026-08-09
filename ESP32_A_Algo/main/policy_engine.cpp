@@ -7,10 +7,6 @@
 namespace {
 
 constexpr float kStrongGlareThreshold = 0.46f;
-// Privacy demonstrations must keep the Power Stage enabled.  A zero MI is
-// treated as safe-off by ESP32_B, so use a small non-zero strong-scattering
-// operating point for both camping and parked modes.
-constexpr float kPrivacyTransmission = 0.04f;
 
 enum class CameraSide : uint8_t {
     DRIVER_LEFT,
@@ -403,18 +399,20 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
                 transmission < 0.45f) {
                 transmission = 0.45f;
             }
+            // Camping and parked are intentional power-off privacy modes.
+            // Sending both enable=false and MI 0 makes ESP32_B apply its hard
+            // electrical stop instead of keeping the Power Stage energized at
+            // a small non-zero strong-scattering operating point.
             if (privacy_need > 0.0f) {
-                target.enable = true;
-                if (transmission > kPrivacyTransmission) {
-                    transmission = kPrivacyTransmission;
-                }
+                target.enable = false;
+                transmission = 0.0f;
             }
 
             target.score = score;
             target.target_transmission = transmission;
             target.target_mi = transmission_to_mi(transmission);
             target.optical_state = optical_state_for_transmission(transmission);
-            if (privacy_need > 0.0f) target.reason = "privacy mode";
+            if (privacy_need > 0.0f) target.reason = "privacy power-off";
             else if (camera_fresh && profile.camera_weight > 0.0f && camera > 0.2f) {
                 target.reason = "camera glare response";
             } else if (temperature_fresh && decision.thermal_risk > 0.2f) {
@@ -429,7 +427,13 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
         }
 
         const float desired_mi = target.enable ? target.target_mi : 0.0f;
-        if (!servo_initialized_[channel]) {
+        if (!target.enable || target.fault) {
+            // Disable is a hard stop, so do not leave a stale non-zero
+            // commanded MI visible beside enable=false in telemetry or on the
+            // wire while the optical servo ramps down.
+            servo_mi_[channel] = 0.0f;
+            servo_initialized_[channel] = true;
+        } else if (!servo_initialized_[channel]) {
             servo_mi_[channel] = desired_mi;
             servo_initialized_[channel] = true;
         } else {
@@ -461,8 +465,11 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
     if (any_fault) decision.decision_reason = "fault: output disabled";
     else if (any_persistent_manual) decision.decision_reason = "persistent manual override";
     else if (any_manual) decision.decision_reason = "manual TTL override";
-    else if (privacy_need > 0.0f) decision.decision_reason = "privacy mode";
-    else if (decision.strong_front_light) {
+    else if (privacy_need > 0.0f) {
+        decision.decision_reason = vehicle_mode_ == VehicleMode::CAMPING
+            ? "camping: all PDLC outputs disabled"
+            : "parked: all PDLC outputs disabled";
+    } else if (decision.strong_front_light) {
         decision.decision_reason = "camera glare: directional fast response";
     } else if (decision.thermal_risk > 0.2f) {
         decision.decision_reason = temperature_override_active

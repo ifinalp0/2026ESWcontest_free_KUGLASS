@@ -104,16 +104,16 @@ int main() {
         "\"mode\":\"camping\"}"), now).accepted);
     PolicyDecision privacy = privacy_engine.update(SensorSnapshot{}, now);
     for (const PolicyChannelTarget& channel : privacy.channels) {
-        assert(channel.target_mi < 0.12f);
-        assert(channel.target_mi > 0.0f);
+        assert(channel.target_mi == 0.0f);
+        assert(channel.applied_mi == 0.0f);
         assert(channel.optical_state == OpticalState::FROST);
-        assert(channel.enable);
+        assert(!channel.enable);
     }
     ProtocolCommand privacy_command;
     assert(policy_decision_to_protocol(privacy, 250, &privacy_command));
     for (const ProtocolChannelCommand& channel : privacy_command.channels) {
-        assert(channel.mi > 0.0f);
-        assert(channel.enable);
+        assert(channel.mi == 0.0f);
+        assert(!channel.enable);
     }
 
     PolicyEngine parked_engine;
@@ -123,10 +123,10 @@ int main() {
         "\"mode\":\"parked\"}"), now).accepted);
     const PolicyDecision parked = parked_engine.update(SensorSnapshot{}, now);
     for (const PolicyChannelTarget& channel : parked.channels) {
-        assert(channel.target_mi > 0.0f);
-        assert(channel.target_mi < 0.12f);
+        assert(channel.target_mi == 0.0f);
+        assert(channel.applied_mi == 0.0f);
         assert(channel.optical_state == OpticalState::FROST);
-        assert(channel.enable);
+        assert(!channel.enable);
     }
 
     PolicyEngine noise_engine;
@@ -158,8 +158,11 @@ int main() {
     assert(response_engine.apply_command(parse(
         "{\"v\":1,\"type\":\"ui_command\",\"seq\":2,\"command\":\"set_mode\","
         "\"mode\":\"camping\"}"), now + 1U).accepted);
-    PolicyDecision fast_response;
-    for (uint32_t elapsed = 50U; elapsed <= 250U; elapsed += 50U) {
+    PolicyDecision fast_response =
+        response_engine.update(SensorSnapshot{}, now + 50U);
+    assert(!fast_response.channels[0].enable);
+    assert(fast_response.channels[0].applied_mi == 0.0f);
+    for (uint32_t elapsed = 100U; elapsed <= 250U; elapsed += 50U) {
         fast_response = response_engine.update(SensorSnapshot{}, now + elapsed);
     }
     assert(clear.channels[0].applied_mi - fast_response.channels[0].applied_mi >

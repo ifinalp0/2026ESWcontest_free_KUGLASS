@@ -304,6 +304,18 @@ int main() {
     for (size_t i = 0; i < channels.count(); ++i) {
         assert(near(channels.channel(i)->applied_mi, 0.0f));
     }
+    ProtocolCommand privacy_power_off = make_full_command(0.0f);
+    for (ProtocolChannelCommand& item : privacy_power_off.channels) {
+        item.enable = false;
+    }
+    assert(channels.apply_command(privacy_power_off));
+    channels.update(0.001f, true);
+    for (size_t i = 0; i < channels.count(); ++i) {
+        assert(!channels.channel(i)->enable);
+        assert(near(channels.channel(i)->target_mi, 0.0f));
+        assert(near(channels.channel(i)->applied_mi, 0.0f));
+    }
+    assert(channels.apply_command(maximum));
     channels.update(0.001f, true);
     assert(near(channels.channel(0)->applied_mi, 0.004f));
     channels.set_fault(0, true);

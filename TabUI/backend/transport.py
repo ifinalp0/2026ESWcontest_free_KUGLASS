@@ -296,10 +296,9 @@ class MockTransport:
     SCENARIO_TARGETS = {
         "none": [MAX_MI] * 4,
         "hot_summer": [MAX_MI] * 4,
-        # These non-zero targets keep ESP32_B's channel enable asserted while
-        # presenting the privacy scenarios as strong scattering.
-        "camping": [0.0303] * 4,
-        "parked": [0.0303] * 4,
+        # Privacy modes intentionally request ESP32_B's hard electrical stop.
+        "camping": [0.0] * 4,
+        "parked": [0.0] * 4,
         "camera_saturation": [0.2653, 0.48, 0.5432, 0.5432],
     }
     SCENARIO_INTERNAL_TEMPERATURES = {
@@ -324,6 +323,7 @@ class MockTransport:
         self._pending_control_result: dict[str, Any] | None = None
         self._manual_targets: dict[int, tuple[float, bool, float | None]] = {}
         self._auto_targets = [MAX_MI] * 4
+        self._auto_enabled = [True] * 4
         self._scenario_internal_temp = self.SCENARIO_INTERNAL_TEMPERATURES["none"]
         self._temperature_override: float | None = None
         self._state["environment"].update({
@@ -431,7 +431,7 @@ class MockTransport:
                 channel["manualUntil"] = None
                 channel["manualPersistent"] = False
                 channel["targetMi"] = self._auto_targets[item]
-                channel["commandedEnable"] = True
+                channel["commandedEnable"] = self._auto_enabled[item]
                 channel["commandedEnableKnown"] = True
             self._state["decisionReason"] = "MOCK ESP32_A: 자동 정책으로 복귀했습니다."
         elif command == "reset_fault":
@@ -489,13 +489,19 @@ class MockTransport:
             if demo_mode == "hot_summer"
             else list(self.SCENARIO_TARGETS[demo_mode])
         )
+        outputs_enabled = demo_mode not in {"camping", "parked"}
+        self._auto_enabled = [outputs_enabled] * 4
         self._manual_targets.clear()
         for index, target in enumerate(self._auto_targets):
-            self._state["channels"][index]["targetMi"] = target
-            self._state["channels"][index]["commandedEnable"] = True
-            self._state["channels"][index]["commandedEnableKnown"] = True
-            self._state["channels"][index]["manualUntil"] = None
-            self._state["channels"][index]["manualPersistent"] = False
+            channel = self._state["channels"][index]
+            self._set_channel(
+                channel,
+                target,
+                0.0 if not outputs_enabled else float(channel["appliedMi"]),
+                enabled=outputs_enabled,
+            )
+            channel["manualUntil"] = None
+            channel["manualPersistent"] = False
         environments = {
             "none": (27.0, 0.08, 0.07, 0.86),
             "hot_summer": (39.0, 0.18, 0.16, 0.84),
@@ -509,8 +515,8 @@ class MockTransport:
         reasons = {
             "none": "MOCK ESP32_A: 기본 주행 자동 정책.",
             "hot_summer": "MOCK ESP32_A: 내부온도에 따라 4채널 열부하 제어를 적용합니다.",
-            "camping": "MOCK ESP32_A: 차박 프라이버시를 위해 전 채널을 강산란으로 전환합니다.",
-            "parked": "MOCK ESP32_A: 주차 도난방지와 열부하 저감을 위해 전 채널을 보호합니다.",
+            "camping": "MOCK ESP32_A: 차박 프라이버시를 위해 PDLC 전 채널 전원을 끕니다.",
+            "parked": "MOCK ESP32_A: 주차 상태에서 PDLC 전 채널 전원을 끕니다.",
             "camera_saturation": "MOCK ESP32_A: 운전석측 ROI는 CH0/CH2, 조수석측 ROI는 CH1/CH3에 연결합니다.",
         }
         self._state["decisionReason"] = reasons[demo_mode]
@@ -551,15 +557,19 @@ class MockTransport:
                 channel["manualUntil"] = None
                 channel["manualPersistent"] = False
                 channel["targetMi"] = self._auto_targets[channel_id]
-                channel["commandedEnable"] = True
+                channel["commandedEnable"] = self._auto_enabled[channel_id]
                 channel["commandedEnableKnown"] = True
         for channel in self._state["channels"]:
             enabled = bool(channel["commandedEnable"])
             target = 0.0 if channel["fault"] or not enabled else float(channel["targetMi"])
             applied = float(channel["appliedMi"])
-            rate = 0.12 if target < applied else 0.04
-            delta = max(-rate, min(rate, target - applied))
-            self._set_channel(channel, float(channel["targetMi"]), applied + delta, enabled=enabled)
+            if channel["fault"] or not enabled:
+                applied = 0.0
+            else:
+                rate = 0.12 if target < applied else 0.04
+                delta = max(-rate, min(rate, target - applied))
+                applied += delta
+            self._set_channel(channel, float(channel["targetMi"]), applied, enabled=enabled)
         self._update_camera()
         self._state["timestamp"] = now
 

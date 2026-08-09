@@ -29,9 +29,13 @@ export function ChannelTable({ channels, selectedChannel, onSelectChannel }: Pro
             : 0;
           const stateLabel = channel.fault
             ? '구동기 고장'
-            : channel.appliedKnown
-              ? opticalStateLabels[channel.opticalState]
-              : 'ESP32_B 상태 대기';
+            : channel.commandedEnableKnown && !channel.commandedEnable
+              ? channel.appliedKnown && channel.appliedMi === 0
+                ? '전원 OFF'
+                : '전원 OFF 명령'
+              : channel.appliedKnown
+                ? opticalStateLabels[channel.opticalState]
+                : 'ESP32_B 상태 대기';
           const displayName = channelDisplayName(channel.name);
 
           return (

@@ -64,13 +64,19 @@ class GatewayTests(unittest.TestCase):
         self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 39)
         self.assertFalse(self.gateway.snapshot()["environment"]["internalTempOverride"])
 
-    def test_mock_privacy_scenarios_keep_all_channels_enabled_at_nonzero_mi(self) -> None:
+    def test_mock_privacy_scenarios_power_off_all_channels(self) -> None:
         for scenario in ("camping", "parked"):
             self.gateway.submit({"type": "setScenario", "demoMode": scenario})
             self.wait_for(lambda: self.gateway.snapshot()["demoMode"] == scenario)
             channels = self.gateway.snapshot()["channels"]
-            self.assertTrue(all(channel["commandedEnable"] for channel in channels))
-            self.assertTrue(all(0.0 < channel["targetMi"] < 0.12 for channel in channels))
+            self.assertTrue(all(not channel["commandedEnable"] for channel in channels))
+            self.assertTrue(all(channel["targetMi"] == 0.0 for channel in channels))
+            self.wait_for(
+                lambda: all(
+                    channel["appliedMi"] == 0.0
+                    for channel in self.gateway.snapshot()["channels"]
+                )
+            )
 
     def test_camera_stream_request_is_tracked_without_changing_policy(self) -> None:
         before = [channel["targetMi"] for channel in self.gateway.snapshot()["channels"]]
