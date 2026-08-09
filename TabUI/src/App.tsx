@@ -30,7 +30,10 @@ export default function App() {
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [theme, setTheme] = useState<BrandTheme>(getInitialTheme);
   const controllerAvailable = connected && state.link.hardwareConnected;
-  const diagnosticsEnabled = controllerAvailable && (state.link.transport === 'mock' || state.link.hilEnabled);
+  const diagnosticsEnabled = controllerAvailable && (
+    state.link.transport === 'mock'
+    || (state.link.hilEnabled && state.controllerDiagnostics.firmwareDiagnosticsEnabled === true)
+  );
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -70,6 +73,7 @@ export default function App() {
           key={state.demoMode}
           channels={state.channels}
           environment={state.environment}
+          demoMode={state.demoMode}
           selectedChannel={selectedChannel}
           sendCommand={sendCommand}
           controlsEnabled={controllerAvailable}

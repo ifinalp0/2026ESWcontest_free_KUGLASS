@@ -76,6 +76,27 @@ int main() {
     assert(thermal.thermal_risk > 0.99f);
     assert(thermal.channels[3].target_mi < thermal.channels[0].target_mi);
 
+    PolicyEngine thermal_demo_engine;
+    thermal_demo_engine.begin();
+    assert(thermal_demo_engine.apply_command(parse(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":1,\"command\":\"set_demo\","
+        "\"demo_mode\":\"hot_summer\"}"), now).accepted);
+    SensorSnapshot cool_demo;
+    cool_demo.internal_temp_valid = true;
+    cool_demo.internal_temp_c = 25.0f;
+    cool_demo.internal_temp_timestamp_ms = now;
+    const PolicyDecision cool_thermal_demo =
+        thermal_demo_engine.update(cool_demo, now);
+    assert(cool_thermal_demo.thermal_risk == 0.0f);
+    SensorSnapshot hot_demo = cool_demo;
+    hot_demo.internal_temp_c = 42.0f;
+    hot_demo.internal_temp_timestamp_ms = now + 50U;
+    const PolicyDecision hot_thermal_demo =
+        thermal_demo_engine.update(hot_demo, now + 50U);
+    assert(hot_thermal_demo.thermal_risk > 0.99f);
+    assert(hot_thermal_demo.channels[2].target_mi <
+           cool_thermal_demo.channels[2].target_mi);
+
     PolicyEngine privacy_engine;
     privacy_engine.begin();
     assert(privacy_engine.apply_command(parse(
@@ -84,6 +105,27 @@ int main() {
     PolicyDecision privacy = privacy_engine.update(SensorSnapshot{}, now);
     for (const PolicyChannelTarget& channel : privacy.channels) {
         assert(channel.target_mi < 0.12f);
+        assert(channel.target_mi > 0.0f);
+        assert(channel.optical_state == OpticalState::FROST);
+        assert(channel.enable);
+    }
+    ProtocolCommand privacy_command;
+    assert(policy_decision_to_protocol(privacy, 250, &privacy_command));
+    for (const ProtocolChannelCommand& channel : privacy_command.channels) {
+        assert(channel.mi > 0.0f);
+        assert(channel.enable);
+    }
+
+    PolicyEngine parked_engine;
+    parked_engine.begin();
+    assert(parked_engine.apply_command(parse(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":1,\"command\":\"set_mode\","
+        "\"mode\":\"parked\"}"), now).accepted);
+    const PolicyDecision parked = parked_engine.update(SensorSnapshot{}, now);
+    for (const PolicyChannelTarget& channel : parked.channels) {
+        assert(channel.target_mi > 0.0f);
+        assert(channel.target_mi < 0.12f);
+        assert(channel.optical_state == OpticalState::FROST);
         assert(channel.enable);
     }
 

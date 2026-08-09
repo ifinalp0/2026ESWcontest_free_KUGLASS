@@ -664,7 +664,7 @@ button.status-block {
 .scenario-options {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .scenario-option {
@@ -1057,11 +1057,13 @@ button.status-block {
 .glare-spot {
   position: absolute;
   top: 35px;
-  left: 24%;
+  left: 50%;
   width: 82px;
   height: 82px;
+  transform: translateX(-50%);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 248, 188, 0.98), rgba(255, 188, 57, 0.62) 38%, rgba(255, 191, 65, 0) 72%);
+  transition: left 320ms ease-out, opacity 180ms ease-out;
 }
 
 .metric-grid {
@@ -2063,7 +2065,7 @@ select:focus-visible,
   display: grid;
   flex: 1;
   gap: 6px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .scenario-option {
@@ -2388,6 +2390,70 @@ input[type="range"]::-webkit-slider-thumb {
   grid-template-columns: 58px minmax(0, 1fr) 48px;
 }
 
+.temperature-only,
+.thermal-inputs {
+  gap: 8px;
+}
+
+.temperature-readout {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.temperature-readout > svg {
+  flex: 0 0 auto;
+  color: var(--hyundai-blue-bright);
+}
+
+.temperature-readout > span {
+  display: grid;
+  gap: 2px;
+}
+
+.temperature-readout small {
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.temperature-readout strong {
+  color: var(--hyundai-blue);
+  font-family: var(--font-data);
+  font-size: 1rem;
+}
+
+.temperature-demo-toggle {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--hyundai-blue);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--hyundai-blue);
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.temperature-demo-toggle:hover:not(:disabled),
+.temperature-demo-toggle.active {
+  background: var(--hyundai-blue);
+  color: #ffffff;
+}
+
+.temperature-demo-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .validation-tools {
   padding: 0;
   background: var(--panel);
@@ -2514,7 +2580,7 @@ input[type="range"]::-webkit-slider-thumb {
   }
 
   .scenario-options {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .scenario-option {

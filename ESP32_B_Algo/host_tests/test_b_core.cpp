@@ -63,6 +63,9 @@ bool probe_enable_commit(size_t channel_index, void* context) {
 }  // namespace
 
 int main() {
+    static_assert(KUGLASS_FAULT_CONFIRM_SAMPLES == 20U);
+    static_assert(KUGLASS_FAULT_REPEAT_EVENT_LIMIT == 3U);
+
     EstopInputQualifier estop_qualifier;
     assert(estop_qualifier.sample(true) ==
            EstopInputQualification::HEALTHY);
@@ -129,10 +132,16 @@ int main() {
     assert(!fault_qualifier.pending());
     assert(fault_qualifier.repeat_event_count() == 1U);
 
-    // A second self-clearing FAULT_N pulse inside the guard window must latch
-    // instead of creating an endless cut/ramp/retry cycle.
-    assert(fault_qualifier.note_falling_edge(
-        100U + KUGLASS_FAULT_REPEAT_WINDOW_MS));
+    // Two self-clearing FAULT_N pulses may recover. A third pulse inside the
+    // guard window must latch instead of creating an endless retry cycle.
+    assert(!fault_qualifier.note_falling_edge(200U));
+    for (uint8_t i = 0; i < KUGLASS_FAULT_RELEASE_SAMPLES - 1U; ++i) {
+        assert(fault_qualifier.sample(true) ==
+               FaultInputQualification::QUALIFYING_HIGH);
+    }
+    assert(fault_qualifier.sample(true) ==
+           FaultInputQualification::RECOVERED_HIGH);
+    assert(fault_qualifier.note_falling_edge(300U));
     fault_qualifier.reset();
     assert(!fault_qualifier.note_falling_edge(100U));
     assert(!fault_qualifier.note_falling_edge(

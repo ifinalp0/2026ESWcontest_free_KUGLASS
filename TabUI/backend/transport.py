@@ -295,11 +295,21 @@ class MockTransport:
 
     SCENARIO_TARGETS = {
         "none": [MAX_MI] * 4,
-        "hot_summer": [0.5179, 0.5053, 0.3284, 0.3284],
-        "camping": [0.0253] * 4,
-        "parked": [0.0189] * 4,
+        "hot_summer": [MAX_MI] * 4,
+        # These non-zero targets keep ESP32_B's channel enable asserted while
+        # presenting the privacy scenarios as strong scattering.
+        "camping": [0.0303] * 4,
+        "parked": [0.0303] * 4,
         "camera_saturation": [0.2653, 0.48, 0.5432, 0.5432],
     }
+    SCENARIO_INTERNAL_TEMPERATURES = {
+        "none": 27.0,
+        "hot_summer": 39.0,
+        "camping": 24.0,
+        "parked": 33.0,
+        "camera_saturation": 28.0,
+    }
+    THERMAL_HOT_TARGETS = [0.5179, 0.5053, 0.3284, 0.3284]
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -314,8 +324,11 @@ class MockTransport:
         self._pending_control_result: dict[str, Any] | None = None
         self._manual_targets: dict[int, tuple[float, bool, float | None]] = {}
         self._auto_targets = [MAX_MI] * 4
+        self._scenario_internal_temp = self.SCENARIO_INTERNAL_TEMPERATURES["none"]
+        self._temperature_override: float | None = None
         self._state["environment"].update({
             "internalTemp": 27.0,
+            "internalTempOverride": False,
             "frontLeftSaturation": 0.08,
             "frontRightSaturation": 0.07,
             "edgeDensity": 0.86,
@@ -443,9 +456,24 @@ class MockTransport:
                 "front_right_saturation": "frontRightSaturation", "edge_density": "edgeDensity",
             }
             for key, value in record.get("environment", {}).items():
-                if key in aliases:
+                if key == "internal_temp_c":
+                    self._temperature_override = None if value is None else float(value)
+                    self._state["environment"]["internalTemp"] = (
+                        self._scenario_internal_temp
+                        if self._temperature_override is None
+                        else self._temperature_override
+                    )
+                    self._state["environment"]["internalTempOverride"] = (
+                        self._temperature_override is not None
+                    )
+                elif key in aliases:
                     self._state["environment"][aliases[key]] = value
-            self._state["decisionReason"] = "MOCK/HIL 환경 override를 ESP32_A 입력으로 적용했습니다."
+            if self._state["demoMode"] == "hot_summer":
+                self._refresh_thermal_targets()
+                source = "DS18B20 센서" if self._temperature_override is None else "외부 온도 시연"
+                self._state["decisionReason"] = f"MOCK ESP32_A: {source} 입력으로 열부하를 판단합니다."
+            else:
+                self._state["decisionReason"] = "MOCK/HIL 환경 override를 ESP32_A 입력으로 적용했습니다."
         elif command == "camera_stream":
             # MOCK has no physical image source. It still acknowledges the
             # command so the viewer can exercise its waiting/error UI.
@@ -453,7 +481,14 @@ class MockTransport:
 
     def _set_scenario(self, demo_mode: str) -> None:
         self._state["demoMode"] = demo_mode
-        self._auto_targets = list(self.SCENARIO_TARGETS[demo_mode])
+        self._scenario_internal_temp = self.SCENARIO_INTERNAL_TEMPERATURES[demo_mode]
+        self._temperature_override = None
+        self._state["environment"]["internalTempOverride"] = False
+        self._auto_targets = (
+            self._thermal_targets(self._scenario_internal_temp)
+            if demo_mode == "hot_summer"
+            else list(self.SCENARIO_TARGETS[demo_mode])
+        )
         self._manual_targets.clear()
         for index, target in enumerate(self._auto_targets):
             self._state["channels"][index]["targetMi"] = target
@@ -462,11 +497,11 @@ class MockTransport:
             self._state["channels"][index]["manualUntil"] = None
             self._state["channels"][index]["manualPersistent"] = False
         environments = {
-            "none": (27, 0.08, 0.07, 0.86),
-            "hot_summer": (39, 0.18, 0.16, 0.84),
-            "camping": (24, 0.02, 0.02, 0.72),
-            "parked": (33, 0.10, 0.09, 0.76),
-            "camera_saturation": (28, 0.90, 0.36, 0.83),
+            "none": (27.0, 0.08, 0.07, 0.86),
+            "hot_summer": (39.0, 0.18, 0.16, 0.84),
+            "camping": (24.0, 0.02, 0.02, 0.72),
+            "parked": (33.0, 0.10, 0.09, 0.76),
+            "camera_saturation": (28.0, 0.90, 0.36, 0.83),
         }
         values = environments[demo_mode]
         keys = ("internalTemp", "frontLeftSaturation", "frontRightSaturation", "edgeDensity")
@@ -479,7 +514,33 @@ class MockTransport:
             "camera_saturation": "MOCK ESP32_A: 운전석측 ROI는 CH0/CH2, 조수석측 ROI는 CH1/CH3에 연결합니다.",
         }
         self._state["decisionReason"] = reasons[demo_mode]
+        self._state["controllerDiagnostics"]["thermalRisk"] = clamp(
+            (self._scenario_internal_temp - 27.0) / 15.0
+        )
         self._update_camera()
+
+    @classmethod
+    def _thermal_targets(cls, temperature_c: float) -> list[float]:
+        thermal_risk = clamp((temperature_c - 27.0) / 15.0)
+        return [
+            round(MAX_MI - (MAX_MI - hot_target) * thermal_risk, 4)
+            for hot_target in cls.THERMAL_HOT_TARGETS
+        ]
+
+    def _refresh_thermal_targets(self) -> None:
+        temperature = self._state["environment"]["internalTemp"]
+        if temperature is None:
+            return
+        thermal_risk = clamp((float(temperature) - 27.0) / 15.0)
+        self._state["controllerDiagnostics"]["thermalRisk"] = round(thermal_risk, 4)
+        self._auto_targets = self._thermal_targets(float(temperature))
+        for channel_id, target in enumerate(self._auto_targets):
+            if channel_id in self._manual_targets:
+                continue
+            channel = self._state["channels"][channel_id]
+            channel["targetMi"] = target
+            channel["commandedEnable"] = True
+            channel["commandedEnableKnown"] = True
 
     def _step(self) -> None:
         now = time.time()

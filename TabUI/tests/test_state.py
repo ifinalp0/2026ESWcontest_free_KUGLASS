@@ -57,7 +57,10 @@ class StateStoreTests(unittest.TestCase):
             "type": "state",
             "vehicle_mode": "camping",
             "demo_mode": "camping",
-            "environment": {"internal_temp_c": 29.5},
+            "environment": {
+                "internal_temp_c": 29.5,
+                "internal_temp_override": True,
+            },
             "camera_metrics": {"front_left_saturation": 0.4, "frame_id": 12},
             "channels": [{
                 "channel_id": 0,
@@ -79,6 +82,7 @@ class StateStoreTests(unittest.TestCase):
         state = store.snapshot()
         self.assertEqual(state["vehicleMode"], "camping")
         self.assertEqual(state["environment"]["internalTemp"], 29.5)
+        self.assertTrue(state["environment"]["internalTempOverride"])
         self.assertEqual(state["cameraMetrics"]["frameId"], 12)
         self.assertEqual(state["channels"][0]["targetMi"], 0.2)
         self.assertEqual(state["channels"][0]["commandedMi"], 0.25)

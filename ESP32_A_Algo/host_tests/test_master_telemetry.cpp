@@ -23,6 +23,7 @@ int main() {
     decision.vehicle_mode = VehicleMode::STOPPED;
     decision.demo_mode = DemoMode::CAMERA_SATURATION;
     decision.thermal_risk = 0.42f;
+    decision.temperature_override_active = true;
     decision.glare_total = 0.73f;
     decision.decision_reason = "camera glare: directional fast response";
     for (size_t i = 0; i < KUGLASS_TOTAL_CHANNELS; ++i) {
@@ -54,6 +55,7 @@ int main() {
     assert(std::strstr(line, "\"type\":\"state\"") != nullptr);
     assert(std::strstr(line, "\"vehicle_mode\":\"stopped\"") != nullptr);
     assert(std::strstr(line, "\"camera_metrics\"") != nullptr);
+    assert(std::strstr(line, "\"internal_temp_override\":true") != nullptr);
     assert(std::strstr(line, "\"channels\"") != nullptr);
     assert(std::strstr(line, "\"decision_reason\"") != nullptr);
     assert(std::strstr(line, "\"downstream\"") != nullptr);

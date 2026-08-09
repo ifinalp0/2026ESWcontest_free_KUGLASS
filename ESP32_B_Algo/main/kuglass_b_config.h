@@ -23,17 +23,17 @@ static constexpr uint32_t KUGLASS_OUTPUT_UPDATE_MS = 1;
 // may be released as a glitch and wait for a fresh full command.
 static constexpr uint8_t KUGLASS_ESTOP_CONFIRM_SAMPLES = 10;
 static constexpr uint8_t KUGLASS_ESTOP_RELEASE_SAMPLES = 10;
-// A raw FAULT_N falling edge still cuts the channel immediately. Ten
-// consecutive output-task samples prevent brief or intermittent LOW noise
-// from becoming a reset-required latched fault. Any intervening HIGH restarts
+// A raw FAULT_N falling edge still cuts the channel immediately. Twenty
+// consecutive output-task samples prevent short switching transients from
+// becoming a reset-required latched fault. Any intervening HIGH restarts
 // qualification from zero.
-static constexpr uint8_t KUGLASS_FAULT_CONFIRM_SAMPLES = 10;
+static constexpr uint8_t KUGLASS_FAULT_CONFIRM_SAMPLES = 20;
 // A short FAULT_N pulse can disappear as soon as RUN_OK and the MCU ENABLE
-// request cut the stage. Allow one isolated pulse to recover after a stable
-// HIGH interval, but never retry an unstable stage forever. Two falling edges
-// inside this window latch the affected channel and require reset.
+// request cut the stage. Allow two isolated pulses to recover after a stable
+// HIGH interval, but never retry an unstable stage forever. Three falling
+// edges inside this window latch the affected channel and require reset.
 static constexpr uint8_t KUGLASS_FAULT_RELEASE_SAMPLES = 10;
-static constexpr uint8_t KUGLASS_FAULT_REPEAT_EVENT_LIMIT = 2;
+static constexpr uint8_t KUGLASS_FAULT_REPEAT_EVENT_LIMIT = 3;
 static constexpr uint32_t KUGLASS_FAULT_REPEAT_WINDOW_MS = 5000;
 static constexpr uint32_t KUGLASS_DIRECTION_BLANKING_MS = 1;
 static constexpr uint32_t KUGLASS_SAFETY_WATCHDOG_MS = 100;

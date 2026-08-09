@@ -64,12 +64,14 @@ freshness와 reset context를 무효화하며, 유효한 B status로 online을 �
 | `return_auto` | 단일 채널 또는 전체 수동 override 해제 |
 | `reset_fault` | 최신 B boot/challenge context를 사용한 reset 요청 |
 | `camera_stream` | `enable`, 최대 15초 lease |
-| `set_environment` | MOCK 또는 양쪽에서 허용된 HIL 전용 |
+| `set_environment` | MOCK 또는 양쪽에서 허용된 HIL 전용. `environment.internal_temp_c`는 열부하 외부 온도 시연값이며 `null`은 해당 override 해제 |
 | `set_channel_fault` | MOCK 또는 양쪽에서 허용된 HIL 전용 |
 
 LIVE 자동 모드에서 TabUI는 저수준 `ch` 배열이나 목표 MI를 계산하지 않는다.
 일반 운용 화면의 수동 기본 TTL은 15초다. 관리자 페이지는 `ttl_ms=0`을 보내며,
 이 override는 명시적인 `return_auto`, 새 demo 설정 또는 ESP32_A 재부팅 전까지 유지된다.
+환경 override도 새 demo 설정에서 해제된다. 합성 `internal_temp_c`는 production
+외부 온도 센서 telemetry가 아니라 MOCK/HIL의 임시 thermal policy 입력이다.
 
 ## ESP32_A → ESP32_B actuator command
 
@@ -108,11 +110,12 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
   HIGH로 돌아온 glitch는 10회 연속 HIGH 안정화 뒤 해제되며, 이전 actuator command
   lease를 재사용하지 않고 다음 유효 full frame까지 전체 출력을 off로 유지한다.
 - `FAULT_N` falling edge는 해당 채널 출력을 즉시 차단한다. 1 ms 출력 주기에서
-  10회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
-  `ch[].fault`에 표시되고 그 채널의 `mi`만 0.0이 된다. 첫 짧은 pulse는 10회 연속
-  HIGH가 확인되면 자동 복구할 수 있다. 그러나 5초 안에 두 번째 falling edge가
-  발생하면 출력 차단으로 스스로 HIGH가 된 실제 fault의 반복 재인가를 막기 위해
-  해당 채널을 latch한다. 채널 fault가 하나라도 활성일 때 `fault_code`는
+  20회 연속 LOW가 확인된 Power Stage Fault만 reset-required latch로 확정되어 해당
+  `ch[].fault`에 표시되고 그 채널의 `mi`만 0.0이 된다. 첫 두 번의 짧은 pulse는
+  각각 10회 연속 HIGH가 확인되면 자동 복구할 수 있다. 그러나 5초 안에 세 번째
+  falling edge가 발생하면 출력 차단으로 스스로 HIGH가 된 실제 fault의 반복
+  재인가를 막기 위해 해당 채널을 latch한다. 채널 fault가 하나라도 활성일 때
+  `fault_code`는
   `POWER_STAGE_FAULT`이고, E-Stop·통신·명령 오류의 `fault_code`는 controller-wide
   차단 원인이다. 정상인 나머지 채널은 활성 command lease를 계속 따른다.
 - `diagnostic`, `adc`, `control_result`는 선택 필드다.
@@ -168,6 +171,9 @@ ESP32_A USB 링크의 주요 record는 다음과 같다.
 
 `target_mi`, `commanded_mi`, `applied_mi`는 서로 다른 상태다. TabUI는 유효한
 B status를 받기 전까지 적용값을 추정하지 않는다.
+`state.environment.internal_temp_override`는 현재 보이는 온도가 물리 DS18B20이
+아니라 MOCK/HIL 시연 override이면 true이며, TabUI의 외부 온도 버튼은 이 상태를
+기준으로 표시한다.
 각 A `state.channels` 항목의 `manual_active`는 수동 적용 여부를,
 `manual_persistent`는 관리자 지속 override 여부를 나타낸다. 일반 수동은
 `manual_remaining_ms`가 양수이고, 관리자 지속 수동은 이 값을 0으로 보고한다.

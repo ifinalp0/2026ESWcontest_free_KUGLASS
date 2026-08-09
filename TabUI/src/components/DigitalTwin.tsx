@@ -561,9 +561,9 @@ export function DigitalTwin(props: Props) {
               <small>{channelDisplayName(selected.name)}</small>
             </div>
             <div className="canvas-telemetry">
-              <span><small>목표</small><strong>{Math.round(selected.targetMi * 100)}%</strong></span>
-              <span><small>적용</small><strong>{selected.appliedKnown ? `${Math.round(selected.appliedMi * 100)}%` : '대기'}</strong></span>
-              <span><small>투과</small><strong>{selected.appliedKnown ? `${Math.round(selected.estimatedTransmittance * 100)}%` : '대기'}</strong></span>
+              <span><small>목표</small><strong>MI {selected.targetMi.toFixed(3)}</strong></span>
+              <span><small>적용</small><strong>{selected.appliedKnown ? `MI ${selected.appliedMi.toFixed(3)}` : '대기'}</strong></span>
+              <span><small>추정 투명도</small><strong>{selected.appliedKnown ? `${Math.round(selected.estimatedTransmittance * 100)}%` : '대기'}</strong></span>
             </div>
           </>
         ) : null}

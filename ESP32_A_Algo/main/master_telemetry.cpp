@@ -52,8 +52,14 @@ bool format_master_state(const PolicyDecision& decision,
     }
     if (sensors.internal_temp_valid) {
         if (!append(output, output_size, &used,
-                    "\"internal_temp_c\":%.2f},", sensors.internal_temp_c)) return false;
-    } else if (!append(output, output_size, &used, "\"internal_temp_c\":null},")) {
+                    "\"internal_temp_c\":%.2f,\"internal_temp_override\":%s},",
+                    sensors.internal_temp_c,
+                    decision.temperature_override_active ? "true" : "false")) {
+            return false;
+        }
+    } else if (!append(output, output_size, &used,
+                       "\"internal_temp_c\":null,\"internal_temp_override\":%s},",
+                       decision.temperature_override_active ? "true" : "false")) {
         return false;
     }
 

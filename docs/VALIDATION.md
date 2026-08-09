@@ -61,6 +61,9 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
   0.60 초과 frame을 전체 거부하는지 확인
 - TabUI의 산란·3D 표현과 추정 투과도가 MI 0.60에서 각각 0%·완전 투명·100%로
   일치하는지 확인
+- 차박·주차의 CH0~CH3가 `enable=true`와 비영(非零) 강산란 MI를 함께 유지하는지 확인
+- 열부하에서 실제 DS18B20 온도 변화가 목표를 바꾸고, MOCK/HIL 외부 온도 시연값과
+  `null` 해제 뒤 물리 센서 복귀가 같은 thermal policy 경로에서 동작하는지 확인
 - A AUTO 0.01 MI deadband와 20 Hz 빠른 servo가 작은 카메라 목표 chatter는
   유지하면서 큰 target 변화에는 지연 없이 수렴하는지 확인
 - B의 감소 12.0 MI/s·증가 4.0 MI/s와 2 ms slew `dt` 상한을 확인하고, 저전압
@@ -68,8 +71,9 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
   Power Stage/HV 검증 완료로 간주하지 않음
 - E-Stop falling edge 즉시 전체 차단, 1~9 sample LOW 뒤 10회 HIGH 안정화와 새
   full command 복구, 10회 연속 LOW E-Stop latch와 안전 조건 확인 후 reset
-- `FAULT_N` falling edge 해당 채널 즉시 차단, 첫 1~9 sample pulse 뒤 10회 연속
-  HIGH 자동 복구, 5초 내 두 번째 falling edge 및 10회 연속 LOW Fault latch
+- `FAULT_N` falling edge 해당 채널 즉시 차단, 첫 두 번의 1~19 sample pulse 뒤
+  각각 10회 연속 HIGH 자동 복구, 5초 내 세 번째 falling edge 및 20회 연속 LOW
+  Fault latch
 - B reboot의 `boot_id`, A reboot의 `source_session_id`, one-time challenge와 replay 거부
 - 정확한 `control_result` correlation과 1,500 ms reset timeout
 - reset 직후 네 ENABLE LOW, PWM 0, 방향 blanking과 E-Stop hardware gate

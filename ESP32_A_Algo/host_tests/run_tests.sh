@@ -66,6 +66,14 @@ $CXX $CXXFLAGS \
     -o "$TEST_BUILD_DIR/test_policy"
 
 $CXX $CXXFLAGS \
+    -DKUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1 \
+    "$PROJECT_DIR/main/protocol.cpp" \
+    "$PROJECT_DIR/main/ui_protocol.cpp" \
+    "$PROJECT_DIR/main/policy_engine.cpp" \
+    "$PROJECT_DIR/host_tests/test_policy_diagnostics.cpp" \
+    -o "$TEST_BUILD_DIR/test_policy_diagnostics"
+
+$CXX $CXXFLAGS \
     "$PROJECT_DIR/main/camera_metric_adapter.cpp" \
     "$PROJECT_DIR/main/ds18b20_sensor.cpp" \
     "$PROJECT_DIR/main/sensor_state.cpp" \
@@ -116,6 +124,7 @@ echo "camera pin contract ok"
 "$TEST_BUILD_DIR/test_protocol"
 "$TEST_BUILD_DIR/test_ui_protocol"
 "$TEST_BUILD_DIR/test_policy"
+"$TEST_BUILD_DIR/test_policy_diagnostics"
 "$TEST_BUILD_DIR/test_sensors"
 "$TEST_BUILD_DIR/test_downstream_status"
 "$TEST_BUILD_DIR/test_json_line_accumulator"

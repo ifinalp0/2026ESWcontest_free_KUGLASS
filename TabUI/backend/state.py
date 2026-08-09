@@ -97,6 +97,7 @@ def default_state() -> dict[str, Any]:
         "demoMode": "none",
         "environment": {
             "internalTemp": None,
+            "internalTempOverride": False,
             "frontLeftSaturation": 0.0,
             "frontRightSaturation": 0.0,
             "edgeDensity": 0.0,
@@ -379,6 +380,9 @@ class StateStore:
             value = _first(incoming, aliases)
             if value is not None or any(alias in incoming for alias in aliases):
                 environment[target] = None if value is None else float(value)
+        override = _first(incoming, ("internalTempOverride", "internal_temp_override"))
+        if isinstance(override, bool):
+            environment["internalTempOverride"] = override
 
     def _merge_camera(self, incoming: dict[str, Any]) -> None:
         camera = self._state["cameraMetrics"]

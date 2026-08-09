@@ -62,9 +62,9 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
   HIGH와 새 full command 전까지 off를 유지한 뒤 reset 없이 복구되는지 확인하고,
   10회 연속 LOW에서는 E-Stop latch와 reset challenge 교체를 확인합니다.
 - 각 `FAULT_N_CHx`를 한 번에 하나씩 LOW로 주입해 falling edge의 즉시 enable
-  차단, 1~9회 output sample 안에 HIGH로 복귀한 첫 pulse의 10회 연속 HIGH 후 자동
-  복구, 5초 안의 두 번째 falling edge 및 10회 연속 LOW의 latch와 PWM force-low,
-  reset 전 재활성화 금지를 확인합니다. 반복 event latch에서는 status
+  차단, 첫 두 번의 1~19회 output sample LOW pulse가 각각 10회 연속 HIGH 후 자동
+  복구되는지, 5초 안의 세 번째 falling edge 및 20회 연속 LOW의 latch와 PWM
+  force-low, reset 전 재활성화 금지를 확인합니다. 반복 event latch에서는 status
   `fault_code=POWER_STAGE_FAULT`와 해당 채널 `fault=true`도 확인합니다. 동시에 다른
   세 채널의 enable/PWM과 활성 command lease가 중단되지 않는지 확인합니다.
 - GPIO3 temperature source가 연결된 cold boot를 반복하고 strapping failure 여부를 기록합니다.

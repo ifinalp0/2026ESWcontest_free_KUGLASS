@@ -46,6 +46,32 @@ class GatewayTests(unittest.TestCase):
         self.gateway.submit({"type": "setEnvironment", "environment": {"internalTemp": 40}})
         self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 40)
 
+    def test_mock_thermal_demo_uses_sensor_or_external_temperature(self) -> None:
+        self.gateway.submit({"type": "setScenario", "demoMode": "hot_summer"})
+        self.wait_for(lambda: self.gateway.snapshot()["demoMode"] == "hot_summer")
+
+        self.gateway.submit({"type": "setEnvironment", "environment": {"internalTemp": 20}})
+        self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 20)
+        cool_target = self.gateway.snapshot()["channels"][2]["targetMi"]
+
+        self.gateway.submit({"type": "setEnvironment", "environment": {"internalTemp": 45}})
+        self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 45)
+        self.assertTrue(self.gateway.snapshot()["environment"]["internalTempOverride"])
+        hot_target = self.gateway.snapshot()["channels"][2]["targetMi"]
+        self.assertLess(hot_target, cool_target)
+
+        self.gateway.submit({"type": "setEnvironment", "environment": {"internalTemp": None}})
+        self.wait_for(lambda: self.gateway.snapshot()["environment"]["internalTemp"] == 39)
+        self.assertFalse(self.gateway.snapshot()["environment"]["internalTempOverride"])
+
+    def test_mock_privacy_scenarios_keep_all_channels_enabled_at_nonzero_mi(self) -> None:
+        for scenario in ("camping", "parked"):
+            self.gateway.submit({"type": "setScenario", "demoMode": scenario})
+            self.wait_for(lambda: self.gateway.snapshot()["demoMode"] == scenario)
+            channels = self.gateway.snapshot()["channels"]
+            self.assertTrue(all(channel["commandedEnable"] for channel in channels))
+            self.assertTrue(all(0.0 < channel["targetMi"] < 0.12 for channel in channels))
+
     def test_camera_stream_request_is_tracked_without_changing_policy(self) -> None:
         before = [channel["targetMi"] for channel in self.gateway.snapshot()["channels"]]
         [sequence] = self.gateway.submit({"type": "setCameraStream", "enabled": True})

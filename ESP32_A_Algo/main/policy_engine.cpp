@@ -7,6 +7,10 @@
 namespace {
 
 constexpr float kStrongGlareThreshold = 0.46f;
+// Privacy demonstrations must keep the Power Stage enabled.  A zero MI is
+// treated as safe-off by ESP32_B, so use a small non-zero strong-scattering
+// operating point for both camping and parked modes.
+constexpr float kPrivacyTransmission = 0.04f;
 
 enum class CameraSide : uint8_t {
     DRIVER_LEFT,
@@ -122,12 +126,15 @@ bool time_reached(uint32_t now_ms, uint32_t deadline_ms) {
 void copy_environment_value(uint32_t field,
                             const EnvironmentPatch& source,
                             EnvironmentPatch* destination) {
-    destination->present_mask |= field;
-    if ((source.value_mask & field) != 0U) {
-        destination->value_mask |= field;
-    } else {
+    if ((source.value_mask & field) == 0U) {
+        // JSON null releases the HIL override so the physical sensor becomes
+        // authoritative again; it does not manufacture a missing sensor.
+        destination->present_mask &= ~field;
         destination->value_mask &= ~field;
+        return;
     }
+    destination->present_mask |= field;
+    destination->value_mask |= field;
     switch (field) {
         case ENV_INTERNAL_TEMP:
             destination->internal_temp_c = source.internal_temp_c;
@@ -184,6 +191,9 @@ PolicyApplyResult PolicyEngine::apply_command(const UiCommand& command, uint32_t
             return {true, nullptr};
         case UiCommandType::SET_DEMO:
             for (ManualState& manual : manual_) manual = ManualState{};
+            // A new scenario always starts from physical inputs.  MOCK/HIL
+            // overrides can be applied explicitly after selecting it.
+            diagnostic_environment_ = EnvironmentPatch{};
             demo_mode_ = command.demo_mode;
             if (demo_mode_ == DemoMode::CAMPING) vehicle_mode_ = VehicleMode::CAMPING;
             if (demo_mode_ == DemoMode::PARKED) vehicle_mode_ = VehicleMode::PARKED;
@@ -254,17 +264,10 @@ SensorSnapshot PolicyEngine::effective_sensors(const SensorSnapshot& physical,
         return (patch.present_mask & field) != 0U &&
                (patch.value_mask & field) != 0U;
     };
-    const auto was_cleared = [&patch](uint32_t field) {
-        return (patch.present_mask & field) != 0U &&
-               (patch.value_mask & field) == 0U;
-    };
-
     if (has_value(ENV_INTERNAL_TEMP)) {
         result.internal_temp_c = patch.internal_temp_c;
         result.internal_temp_valid = true;
         result.internal_temp_timestamp_ms = now_ms;
-    } else if (was_cleared(ENV_INTERNAL_TEMP)) {
-        result.internal_temp_valid = false;
     }
 
     const uint32_t camera_fields = ENV_FRONT_LEFT_SATURATION |
@@ -293,10 +296,18 @@ SensorSnapshot PolicyEngine::effective_sensors(const SensorSnapshot& physical,
 PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
                                     uint32_t now_ms) {
     const SensorSnapshot sensors = effective_sensors(physical_sensors, now_ms);
+#if KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS
+    const bool temperature_override_active =
+        (diagnostic_environment_.present_mask & ENV_INTERNAL_TEMP) != 0U &&
+        (diagnostic_environment_.value_mask & ENV_INTERNAL_TEMP) != 0U;
+#else
+    const bool temperature_override_active = false;
+#endif
     PolicyDecision decision;
     decision.seq = ++decision_seq_;
     decision.vehicle_mode = vehicle_mode_;
     decision.demo_mode = demo_mode_;
+    decision.temperature_override_active = temperature_override_active;
 
     const bool camera_fresh = sensors.camera_valid &&
         timestamp_fresh(now_ms, sensors.camera_timestamp_ms, KUGLASS_CAMERA_STALE_MS);
@@ -321,11 +332,6 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
         ? clamp01((sensors.internal_temp_c - 27.0f) / 15.0f)
         : 0.0f;
 
-    if (demo_mode_ == DemoMode::HOT_SUMMER && temperature_fresh) {
-        decision.thermal_risk = decision.thermal_risk < 0.8f
-                                    ? 0.8f
-                                    : decision.thermal_risk;
-    }
     if (demo_mode_ == DemoMode::CAMERA_SATURATION && camera_fresh) {
         decision.glare_left = decision.glare_left < 0.8f ? 0.8f : decision.glare_left;
         decision.glare_right = decision.glare_right < 0.8f ? 0.8f : decision.glare_right;
@@ -398,9 +404,10 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
                 transmission = 0.45f;
             }
             if (privacy_need > 0.0f) {
-                const float privacy_transmission = vehicle_mode_ == VehicleMode::CAMPING
-                    ? 0.08f : 0.16f;
-                if (transmission > privacy_transmission) transmission = privacy_transmission;
+                target.enable = true;
+                if (transmission > kPrivacyTransmission) {
+                    transmission = kPrivacyTransmission;
+                }
             }
 
             target.score = score;
@@ -411,7 +418,9 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             else if (camera_fresh && profile.camera_weight > 0.0f && camera > 0.2f) {
                 target.reason = "camera glare response";
             } else if (temperature_fresh && decision.thermal_risk > 0.2f) {
-                target.reason = "internal temperature response";
+                target.reason = temperature_override_active
+                    ? "demonstration temperature response"
+                    : "internal temperature response";
             } else if (!camera_fresh && !temperature_fresh) {
                 target.reason = "sensor input unavailable";
             } else {
@@ -456,7 +465,9 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
     else if (decision.strong_front_light) {
         decision.decision_reason = "camera glare: directional fast response";
     } else if (decision.thermal_risk > 0.2f) {
-        decision.decision_reason = "internal temperature: thermal load response";
+        decision.decision_reason = temperature_override_active
+            ? "demonstration temperature: thermal load response"
+            : "internal temperature: thermal load response";
     } else if (!camera_fresh && !temperature_fresh) {
         decision.decision_reason = "camera and temperature unavailable";
     } else {

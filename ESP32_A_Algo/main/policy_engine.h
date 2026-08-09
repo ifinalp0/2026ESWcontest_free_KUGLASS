@@ -38,6 +38,7 @@ struct PolicyDecision {
     float glare_right = 0.0f;
     float glare_total = 0.0f;
     bool strong_front_light = false;
+    bool temperature_override_active = false;
     PolicyChannelTarget channels[KUGLASS_TOTAL_CHANNELS];
     const char* decision_reason = "automatic clear";
 };

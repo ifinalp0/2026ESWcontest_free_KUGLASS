@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, RotateCcw, SlidersHorizontal, Thermometer } from 'lucide-react';
 import { channelDisplayName } from '../lib/labels';
 import { MAX_MI, normalizedMi } from '../lib/mi';
-import type { ChannelState, ControlCommand, EnvironmentInput } from '../types';
+import type { ChannelState, ControlCommand, DemoMode, EnvironmentInput } from '../types';
 
 interface Props {
   channels: ChannelState[];
   environment: EnvironmentInput;
+  demoMode: DemoMode;
   selectedChannel: number;
   sendCommand: (command: ControlCommand) => void;
   controlsEnabled: boolean;
   diagnosticsEnabled: boolean;
 }
 
-export function ControlPanel({ channels, environment, selectedChannel, sendCommand, controlsEnabled, diagnosticsEnabled }: Props) {
+export function ControlPanel({ channels, environment, demoMode, selectedChannel, sendCommand, controlsEnabled, diagnosticsEnabled }: Props) {
   const selected = channels[selectedChannel];
   const interactionActive = useRef(false);
   const pendingManual = useRef<{ channel: number; mi: number } | null>(null);
@@ -23,6 +24,10 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
   const frostStrength = manualDraft.channel === selected.channel ? manualDraft.frostStrength : controllerFrostStrength;
   const manualRemaining = selected.manualUntil ? Math.max(0, Math.round(selected.manualUntil - Date.now() / 1000)) : null;
   const manualActive = selected.manualPersistent || manualRemaining !== null;
+  const externalTemperatureDemo = environment.internalTempOverride;
+  const [externalTemperature, setExternalTemperature] = useState(
+    Math.round(environment.internalTemp ?? 39)
+  );
 
   useEffect(() => {
     if (manualDraft.channel !== selected.channel) {
@@ -54,6 +59,12 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
     }
   }, [controllerFrostStrength, controlsEnabled, manualDraft, selected.channel, selected.commandedMi]);
 
+  useEffect(() => {
+    if (!externalTemperatureDemo && environment.internalTemp !== null) {
+      setExternalTemperature(Math.round(environment.internalTemp));
+    }
+  }, [environment.internalTemp, externalTemperatureDemo]);
+
   const setManual = (value: number) => {
     if (!controlsEnabled || selected.fault) {
       return;
@@ -76,12 +87,36 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
     sendCommand({ type: 'returnAuto', channel: selected.channel });
   };
 
-  const setEnvironmentValue = (key: keyof EnvironmentInput, value: number | null) => {
+  const setEnvironmentValue = (
+    key: keyof Omit<EnvironmentInput, 'internalTempOverride'>,
+    value: number | null
+  ) => {
     if (!diagnosticsEnabled) {
       return;
     }
     sendCommand({ type: 'setEnvironment', environment: { [key]: value } });
   };
+
+  const toggleExternalTemperatureDemo = () => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
+    if (externalTemperatureDemo) {
+      sendCommand({ type: 'setEnvironment', environment: { internalTemp: null } });
+      return;
+    }
+    sendCommand({ type: 'setEnvironment', environment: { internalTemp: externalTemperature } });
+  };
+
+  const updateExternalTemperature = (value: number) => {
+    const temperature = Math.max(15, Math.min(50, Math.round(value)));
+    setExternalTemperature(temperature);
+    setEnvironmentValue('internalTemp', temperature);
+  };
+
+  const temperatureText = environment.internalTemp === null
+    ? '측정값 없음'
+    : `${environment.internalTemp.toFixed(1)} °C`;
 
   return (
     <section className="panel control-panel">
@@ -111,7 +146,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
             <strong>MI {selected.targetMi.toFixed(3)}</strong>
           </span>
           <span title="ESP32_A가 ESP32_B로 보낸 명령 MI">
-            <small>A COMMANDED</small>
+            <small>A COMMANDED {selected.commandedEnableKnown ? selected.commandedEnable ? '· ENABLE' : '· OFF' : ''}</small>
             <strong>MI {selected.commandedMi.toFixed(3)}</strong>
           </span>
           <span title="ESP32_B가 보고한 실제 적용 MI">
@@ -127,9 +162,9 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
           <small>{!controlsEnabled ? '장치 연결 대기' : selected.fault ? '고장 중 비활성' : '15초 자동 복귀'}</small>
         </div>
         <div className="range-label">
-          <span>투명</span>
+          <span>투명 100%</span>
           <strong>로컬 DRAFT · 산란 {frostStrength}%</strong>
-          <span>강산란</span>
+          <span>강산란 0%</span>
         </div>
         <input
           type="range"
@@ -154,16 +189,61 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
         ) : null}
       </div>
 
-      <div className="env-controls">
-        <div className="control-section-title">
-          <span>환경 입력 · HIL</span>
-          <small>{diagnosticsEnabled ? '시험 override 활성' : '실측 센서 보호'}</small>
+      {demoMode === 'none' ? (
+        <div className="env-controls temperature-only">
+          <div className="control-section-title">
+            <span>현재 온도</span>
+            <small>DS18B20</small>
+          </div>
+          <TemperatureReadout value={temperatureText} source="실측 센서" />
         </div>
-        <EnvSlider disabled={!diagnosticsEnabled} label="내부온도" unit="°C" min={15} max={48} value={environment.internalTemp ?? 27} onChange={(value) => setEnvironmentValue('internalTemp', value)} />
-        <EnvSlider disabled={!diagnosticsEnabled} label="운전석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontLeftSaturation * 100} onChange={(value) => setEnvironmentValue('frontLeftSaturation', value / 100)} />
-        <EnvSlider disabled={!diagnosticsEnabled} label="조수석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontRightSaturation * 100} onChange={(value) => setEnvironmentValue('frontRightSaturation', value / 100)} />
-        <EnvSlider disabled={!diagnosticsEnabled} label="Edge Density" unit="%" min={0} max={100} value={environment.edgeDensity * 100} onChange={(value) => setEnvironmentValue('edgeDensity', value / 100)} />
-      </div>
+      ) : null}
+
+      {demoMode === 'hot_summer' ? (
+        <div className="env-controls thermal-inputs">
+          <div className="control-section-title">
+            <span>열부하 온도 입력</span>
+            <small>{externalTemperatureDemo ? '외부 시연값 적용 중' : 'DS18B20 센서 판단'}</small>
+          </div>
+          <TemperatureReadout
+            value={temperatureText}
+            source={externalTemperatureDemo ? '외부 시연 입력' : '실측 센서'}
+          />
+          <button
+            className={`temperature-demo-toggle${externalTemperatureDemo ? ' active' : ''}`}
+            type="button"
+            disabled={!diagnosticsEnabled}
+            aria-pressed={externalTemperatureDemo}
+            onClick={toggleExternalTemperatureDemo}
+            title={diagnosticsEnabled ? '외부 온도 시연 입력 전환' : 'MOCK 또는 양쪽에서 허용한 HIL에서만 사용할 수 있습니다'}
+          >
+            <Thermometer size={16} />
+            {externalTemperatureDemo ? '온도 센서 판단으로 복귀' : '외부 온도 시연'}
+          </button>
+          {externalTemperatureDemo ? (
+            <EnvSlider
+              label="시연 온도"
+              unit="°C"
+              min={15}
+              max={50}
+              value={externalTemperature}
+              onChange={updateExternalTemperature}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {demoMode === 'camera_saturation' ? (
+        <div className="env-controls">
+          <div className="control-section-title">
+            <span>카메라 입력 · HIL</span>
+            <small>{diagnosticsEnabled ? '시험 override 활성' : '실측 센서 보호'}</small>
+          </div>
+          <EnvSlider disabled={!diagnosticsEnabled} label="운전석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontLeftSaturation * 100} onChange={(value) => setEnvironmentValue('frontLeftSaturation', value / 100)} />
+          <EnvSlider disabled={!diagnosticsEnabled} label="조수석측 ROI 포화" unit="%" min={0} max={100} value={environment.frontRightSaturation * 100} onChange={(value) => setEnvironmentValue('frontRightSaturation', value / 100)} />
+          <EnvSlider disabled={!diagnosticsEnabled} label="Edge Density" unit="%" min={0} max={100} value={environment.edgeDensity * 100} onChange={(value) => setEnvironmentValue('edgeDensity', value / 100)} />
+        </div>
+      ) : null}
 
       <details className="validation-tools">
         <summary>
@@ -183,6 +263,15 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
         </div>
       </details>
     </section>
+  );
+}
+
+function TemperatureReadout({ value, source }: { value: string; source: string }) {
+  return (
+    <div className="temperature-readout" aria-label={`현재 온도 ${value}, ${source}`}>
+      <Thermometer size={20} />
+      <span><small>{source}</small><strong>{value}</strong></span>
+    </div>
   );
 }
 

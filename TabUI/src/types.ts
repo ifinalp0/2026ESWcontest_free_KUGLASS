@@ -26,6 +26,7 @@ export interface ChannelState {
 
 export interface EnvironmentInput {
   internalTemp: number | null;
+  internalTempOverride: boolean;
   frontLeftSaturation: number;
   frontRightSaturation: number;
   edgeDensity: number;
@@ -141,7 +142,7 @@ export type ControlCommand =
   | { type: 'setManualChannel'; channel: number; mi: number; enable?: boolean; ttlSeconds?: number; persistent?: boolean }
   | { type: 'returnAuto'; channel?: number }
   | { type: 'setScenario'; demoMode: DemoMode }
-  | { type: 'setEnvironment'; environment: Partial<EnvironmentInput> }
+  | { type: 'setEnvironment'; environment: Partial<Omit<EnvironmentInput, 'internalTempOverride'>> }
   | { type: 'setChannelFault'; channel: number; fault: boolean }
   | { type: 'setCameraStream'; enabled: boolean }
   | { type: 'resetFault' }

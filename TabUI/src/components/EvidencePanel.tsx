@@ -9,6 +9,21 @@ interface Props {
   connected: boolean;
 }
 
+const ROI_LEFT_CENTER_PERCENT = 27;
+const ROI_RIGHT_CENTER_PERCENT = 73;
+
+function glarePositionPercent(leftSaturation: number, rightSaturation: number) {
+  const leftWeight = Math.max(0, leftSaturation);
+  const rightWeight = Math.max(0, rightSaturation);
+  const totalWeight = leftWeight + rightWeight;
+  if (totalWeight === 0) {
+    return 50;
+  }
+  const rightShare = rightWeight / totalWeight;
+  return ROI_LEFT_CENTER_PERCENT
+    + (ROI_RIGHT_CENTER_PERCENT - ROI_LEFT_CENTER_PERCENT) * rightShare;
+}
+
 export function EvidencePanel({ state, connected }: Props) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const closeViewer = useCallback(() => setViewerOpen(false), []);
@@ -17,6 +32,10 @@ export function EvidencePanel({ state, connected }: Props) {
   const afterSat = Math.max(cameraMetrics.frontLeftSaturation, cameraMetrics.frontRightSaturation);
   const reduction = beforeSat > 0 ? Math.max(0, (beforeSat - afterSat) / beforeSat) : 0;
   const comparativeEvidence = state.link.transport === 'mock';
+  const glareLeft = glarePositionPercent(
+    cameraMetrics.frontLeftSaturation,
+    cameraMetrics.frontRightSaturation
+  );
   return (
     <section className="panel evidence-panel">
       <div className="panel-heading">
@@ -40,7 +59,13 @@ export function EvidencePanel({ state, connected }: Props) {
           <div className="road-line" />
           <div className="roi left">운전석 L {pct(cameraMetrics.frontLeftSaturation)}</div>
           <div className="roi right">조수석 R {pct(cameraMetrics.frontRightSaturation)}</div>
-          <div className="glare-spot" style={{ opacity: Math.min(0.92, cameraMetrics.glare + 0.05) }} />
+          <div
+            className="glare-spot"
+            style={{
+              left: `${glareLeft}%`,
+              opacity: Math.min(0.92, cameraMetrics.glare + 0.05)
+            }}
+          />
           <button
             className="camera-view-button"
             type="button"

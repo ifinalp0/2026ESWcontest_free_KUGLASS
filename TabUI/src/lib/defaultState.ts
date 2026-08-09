@@ -25,6 +25,7 @@ export const defaultState: SimulationState = {
   demoMode: 'none',
   environment: {
     internalTemp: 27,
+    internalTempOverride: false,
     frontLeftSaturation: 0.08,
     frontRightSaturation: 0.07,
     edgeDensity: 0.86

@@ -180,9 +180,9 @@ Logic Carrier 1장과 동일한 단일 채널 Power Stage 4장은 제작 완료�
 - `EN_GLOBAL`은 GPIO19 **input-only**다. J5 NC E-Stop이 열리면 R18 10 kΩ이
   LOW로 만든다. GPIO19를 output, USB 또는 강제 pull-up으로 구성하지 않는다.
 - `FAULT_N_CH0~3`은 active-low이며 R19~R22 10 kΩ 외부 pull-up을 사용한다.
-  LOW는 fault다. 첫 짧은 pulse는 10회 연속 HIGH 뒤 복구할 수 있지만 5초 안의
-  두 번째 falling edge는 해당 채널을 latch한다. HIGH만으로 커넥터 연결을
-  증명하지 않는다.
+  LOW는 fault다. 첫 두 번의 짧은 pulse는 각각 10회 연속 HIGH 뒤 복구할 수
+  있지만 5초 안의 세 번째 falling edge는 해당 채널을 latch한다. 20회 연속
+  LOW도 latch한다. HIGH만으로 커넥터 연결을 증명하지 않는다.
 - J7은 2x32, 모든 짝수 핀은 GND다. 각 채널의 홀수 8핀은
   `PWM_MAG, DIR, CHx_ENABLE, FAULT_N, ADC_I_RAW, ADC_TEMP_RAW, +3.3V, +12V`
   순서다. CH0=1~15, CH1=17~31, CH2=33~47, CH3=49~63이다.
@@ -273,8 +273,8 @@ sh host_tests/run_tests.sh
 
 HIL에서는 command ACK, 관리자 지속/일반 manual TTL, A의 AUTO 지속, A→B timeout safe-off,
 stale sequence 거부, target/commanded/applied MI 분리를 확인한다. `FAULT_N`은
-첫 짧은 pulse 뒤 10회 연속 HIGH 복구, 5초 안의 두 번째 falling edge latch와
-10회 연속 LOW latch를 확인한다. Fault reset은
+첫 두 번의 짧은 pulse 뒤 각각 10회 연속 HIGH 복구, 5초 안의 세 번째 falling edge
+latch와 20회 연속 LOW latch를 확인한다. Fault reset은
 B reboot/`boot_id`, A reboot/`source_session_id`, one-time challenge, replay 거부,
 정확한 `control_result` correlation과 timeout을 포함한다. ADC는 8개 raw/mV,
 validity mask, 0 V·정상·clamp 경계, open/short, power-off injection, 보드별
