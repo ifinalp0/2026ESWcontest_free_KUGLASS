@@ -50,16 +50,17 @@ freshness와 reset context를 무효화하며, 유효한 B status로 online을 �
 ```json
 {"v":1,"type":"ui_command","seq":101,"command":"set_mode","mode":"driving"}
 {"v":1,"type":"ui_command","seq":102,"command":"set_demo","demo_mode":"hot_summer"}
-{"v":1,"type":"ui_command","seq":103,"command":"manual_channel","channel_id":2,"target_mi":0.42,"ttl_ms":30000,"enable":true}
-{"v":1,"type":"ui_command","seq":104,"command":"return_auto","channel_id":2}
-{"v":1,"type":"ui_command","seq":105,"command":"camera_stream","enable":true,"ttl_ms":15000}
+{"v":1,"type":"ui_command","seq":103,"command":"manual_channel","channel_id":2,"target_mi":0.42,"ttl_ms":15000,"enable":true}
+{"v":1,"type":"ui_command","seq":104,"command":"manual_channel","channel_id":2,"target_mi":0.42,"ttl_ms":0,"enable":true}
+{"v":1,"type":"ui_command","seq":105,"command":"return_auto","channel_id":2}
+{"v":1,"type":"ui_command","seq":106,"command":"camera_stream","enable":true,"ttl_ms":15000}
 ```
 
 | 명령 | 핵심 필드와 범위 |
 | --- | --- |
 | `set_mode` | `driving`, `stopped`, `camping`, `parked` |
 | `set_demo` | `none`, `hot_summer`, `camping`, `parked`, `camera_saturation` |
-| `manual_channel` | channel 0~3, MI 0.0~0.70, `enable` boolean, TTL 1~300초 |
+| `manual_channel` | channel 0~3, MI 0.0~0.70, `enable` boolean, 일반 TTL 1~300초 또는 관리자 지속 `ttl_ms=0` |
 | `return_auto` | 단일 채널 또는 전체 수동 override 해제 |
 | `reset_fault` | 최신 B boot/challenge context를 사용한 reset 요청 |
 | `camera_stream` | `enable`, 최대 15초 lease |
@@ -67,6 +68,8 @@ freshness와 reset context를 무효화하며, 유효한 B status로 online을 �
 | `set_channel_fault` | MOCK 또는 양쪽에서 허용된 HIL 전용 |
 
 LIVE 자동 모드에서 TabUI는 저수준 `ch` 배열이나 목표 MI를 계산하지 않는다.
+일반 운용 화면의 수동 기본 TTL은 15초다. 관리자 페이지는 `ttl_ms=0`을 보내며,
+이 override는 명시적인 `return_auto`, 새 demo 설정 또는 ESP32_A 재부팅 전까지 유지된다.
 
 ## ESP32_A → ESP32_B actuator command
 
@@ -165,12 +168,16 @@ ESP32_A USB 링크의 주요 record는 다음과 같다.
 
 `target_mi`, `commanded_mi`, `applied_mi`는 서로 다른 상태다. TabUI는 유효한
 B status를 받기 전까지 적용값을 추정하지 않는다.
+각 A `state.channels` 항목의 `manual_active`는 수동 적용 여부를,
+`manual_persistent`는 관리자 지속 override 여부를 나타낸다. 일반 수동은
+`manual_remaining_ms`가 양수이고, 관리자 지속 수동은 이 값을 0으로 보고한다.
 TabUI의 현재 link error는 뒤이은 A `state.downstream`으로 갱신되며, 감사 로그처럼
 과거 `protocol_error` 한 건을 영구 latch하지 않는다.
 
 ## Lease와 실패 처리
 
-- 수동 명령 TTL과 A→B heartbeat TTL은 별개의 lease다.
+- 일반 수동 명령 TTL과 A→B heartbeat TTL은 별개의 lease다. 관리자 수동의
+  `ttl_ms=0`은 A→B heartbeat TTL을 바꾸지 않는다.
 - TabUI가 끊겨도 ESP32_A의 AUTO 정책은 계속 실행된다.
 - ESP32_A heartbeat가 끊기면 ESP32_B가 local safe-off한다.
 - LIVE telemetry가 stale이면 TabUI는 마지막 실제 값을 표시하되 명령을 거부한다.

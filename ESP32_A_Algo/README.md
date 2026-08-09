@@ -13,7 +13,7 @@ ESP-IDF 프로젝트입니다. 카메라와 내부온도를 처리하고 CH0~CH3
 - OV2640 카메라의 좌/우 ROI 밝기·포화·highlight·Edge Density 계산
 - YwRobot SEN050007 DS18B20 내부온도의 CRC·범위·stale 검사
 - 상황 모드, privacy, thermal, camera glare 정책과 LUT/MI servo
-- CH0~CH3 수동 override TTL과 AUTO 복귀
+- CH0~CH3 관리자 지속/일반 TTL 수동 override와 AUTO 복귀
 - ESP32_B로 20 Hz full-frame heartbeat 전송 및 B status 검증
 - 센서 품질, target/commanded MI와 B의 applied MI/Fault를 TabUI로 중계
 - 요청 중인 경우 VGA JPEG 영상을 TabUI USB 링크로 보조 전송
@@ -146,7 +146,7 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
   0.0~0.70입니다. LUT의 투과축 형상은 유지하면서 최대 출력점을 0.70으로
   스케일하며, 범위 초과 frame은 거부합니다.
 - AUTO에서 카메라 frame 변화가 만드는 0.01 MI 이하 목표 차이는 noise deadband로
-  유지합니다. 수동 TTL 명령에는 이 deadband를 적용하지 않습니다.
+  유지합니다. 관리자 지속 및 일반 TTL 수동 명령에는 이 deadband를 적용하지 않습니다.
 - 그보다 큰 변화는 20 Hz policy loop에서 감소 8.0 MI/s, 증가 4.0 MI/s의 제한과
   0.8 응답 계수를 사용합니다. 일반 조건의 실효 상한은 각각 약 6.4 MI/s와
   3.2 MI/s이며, 전면 강광 fast-attack은 ESP32_B의 로컬 slew를 남긴 채 A측
@@ -193,5 +193,5 @@ Host test는 핀 소유권, 카메라 방향·복구·timestamp, RGB565 ROI, DS1
 field로 만든 status와 ROM banner가 섞인 stream을 A parser에 통과시킵니다.
 
 HIL에서는 카메라 장애 중 DS18B20과 20 Hz heartbeat 지속, 1초 stale 전환,
-무재부팅 복구, 실제 영상과 ROI 방향 일치, USB/A-B UART, 수동 TTL, B timeout,
+무재부팅 복구, 실제 영상과 ROI 방향 일치, USB/A-B UART, 관리자 지속/일반 TTL 수동 제어, B timeout,
 target/commanded/applied MI 분리, 영상 활성 중 heartbeat와 task jitter를 확인합니다.

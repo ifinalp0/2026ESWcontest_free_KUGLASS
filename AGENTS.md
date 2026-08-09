@@ -116,11 +116,11 @@ ESP32_A -> 상태·ACK·B 적용 MI/Fault -> TabUI -> 브라우저
   `ae_metadata_valid=false`로 보고하고 해당 정책 항에서 제외한다.
 - 카메라나 온도가 stale이면 결측으로 표시한다. 임의 기본값을 실제 측정값처럼
   사용하지 않는다.
-- 우선순위는 `E-Stop > 채널별 latched Fault > Manual(TTL) > Demo/Auto`다.
+- 우선순위는 `E-Stop > 채널별 latched Fault > Manual(관리자 지속/일반 TTL) > Demo/Auto`다.
 - LIVE 연결이 끊기면 마지막 실제 상태를 `STALE/OFFLINE`으로 표시하고 명령을
   막는다. MOCK으로 자동 전환하지 않는다.
 - MOCK/REPLAY는 ESP32_A USB 장치를 열거나 ESP32_B 출력 명령을 만들지 않는다.
-- UI는 runtime mode, A/B online·stale, last seen, control source, manual TTL,
+- UI는 runtime mode, A/B online·stale, last seen, control source, 관리자 지속/일반 manual TTL,
   target/commanded/applied MI, 센서 품질, E-Stop/Fault를 구분한다.
 - replay는 최근 상태 snapshot이다. 명령/ACK/Fault 감사 로그나 제어 완료 증거로
   표현하지 않는다.
@@ -271,7 +271,7 @@ cd ESP32_B_Algo
 sh host_tests/run_tests.sh
 ```
 
-HIL에서는 command ACK, manual TTL, A의 AUTO 지속, A→B timeout safe-off,
+HIL에서는 command ACK, 관리자 지속/일반 manual TTL, A의 AUTO 지속, A→B timeout safe-off,
 stale sequence 거부, target/commanded/applied MI 분리를 확인한다. `FAULT_N`은
 첫 짧은 pulse 뒤 10회 연속 HIGH 복구, 5초 안의 두 번째 falling edge latch와
 10회 연속 LOW latch를 확인한다. Fault reset은

@@ -265,7 +265,8 @@ bool parse_ui_command_line(const char* line, UiCommand* out, UiProtocolError* er
                     *error = UiProtocolError::INVALID_FIELD;
                     return false;
                 }
-                if (out->ttl_ms < 1000U || out->ttl_ms > 300000U) {
+                if (out->ttl_ms != 0U &&
+                    (out->ttl_ms < 1000U || out->ttl_ms > 300000U)) {
                     *error = UiProtocolError::OUT_OF_RANGE;
                     return false;
                 }

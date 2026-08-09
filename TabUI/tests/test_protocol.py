@@ -41,6 +41,40 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(message["ttl_ms"], 30000)
         self.assertNotIn("ch", message)
 
+    def test_manual_command_defaults_to_fifteen_seconds(self) -> None:
+        [message] = translate_ui_command(
+            {"type": "setManualChannel", "channel": 0, "mi": 0.5},
+            Sequence().next,
+            diagnostics_enabled=False,
+        )
+        self.assertEqual(message["ttl_ms"], 15000)
+
+    def test_persistent_manual_command_uses_zero_ttl(self) -> None:
+        [message] = translate_ui_command(
+            {
+                "type": "setManualChannel",
+                "channel": 1,
+                "mi": 0.4,
+                "persistent": True,
+            },
+            Sequence().next,
+            diagnostics_enabled=False,
+        )
+        self.assertEqual(message["ttl_ms"], 0)
+
+    def test_persistent_manual_flag_requires_json_boolean(self) -> None:
+        with self.assertRaises(CommandError):
+            translate_ui_command(
+                {
+                    "type": "setManualChannel",
+                    "channel": 1,
+                    "mi": 0.4,
+                    "persistent": "true",
+                },
+                Sequence().next,
+                diagnostics_enabled=False,
+            )
+
     def test_manual_command_can_disable_one_channel(self) -> None:
         [message] = translate_ui_command(
             {

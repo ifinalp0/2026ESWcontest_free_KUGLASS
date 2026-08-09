@@ -22,6 +22,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
   const [manualDraft, setManualDraft] = useState({ channel: selected.channel, frostStrength: controllerFrostStrength });
   const frostStrength = manualDraft.channel === selected.channel ? manualDraft.frostStrength : controllerFrostStrength;
   const manualRemaining = selected.manualUntil ? Math.max(0, Math.round(selected.manualUntil - Date.now() / 1000)) : null;
+  const manualActive = selected.manualPersistent || manualRemaining !== null;
 
   useEffect(() => {
     if (manualDraft.channel !== selected.channel) {
@@ -61,7 +62,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
     const mi = Number((MAX_MI * (1 - frost / 100)).toFixed(3));
     setManualDraft({ channel: selected.channel, frostStrength: frost });
     pendingManual.current = { channel: selected.channel, mi };
-    sendCommand({ type: 'setManualChannel', channel: selected.channel, mi, ttlSeconds: 30 });
+    sendCommand({ type: 'setManualChannel', channel: selected.channel, mi, ttlSeconds: 15 });
   };
 
   const finishManualInteraction = (value: number) => {
@@ -91,9 +92,9 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
             <h2>채널 제어</h2>
           </div>
         </div>
-        <span className={`panel-state ${manualRemaining === null ? 'ok' : 'manual'}`}>
+        <span className={`panel-state ${manualActive ? 'manual' : 'ok'}`}>
           <SlidersHorizontal size={14} />
-          {manualRemaining === null ? 'AUTO' : `TTL ${manualRemaining}s`}
+          {selected.manualPersistent ? 'MANUAL' : manualRemaining === null ? 'AUTO' : `TTL ${manualRemaining}s`}
         </span>
       </div>
 
@@ -123,7 +124,7 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
       <div className="manual-control">
         <div className="control-section-title">
           <span>수동 조절</span>
-          <small>{!controlsEnabled ? '장치 연결 대기' : selected.fault ? '고장 중 비활성' : '30초 자동 복귀'}</small>
+          <small>{!controlsEnabled ? '장치 연결 대기' : selected.fault ? '고장 중 비활성' : '15초 자동 복귀'}</small>
         </div>
         <div className="range-label">
           <span>투명</span>
@@ -145,10 +146,10 @@ export function ControlPanel({ channels, environment, selectedChannel, sendComma
           onPointerCancel={(event) => finishManualInteraction(Number(event.currentTarget.value))}
           onBlur={(event) => finishManualInteraction(Number(event.currentTarget.value))}
         />
-        {manualRemaining !== null ? (
+        {manualActive ? (
           <button className="secondary-button" type="button" disabled={!controlsEnabled} onClick={returnToAuto}>
             <RotateCcw size={17} />
-            수동 제어 해제 · {manualRemaining}초
+            {selected.manualPersistent ? '관리자 수동 제어 해제' : `수동 제어 해제 · ${manualRemaining}초`}
           </button>
         ) : null}
       </div>

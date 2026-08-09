@@ -27,7 +27,7 @@ flowchart LR
 - 출력: PDLC CH0~CH3
 - MI 의미: 값이 클수록 CLEAR이며 현재 운용 상한 0.70이 최대 투명 방향입니다.
   0.0 또는 disable은 safe-off·강산란 방향입니다.
-- 제어 우선순위: `E-Stop > latched Fault > Manual(TTL) > Demo/Auto`
+- 제어 우선순위: `E-Stop > latched Fault > Manual(관리자 지속/일반 TTL) > Demo/Auto`
 
 ESP32_A가 권위 있는 목표 MI를 계산합니다. ESP32_B는 목표를 다시 계산하지 않고
 명령 검증, 출력, 로컬 차단과 실제 적용 상태 회신만 수행합니다. TabUI는 LIVE
@@ -131,13 +131,13 @@ idf.py build
 
 현재 저장소에는 다음 항목이 구현되어 있습니다.
 
-- ESP32_A 카메라·DS18B20 입력, 정책, 수동 TTL, 20 Hz A→B heartbeat
+- ESP32_A 카메라·DS18B20 입력, 정책, 관리자 지속/일반 TTL 수동 제어, 20 Hz A→B heartbeat
 - ESP32_B strict full-frame 검증, 4채널 16 kHz/60 Hz SPWM, 채널별 Fault 차단과
   timeout 전체 safe-off
 - boot/session/challenge에 묶인 Fault reset과 결과 correlation
 - ESP32_B ADC 8채널 raw/mV 및 validity telemetry
 - TabUI LIVE/MOCK/REPLAY 상태 분리, 명령 gateway와 on-demand 카메라 영상
-- TabUI 독립 관리자 콘솔의 A/B 통신·센서·ADC 진단과 채널별 Enable/MI TTL 제어
+- TabUI 독립 관리자 콘솔의 A/B 통신·센서·ADC 진단과 채널별 지속 Enable/MI 제어
 - 제작 완료된 Logic Carrier 1장과 동일 단일 채널 Power Stage PCB 4장의 원본·계약
 
 다음 항목은 저장소에 실측 완료 기록이 없으므로 확정값으로 사용하지 않습니다.

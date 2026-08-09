@@ -71,6 +71,21 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(channel["targetMi"], 0.0)
         self.assertIsNotNone(channel["manualUntil"])
 
+    def test_mock_persistent_manual_has_no_expiration(self) -> None:
+        self.gateway.submit({
+            "type": "setManualChannel",
+            "channel": 2,
+            "mi": 0.35,
+            "persistent": True,
+        })
+        self.wait_for(lambda: self.gateway.snapshot()["channels"][2]["manualPersistent"])
+        channel = self.gateway.snapshot()["channels"][2]
+        self.assertIsNone(channel["manualUntil"])
+        self.assertEqual(channel["targetMi"], 0.35)
+
+        self.gateway.submit({"type": "returnAuto", "channel": 2})
+        self.wait_for(lambda: not self.gateway.snapshot()["channels"][2]["manualPersistent"])
+
     def test_backend_runtime_can_stop_and_start_without_restarting_http_owner(self) -> None:
         self.wait_for(lambda: self.gateway.link_snapshot()["hardwareConnected"])
         self.assertTrue(self.gateway.link_snapshot()["backendRunning"])

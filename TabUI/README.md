@@ -30,7 +30,7 @@ ESP32_A GND       --- ESP32_B GND
 
 - IONIQ 5 3D 모형과 CH0~CH3 선택
 - 기본, 열부하, 차박, 주차, 카메라 역광 시나리오
-- 채널별 30초 수동 MI와 AUTO 복귀
+- 일반 운용 화면의 채널별 15초 수동 MI와 AUTO 복귀
 - 운용 MI 0.0~0.70 검증과 상한 0.70 기준의 투명도·산란 표시
 - 카메라 좌/우 ROI 포화, Edge Density와 내부온도 표시
 - on-demand ESP32_A OV2640 영상
@@ -39,7 +39,7 @@ ESP32_A GND       --- ESP32_B GND
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
 - Topbar `BACKEND` 전원 버튼의 ESP32_A gateway 런타임 시작·종료
 - `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
-- `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI·TTL 제어와 전체 AUTO 복귀
+- `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI 지속 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
 
 LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습니다. MOCK으로
@@ -64,8 +64,9 @@ npm start
 않습니다.
 
 운영 화면 우측 상단의 `관리자` 버튼 또는 `http://localhost:8080/admin`에서
-관리자 콘솔을 엽니다. 관리자 수동은 ESP32_A의 기존 채널별 TTL override를
-사용하며, 잠금을 다시 닫으면 전체 `return_auto`를 요청합니다. ESP32_B status는
+관리자 콘솔을 엽니다. 관리자 수동은 TTL 없이 ESP32_A에서 유지되며, 잠금을 다시
+닫으면 전체 `return_auto`를 요청합니다. 연결 단절 중에는 수동 상태가 계속되므로
+연결 복구 후 명시적으로 AUTO 복귀를 요청해야 합니다. ESP32_B status는
 적용 MI와 Fault를 회신하지만 적용 Enable을 직접 회신하지 않으므로 관리자 화면은
 이를 추정값으로 표시하지 않습니다.
 

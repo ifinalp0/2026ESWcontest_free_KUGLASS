@@ -82,7 +82,8 @@ bool format_master_state(const PolicyDecision& decision,
                     "%s{\"channel_id\":%u,\"target_mi\":%.4f,\"commanded_mi\":%.4f,"
                     "\"applied_source\":\"awaiting_esp32_b\","
                     "\"estimated_transmittance\":%.4f,\"optical_state\":\"%s\","
-                    "\"enable\":%s,\"fault\":%s,\"manual_remaining_ms\":%lu}",
+                    "\"enable\":%s,\"fault\":%s,\"manual_active\":%s,"
+                    "\"manual_persistent\":%s,\"manual_remaining_ms\":%lu}",
                     i == 0 ? "" : ",",
                     static_cast<unsigned>(channel.channel_id),
                     channel.target_mi,
@@ -91,8 +92,12 @@ bool format_master_state(const PolicyDecision& decision,
                     optical_state_name(channel.optical_state),
                     channel.enable ? "true" : "false",
                     channel.fault ? "true" : "false",
+                    channel.manual ? "true" : "false",
+                    channel.manual_persistent ? "true" : "false",
                     static_cast<unsigned long>(
-                        channel.manual ? remaining_ms(now_ms, channel.manual_until_ms) : 0U))) {
+                        channel.manual && !channel.manual_persistent
+                            ? remaining_ms(now_ms, channel.manual_until_ms)
+                            : 0U))) {
             return false;
         }
     }

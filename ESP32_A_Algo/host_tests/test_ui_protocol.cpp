@@ -23,6 +23,18 @@ int main() {
     assert(!command.enable);
 
     assert(parse_ui_command_line(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":110,\"command\":\"manual_channel\","
+        "\"channel_id\":1,\"target_mi\":0.4,\"ttl_ms\":0,\"enable\":true}",
+        &command, &error));
+    assert(command.ttl_ms == 0U);
+
+    assert(!parse_ui_command_line(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":110,\"command\":\"manual_channel\","
+        "\"channel_id\":1,\"target_mi\":0.4,\"ttl_ms\":999,\"enable\":true}",
+        &command, &error));
+    assert(error == UiProtocolError::OUT_OF_RANGE);
+
+    assert(parse_ui_command_line(
         "{\"v\":1,\"type\":\"ui_command\",\"seq\":111,\"command\":\"manual_channel\","
         "\"channel_id\":0,\"target_mi\":0.7,\"ttl_ms\":30000,\"enable\":true}",
         &command, &error));

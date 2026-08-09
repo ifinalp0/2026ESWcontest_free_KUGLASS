@@ -47,7 +47,6 @@ interface CameraStatus {
 interface ManualDraft {
   mi: number;
   enable: boolean;
-  ttlSeconds: number;
 }
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted';
@@ -55,8 +54,7 @@ type Tone = 'ok' | 'warn' | 'danger' | 'muted';
 function buildDrafts(channels: ChannelState[]): ManualDraft[] {
   return channels.map((channel) => ({
     mi: Math.min(MAX_ADMIN_MI, channel.commandedMi),
-    enable: channel.commandedEnableKnown ? channel.commandedEnable : true,
-    ttlSeconds: 30
+    enable: channel.commandedEnableKnown ? channel.commandedEnable : true
   }));
 }
 
@@ -99,6 +97,7 @@ function deviceTimestampLabel(seconds: number): string {
 }
 
 function manualRemaining(channel: ChannelState): string {
+  if (channel.manualPersistent) return 'MANUAL · 유지';
   if (channel.manualUntil === null) return 'AUTO';
   return `TTL ${Math.max(0, Math.ceil(channel.manualUntil - Date.now() / 1000))}s`;
 }
@@ -219,7 +218,7 @@ export function AdminPage() {
         sendCommand({ type: 'returnAuto' });
         setNotice('전체 채널의 관리자 수동을 해제하고 ESP32_A AUTO 정책으로 복귀를 요청했습니다.');
       } else {
-        setNotice('연결이 없어 복귀 명령을 보낼 수 없습니다. 기존 수동 명령은 각 TTL 만료 후 AUTO로 복귀합니다.');
+        setNotice('연결이 없어 복귀 명령을 보낼 수 없습니다. 관리자 수동은 ESP32_A에서 계속 유지되므로 연결 복구 후 AUTO 복귀를 요청하세요.');
       }
       setManualMode(false);
       return;
@@ -239,9 +238,9 @@ export function AdminPage() {
       channel,
       mi: draft.mi,
       enable: draft.enable,
-      ttlSeconds: draft.ttlSeconds
+      persistent: true
     });
-    setNotice(`CH${channel} ${draft.enable ? `ENABLE ON · MI ${draft.mi.toFixed(3)}` : 'ENABLE OFF'} · TTL ${draft.ttlSeconds}s 전송을 요청했습니다.`);
+    setNotice(`CH${channel} ${draft.enable ? `ENABLE ON · MI ${draft.mi.toFixed(3)}` : 'ENABLE OFF'} · AUTO 복귀 전까지 유지하도록 요청했습니다.`);
   };
 
   const applyAllChannels = () => {
@@ -255,11 +254,11 @@ export function AdminPage() {
         channel: channel.channel,
         mi: draft.mi,
         enable: draft.enable,
-        ttlSeconds: draft.ttlSeconds
+        persistent: true
       });
       submitted += 1;
     });
-    setNotice(`${submitted}개 정상 채널의 관리자 수동 명령을 ESP32_A에 전송 요청했습니다.`);
+    setNotice(`${submitted}개 정상 채널을 AUTO 복귀 전까지 유지하도록 ESP32_A에 요청했습니다.`);
   };
 
   const linkSummary = useMemo(() => {
@@ -468,21 +467,10 @@ export function AdminPage() {
                     onChange={(event) => updateDraft(channel.channel, { mi: Number(event.target.value) })}
                   />
                 </label>
-                <label className="admin-ttl-control">
-                  <span>Manual TTL</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="300"
-                    step="1"
-                    value={draft.ttlSeconds}
-                    disabled={locked}
-                    onChange={(event) => updateDraft(channel.channel, {
-                      ttlSeconds: Math.max(1, Math.min(300, Number(event.target.value) || 1))
-                    })}
-                  />
-                  <b>sec</b>
-                </label>
+                <div className="admin-persistent-control">
+                  <span>관리자 수동 유지</span>
+                  <b>AUTO 복귀 전까지</b>
+                </div>
                 <button
                   type="button"
                   className="admin-apply-button"
@@ -598,7 +586,7 @@ export function AdminPage() {
       </details>
 
       <footer className="admin-footer">
-        <span><ShieldAlert size={14} /> 제어 우선순위: E-Stop &gt; latched Fault &gt; 관리자/수동 TTL &gt; Demo/Auto</span>
+        <span><ShieldAlert size={14} /> 제어 우선순위: E-Stop &gt; latched Fault &gt; 관리자 수동/일반 수동 TTL &gt; Demo/Auto</span>
         <span>최대 관리자 MI {MAX_ADMIN_MI.toFixed(2)} · A→B heartbeat TTL은 ESP32_A가 소유</span>
       </footer>
     </main>

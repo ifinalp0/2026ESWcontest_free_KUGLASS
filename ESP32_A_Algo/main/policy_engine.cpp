@@ -173,7 +173,8 @@ PolicyApplyResult PolicyEngine::apply_command(const UiCommand& command, uint32_t
             manual.active = true;
             manual.target_mi = clamp_mi(command.target_mi);
             manual.enable = command.enable;
-            manual.expires_ms = now_ms + command.ttl_ms;
+            manual.persistent = command.ttl_ms == 0U;
+            manual.expires_ms = manual.persistent ? 0U : now_ms + command.ttl_ms;
             return {true, nullptr};
         }
         case UiCommandType::RETURN_AUTO:
@@ -322,12 +323,14 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
 
     bool any_fault = false;
     bool any_manual = false;
+    bool any_persistent_manual = false;
     for (uint8_t channel = 0; channel < KUGLASS_TOTAL_CHANNELS; ++channel) {
         PolicyChannelTarget& target = decision.channels[channel];
         target.channel_id = channel;
 
         ManualState& manual = manual_[channel];
-        if (manual.active && time_reached(now_ms, manual.expires_ms)) {
+        if (manual.active && !manual.persistent &&
+            time_reached(now_ms, manual.expires_ms)) {
             manual = ManualState{};
         }
         const bool diagnostic_fault =
@@ -343,13 +346,17 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
             any_fault = true;
         } else if (manual.active) {
             target.manual = true;
+            target.manual_persistent = manual.persistent;
             target.manual_until_ms = manual.expires_ms;
             target.enable = manual.enable;
             target.target_mi = manual.enable ? manual.target_mi : 0.0f;
             target.target_transmission = clamp01(target.target_mi);
             target.optical_state = optical_state_for_transmission(target.target_transmission);
-            target.reason = "manual TTL override";
+            target.reason = manual.persistent
+                ? "persistent manual override"
+                : "manual TTL override";
             any_manual = true;
+            any_persistent_manual = any_persistent_manual || manual.persistent;
         } else {
             const float camera = channel == 0U
                 ? decision.glare_left
@@ -416,6 +423,7 @@ PolicyDecision PolicyEngine::update(const SensorSnapshot& physical_sensors,
     }
 
     if (any_fault) decision.decision_reason = "fault: output disabled";
+    else if (any_persistent_manual) decision.decision_reason = "persistent manual override";
     else if (any_manual) decision.decision_reason = "manual TTL override";
     else if (privacy_need > 0.0f) decision.decision_reason = "privacy mode";
     else if (decision.strong_front_light) {

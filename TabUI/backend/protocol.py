@@ -83,14 +83,17 @@ def translate_ui_command(
         enable = payload.get("enable", True)
         if not isinstance(enable, bool):
             raise CommandError("enable must be a boolean")
-        ttl_seconds = _number(payload.get("ttlSeconds", 30), "ttlSeconds")
-        if not 1.0 <= ttl_seconds <= 300.0:
+        persistent = payload.get("persistent", False)
+        if not isinstance(persistent, bool):
+            raise CommandError("persistent must be a boolean")
+        ttl_seconds = _number(payload.get("ttlSeconds", 15), "ttlSeconds")
+        if not persistent and not 1.0 <= ttl_seconds <= 300.0:
             raise CommandError("ttlSeconds must be between 1 and 300")
         commands = [{
             "command": "manual_channel",
             "channel_id": _channel(payload.get("channel")),
             "target_mi": round(mi, 4),
-            "ttl_ms": round(ttl_seconds * 1000),
+            "ttl_ms": 0 if persistent else round(ttl_seconds * 1000),
             "enable": enable,
         }]
     elif command_type == "returnAuto":

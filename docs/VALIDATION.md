@@ -54,7 +54,7 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 
 - 카메라·내부온도 입력과 stale 처리
 - CH0~CH3 full/unique frame과 duplicate/stale sequence 거부
-- command ACK, manual TTL, AUTO 복귀와 TabUI 단절 중 A의 AUTO 지속
+- command ACK, 일반 수동 15초 TTL, 관리자 수동 지속/AUTO 복귀와 TabUI 단절 중 A의 AUTO 지속
 - A→B timeout, invalid frame, watchdog의 B safe-off
 - target/commanded/applied MI 분리
 - TabUI→A 수동 명령, A→B full frame과 B→A status가 MI 0.0~0.70만 수락하고

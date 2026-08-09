@@ -321,6 +321,30 @@ class StateStoreTests(unittest.TestCase):
         })
         self.assertIsNone(store.snapshot()["channels"][2]["manualUntil"])
 
+    def test_persistent_manual_state_is_distinct_from_auto(self) -> None:
+        store = StateStore(time_fn=lambda: 1000.5)
+        store.apply_record({
+            "type": "state",
+            "channels": [{
+                "channel_id": 1,
+                "manual_persistent": True,
+                "manual_remaining_ms": 0,
+            }],
+        })
+        channel = store.snapshot()["channels"][1]
+        self.assertTrue(channel["manualPersistent"])
+        self.assertIsNone(channel["manualUntil"])
+
+        store.apply_record({
+            "type": "state",
+            "channels": [{
+                "channel_id": 1,
+                "manual_persistent": False,
+                "manual_remaining_ms": 0,
+            }],
+        })
+        self.assertFalse(store.snapshot()["channels"][1]["manualPersistent"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -674,7 +674,7 @@
 
 .admin-control-row,
 .admin-mi-control > span,
-.admin-ttl-control {
+.admin-persistent-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -689,7 +689,7 @@
 
 .admin-control-row b,
 .admin-mi-control b,
-.admin-ttl-control b {
+.admin-persistent-control b {
   color: var(--admin-ink);
   font-family: var(--font-data);
   font-size: 0.65rem;
@@ -750,23 +750,9 @@
   opacity: 0.35;
 }
 
-.admin-ttl-control {
-  justify-content: flex-start;
+.admin-persistent-control {
   color: var(--admin-muted);
   font-size: 0.58rem;
-}
-
-.admin-ttl-control input {
-  width: 72px;
-  height: 30px;
-  margin-left: auto;
-  padding: 0 7px;
-  border: 1px solid var(--admin-line-strong);
-  border-radius: 7px;
-  background: #071018;
-  color: var(--admin-ink);
-  font-family: var(--font-data);
-  text-align: right;
 }
 
 .admin-apply-button {

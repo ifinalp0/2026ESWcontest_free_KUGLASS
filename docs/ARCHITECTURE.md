@@ -33,7 +33,7 @@ flowchart LR
 | 컴포넌트 | 소유하는 책임 | 소유하지 않는 책임 |
 | --- | --- | --- |
 | TabUI | UI, 고수준 명령 검증, 상태 집계, replay snapshot, ESP32_A USB gateway | LIVE 자동 MI 계산, ESP32_B 직접 제어 |
-| ESP32_A | 카메라·온도 품질, 정책, LUT, AUTO MI noise deadband/빠른 servo, 수동 TTL, 권위 있는 목표 MI, A→B heartbeat | 전력 출력, 로컬 Power Stage 안전 차단 |
+| ESP32_A | 카메라·온도 품질, 정책, LUT, AUTO MI noise deadband/빠른 servo, 관리자 지속/일반 TTL 수동 제어, 권위 있는 목표 MI, A→B heartbeat | 전력 출력, 로컬 Power Stage 안전 차단 |
 | ESP32_B | full-frame 검증, 최종 bounded MI slew, 4채널 SPWM, E-Stop/timeout 전체 차단, 채널별 Fault 차단, 실제 적용 상태 | 센서 정책, 목표 MI 재계산 |
 | Logic Carrier | ESP32_B 탑재, `EN_GLOBAL AND ENABLE_CHx`, Fault pull-up, ADC filter, J7 분배 | complementary gate drive, 인증된 전원 차단 |
 | Power Stage ×4 | 채널별 H-Bridge, LC filter, `RUN_OK`, PDLC 출력, Fault/ADC feedback | 4채널 통합 제어, 목표 MI 결정 |
@@ -41,7 +41,7 @@ flowchart LR
 ## 제어 흐름
 
 1. ESP32_A가 카메라와 내부온도의 유효성·stale 여부를 판단한다.
-2. 상황 모드, thermal, camera glare와 수동 TTL을 결합해 CH0~CH3
+2. 상황 모드, thermal, camera glare와 관리자 지속/일반 TTL 수동 제어를 결합해 CH0~CH3
    `target_mi`를 계산한다.
 3. 운용 상한 0.70으로 스케일한 LUT, AUTO 0.01 MI deadband와 빠른 policy servo를
    적용한 `commanded_mi` 전체를 ESP32_B에 20 Hz로 보낸다.
@@ -54,7 +54,7 @@ flowchart LR
 제어 우선순위는 다음과 같다.
 
 ```text
-E-Stop > latched Fault > Manual(TTL) > Demo/Auto
+E-Stop > latched Fault > Manual(관리자 지속/일반 TTL) > Demo/Auto
 ```
 
 ## 물리 연결

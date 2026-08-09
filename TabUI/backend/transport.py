@@ -312,7 +312,7 @@ class MockTransport:
         self._reset_challenge = 2001
         self._source_session_id = 3001
         self._pending_control_result: dict[str, Any] | None = None
-        self._manual_targets: dict[int, tuple[float, bool, float]] = {}
+        self._manual_targets: dict[int, tuple[float, bool, float | None]] = {}
         self._auto_targets = [MAX_MI] * 4
         self._state["environment"].update({
             "internalTemp": 27.0,
@@ -391,15 +391,19 @@ class MockTransport:
             channel_id = int(record["channel_id"])
             mi = clamp_mi(record["target_mi"])
             enable = bool(record.get("enable", True))
-            expires = time.time() + max(0.0, float(record.get("ttl_ms", 30000))) / 1000.0
+            ttl_ms = max(0.0, float(record.get("ttl_ms", 15000)))
+            persistent = ttl_ms == 0.0
+            expires = None if persistent else time.time() + ttl_ms / 1000.0
             self._manual_targets[channel_id] = (mi, enable, expires)
             channel = self._state["channels"][channel_id]
             channel["targetMi"] = mi if enable else 0.0
             channel["commandedEnable"] = enable
             channel["commandedEnableKnown"] = True
             channel["manualUntil"] = expires
+            channel["manualPersistent"] = persistent
             action = f"MI {mi:.2f}" if enable else "ENABLE OFF"
-            self._state["decisionReason"] = f"MOCK ESP32_A: CH{channel_id} 수동 {action}, TTL 적용 중."
+            lease = "AUTO 복귀 전까지 유지" if persistent else "TTL 적용 중"
+            self._state["decisionReason"] = f"MOCK ESP32_A: CH{channel_id} 수동 {action}, {lease}."
         elif command == "return_auto":
             channel_id = record.get("channel_id")
             if channel_id is None:
@@ -412,6 +416,7 @@ class MockTransport:
             for item in ids:
                 channel = self._state["channels"][item]
                 channel["manualUntil"] = None
+                channel["manualPersistent"] = False
                 channel["targetMi"] = self._auto_targets[item]
                 channel["commandedEnable"] = True
                 channel["commandedEnableKnown"] = True
@@ -455,6 +460,7 @@ class MockTransport:
             self._state["channels"][index]["commandedEnable"] = True
             self._state["channels"][index]["commandedEnableKnown"] = True
             self._state["channels"][index]["manualUntil"] = None
+            self._state["channels"][index]["manualPersistent"] = False
         environments = {
             "none": (27, 0.08, 0.07, 0.86),
             "hot_summer": (39, 0.18, 0.16, 0.84),
@@ -478,10 +484,11 @@ class MockTransport:
     def _step(self) -> None:
         now = time.time()
         for channel_id, (_, _, expires) in list(self._manual_targets.items()):
-            if expires <= now:
+            if expires is not None and expires <= now:
                 self._manual_targets.pop(channel_id, None)
                 channel = self._state["channels"][channel_id]
                 channel["manualUntil"] = None
+                channel["manualPersistent"] = False
                 channel["targetMi"] = self._auto_targets[channel_id]
                 channel["commandedEnable"] = True
                 channel["commandedEnableKnown"] = True

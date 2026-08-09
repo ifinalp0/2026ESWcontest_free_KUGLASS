@@ -120,6 +120,7 @@ def default_state() -> dict[str, Any]:
                 "downstreamFault": False,
                 "fault": False,
                 "manualUntil": None,
+                "manualPersistent": False,
             }
             for channel, name in enumerate(CHANNEL_NAMES)
         ],
@@ -484,6 +485,12 @@ class StateStore:
                     current["manualUntil"] = None
                 else:
                     current["manualUntil"] = received_at + remaining_ms / 1000.0
+            if "manualPersistent" in item or "manual_persistent" in item:
+                persistent_value = item.get(
+                    "manualPersistent", item.get("manual_persistent")
+                )
+                if isinstance(persistent_value, bool):
+                    current["manualPersistent"] = persistent_value
 
     def _record_snapshot(self) -> None:
         self._replay.append(copy.deepcopy(self._state))

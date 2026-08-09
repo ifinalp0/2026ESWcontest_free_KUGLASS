@@ -121,8 +121,23 @@ int main() {
     PolicyApplyResult duplicate = manual_engine.apply_command(manual, now + 1200);
     assert(!duplicate.accepted);
 
+    UiCommand persistent_manual = parse(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":21,\"command\":\"manual_channel\","
+        "\"channel_id\":3,\"target_mi\":0.3,\"ttl_ms\":0,\"enable\":true}");
+    assert(manual_engine.apply_command(persistent_manual, now + 1200).accepted);
+    const PolicyDecision persistent_decision =
+        manual_engine.update(SensorSnapshot{}, now + 1000000U);
+    assert(persistent_decision.channels[3].manual);
+    assert(persistent_decision.channels[3].manual_persistent);
+
+    UiCommand return_auto = parse(
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":22,\"command\":\"return_auto\","
+        "\"channel_id\":3}");
+    assert(manual_engine.apply_command(return_auto, now + 1000001U).accepted);
+    assert(!manual_engine.update(SensorSnapshot{}, now + 1000050U).channels[3].manual);
+
     UiCommand diagnostic = parse(
-        "{\"v\":1,\"type\":\"ui_command\",\"seq\":21,\"command\":\"set_environment\","
+        "{\"v\":1,\"type\":\"ui_command\",\"seq\":23,\"command\":\"set_environment\","
         "\"environment\":{\"internal_temp_c\":40}}");
     assert(!manual_engine.apply_command(diagnostic, now + 1200).accepted);
 

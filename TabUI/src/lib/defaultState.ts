@@ -46,7 +46,8 @@ export const defaultState: SimulationState = {
     masterFault: false,
     downstreamFault: false,
     fault: false,
-    manualUntil: null
+    manualUntil: null,
+    manualPersistent: false
   })),
   cameraMetrics: {
     valid: null,

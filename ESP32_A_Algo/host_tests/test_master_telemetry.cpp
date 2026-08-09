@@ -33,6 +33,8 @@ int main() {
         channel.target_transmission = channel.target_mi;
         channel.enable = true;
         channel.optical_state = i < 3 ? OpticalState::FROST : OpticalState::CLEAR;
+        channel.manual = i == 0;
+        channel.manual_persistent = i == 0;
     }
 
     SensorSnapshot sensors;
@@ -56,6 +58,8 @@ int main() {
     assert(std::strstr(line, "\"decision_reason\"") != nullptr);
     assert(std::strstr(line, "\"downstream\"") != nullptr);
     assert(std::strstr(line, "\"applied_mi\"") == nullptr);
+    assert(std::strstr(line, "\"manual_active\":true") != nullptr);
+    assert(std::strstr(line, "\"manual_persistent\":true") != nullptr);
     assert(count_occurrences(line, "\"channel_id\":") == KUGLASS_TOTAL_CHANNELS);
 
     // stdout intentionally contains exactly one JSON document; run_tests.sh

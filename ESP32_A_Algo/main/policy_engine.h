@@ -23,6 +23,7 @@ struct PolicyChannelTarget {
     bool enable = true;
     bool fault = false;
     bool manual = false;
+    bool manual_persistent = false;
     uint32_t manual_until_ms = 0;
     OpticalState optical_state = OpticalState::FROST;
     const char* reason = "automatic clear";
@@ -59,6 +60,7 @@ private:
         bool active = false;
         float target_mi = 0.0f;
         bool enable = true;
+        bool persistent = false;
         uint32_t expires_ms = 0;
     };
 

@@ -21,6 +21,7 @@ export interface ChannelState {
   downstreamFault: boolean;
   fault: boolean;
   manualUntil: number | null;
+  manualPersistent: boolean;
 }
 
 export interface EnvironmentInput {
@@ -137,7 +138,7 @@ export interface FastState {
 }
 
 export type ControlCommand =
-  | { type: 'setManualChannel'; channel: number; mi: number; enable?: boolean; ttlSeconds?: number }
+  | { type: 'setManualChannel'; channel: number; mi: number; enable?: boolean; ttlSeconds?: number; persistent?: boolean }
   | { type: 'returnAuto'; channel?: number }
   | { type: 'setScenario'; demoMode: DemoMode }
   | { type: 'setEnvironment'; environment: Partial<EnvironmentInput> }
