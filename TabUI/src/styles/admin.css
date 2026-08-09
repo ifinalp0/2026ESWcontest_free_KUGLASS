@@ -312,7 +312,6 @@
   font-size: 0.72rem;
 }
 
-.admin-command-strip button,
 .admin-card-actions button {
   display: inline-flex;
   min-height: 34px;
@@ -329,13 +328,11 @@
   font-weight: 800;
 }
 
-.admin-command-strip button:hover:not(:disabled),
 .admin-card-actions button:hover:not(:disabled) {
   border-color: rgba(85, 199, 233, 0.55);
   background: rgba(85, 199, 233, 0.16);
 }
 
-.admin-command-strip button:disabled,
 .admin-card-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.38;
@@ -755,31 +752,6 @@
   font-size: 0.58rem;
 }
 
-.admin-apply-button {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid rgba(85, 199, 233, 0.3);
-  border-radius: 8px;
-  background: rgba(85, 199, 233, 0.1);
-  color: #bceeff;
-  cursor: pointer;
-  font-size: 0.61rem;
-  font-weight: 800;
-}
-
-.admin-apply-button:hover:not(:disabled) {
-  border-color: rgba(85, 199, 233, 0.58);
-  background: rgba(85, 199, 233, 0.17);
-}
-
-.admin-apply-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.35;
-}
-
 .admin-diagnostics-grid {
   margin-top: 20px;
 }
@@ -996,10 +968,6 @@
   .admin-footer {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .admin-command-strip button {
-    width: 100%;
   }
 
   .admin-grid-top,

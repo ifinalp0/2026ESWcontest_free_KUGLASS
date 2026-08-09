@@ -44,7 +44,7 @@ ESP32_A GND       --- ESP32_B GND
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
 - Topbar `BACKEND` 전원 버튼의 ESP32_A gateway 런타임 시작·종료
 - `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
-- `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI 지속 제어와 전체 AUTO 복귀
+- `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI 변경 즉시 지속 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
 
 LIVE가 끊기면 마지막 실제 값을 stale로 유지하고 명령을 막습니다. MOCK으로
@@ -73,12 +73,15 @@ npm start
 닫으면 전체 `return_auto`를 요청합니다. 연결 단절 중에는 수동 상태가 계속되므로
 연결 복구 후 명시적으로 AUTO 복귀를 요청해야 합니다. ESP32_B status는
 적용 MI와 Fault를 회신하지만 적용 Enable을 직접 회신하지 않으므로 관리자 화면은
-이를 추정값으로 표시하지 않습니다.
+이를 추정값으로 표시하지 않습니다. 관리자 수동이 열린 동안 채널 슬라이더를
+움직이거나 Enable 스위치를 전환하면 별도의 적용 버튼 없이 즉시 지속 수동 명령을
+요청합니다.
 
 Topbar의 `BACKEND` 전원 버튼은 HTTP 화면을 제공하는 최소 제어 셸은 유지한 채
 ESP32_A USB gateway, 명령 queue와 카메라 lease를 함께 시작·종료합니다. 브라우저는
 완전히 종료된 로컬 프로세스를 다시 실행할 수 없으므로 최초 한 번은
-`npm run start:open`으로 TabUI를 실행해야 합니다. `STOPPED`에서 버튼을 다시 누르면
+`npm run start:open`으로 격리 HIL용 TabUI를 실행해야 합니다. 이 명령은 `--hil`을
+명시적으로 적용합니다. `STOPPED`에서 버튼을 다시 누르면
 같은 실행 설정으로 gateway를 재시동하고 새 ESP32_A telemetry가 올 때까지 명령을
 차단합니다. 이 동작은 ESP32_A의 AUTO 정책이나 A→B heartbeat를 중단하지 않습니다.
 
@@ -91,10 +94,12 @@ ESP32_A DevKit의 USB 단자와 MacBook을 데이터 micro-USB 케이블로 연�
 npm run start:open
 ```
 
-이 명령은 `.venv`의 Python으로 LIVE 백엔드를 시작하고, macOS의 단일
+이 명령은 `.venv`의 Python으로 HIL 허용 LIVE 백엔드를 시작하고, macOS의 단일
 `/dev/cu.usbmodem*` ESP32_A를 USB gateway에 연결한 다음 기본 브라우저에서
 `http://127.0.0.1:8080/demo`을 엽니다. 최초 실행이거나 `.venv`가 없으면 먼저
-`npm run setup:python`을 실행합니다. 종료할 때는 명령을 실행한 터미널에서
+`npm run setup:python`을 실행합니다. ESP32_A도
+`KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1`로 빌드된 격리 HIL 펌웨어여야 환경 주입이
+허용됩니다. 종료할 때는 명령을 실행한 터미널에서
 `Ctrl+C`를 누릅니다.
 
 USB modem이 여러 개면 ESP32_A 장치를 지정합니다.
@@ -139,10 +144,14 @@ ESP32_A 없이 화면만 개발할 때 MOCK을 명시합니다.
 MOCK/REPLAY는 ESP32_A USB 장치를 열거나 하드웨어 출력 명령을 만들지 않습니다.
 
 기본 시나리오의 환경 영역은 DS18B20 현재 온도만 읽기 전용으로 표시합니다.
+현재 시연 화면의 실측 온도 표시는 임시로 26 °C로 고정됩니다. 이는 프런트엔드
+표시만 바꾸며 ESP32_A가 수신하는 센서 값과 온도 기반 제어에는 영향을 주지 않습니다.
 열부하 시나리오는 기본적으로 같은 센서 값을 ESP32_A 정책 입력으로 사용하며,
 `외부 온도 시연`은 MOCK 또는 TabUI와 ESP32_A 양쪽에서 진단 명령을 허용한 격리
-HIL에서만 활성화됩니다. 버튼을 해제하거나 다른 시나리오를 선택하면 합성 온도
-override를 지우고 물리 DS18B20 입력으로 복귀합니다. 이 값은 제품에 외부 온도
+HIL에서만 활성화됩니다. 버튼을 누르면 30~50 °C 범위에서 임의 온도를 자동으로
+선택하고, 표시되는 조절 바로 시연값을 이어서 변경할 수 있습니다. 버튼을 해제하거나
+다른 시나리오를 선택하면 합성 온도 override를 지우고 물리 DS18B20 입력으로
+복귀합니다. 이 값은 제품에 외부 온도
 센서가 추가되었다는 뜻이 아닙니다. 카메라 HIL 조절 바는 역광 시나리오에서만
 표시합니다.
 

@@ -165,12 +165,14 @@ ESP32_A USB 링크의 주요 record는 다음과 같다.
 | --- | --- |
 | `boot` | A 역할과 진단 명령 허용 여부 |
 | `ack` | UI command sequence의 수락·거부 또는 완료 결과 |
-| `state` | 센서 품질, 정책, CH0~CH3 target/commanded 상태 |
+| `state` | 진단 명령 허용 여부, 센서 품질, 정책, CH0~CH3 target/commanded 상태 |
 | `status` + `controller_id=B` | 검증을 통과한 B applied MI, Fault, ADC, reset 결과 |
 | `protocol_error` | A 또는 B 링크의 형식·계약 오류 |
 
 `target_mi`, `commanded_mi`, `applied_mi`는 서로 다른 상태다. TabUI는 유효한
 B status를 받기 전까지 적용값을 추정하지 않는다.
+`state.diagnostics_enabled`는 TabUI가 A의 일회성 `boot` record보다 늦게 연결돼도
+펌웨어의 HIL 허용 여부를 확인할 수 있도록 매 state에 반복된다.
 `state.environment.internal_temp_override`는 현재 보이는 온도가 물리 DS18B20이
 아니라 MOCK/HIL 시연 override이면 true이며, TabUI의 외부 온도 버튼은 이 상태를
 기준으로 표시한다.

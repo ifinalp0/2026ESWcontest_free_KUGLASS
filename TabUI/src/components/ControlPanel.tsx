@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, RotateCcw, SlidersHorizontal, Thermometer } from 'lucide-react';
 import { channelDisplayName } from '../lib/labels';
 import { MAX_MI, normalizedMi } from '../lib/mi';
+import { displayedInternalTemperature, randomExternalDemoTemperature } from '../lib/temperature';
 import type { ChannelState, ControlCommand, DemoMode, EnvironmentInput } from '../types';
 
 interface Props {
@@ -105,7 +106,9 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
       sendCommand({ type: 'setEnvironment', environment: { internalTemp: null } });
       return;
     }
-    sendCommand({ type: 'setEnvironment', environment: { internalTemp: externalTemperature } });
+    const randomTemperature = randomExternalDemoTemperature();
+    setExternalTemperature(randomTemperature);
+    sendCommand({ type: 'setEnvironment', environment: { internalTemp: randomTemperature } });
   };
 
   const updateExternalTemperature = (value: number) => {
@@ -114,9 +117,7 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
     setEnvironmentValue('internalTemp', temperature);
   };
 
-  const temperatureText = environment.internalTemp === null
-    ? '측정값 없음'
-    : `${environment.internalTemp.toFixed(1)} °C`;
+  const temperatureText = `${displayedInternalTemperature(environment).toFixed(1)} °C`;
 
   return (
     <section className="panel control-panel">
@@ -215,14 +216,14 @@ export function ControlPanel({ channels, environment, demoMode, selectedChannel,
             disabled={!diagnosticsEnabled}
             aria-pressed={externalTemperatureDemo}
             onClick={toggleExternalTemperatureDemo}
-            title={diagnosticsEnabled ? '외부 온도 시연 입력 전환' : 'MOCK 또는 양쪽에서 허용한 HIL에서만 사용할 수 있습니다'}
+            title={diagnosticsEnabled ? '30~50 °C 중 임의 온도로 외부 온도 시연을 시작합니다' : 'MOCK 또는 양쪽에서 허용한 HIL에서만 사용할 수 있습니다'}
           >
             <Thermometer size={16} />
             {externalTemperatureDemo ? '온도 센서 판단으로 복귀' : '외부 온도 시연'}
           </button>
           {externalTemperatureDemo ? (
             <EnvSlider
-              label="시연 온도"
+              label="임의 시연 온도"
               unit="°C"
               min={15}
               max={50}

@@ -1,0 +1,171 @@
+{
+  "input": "/Users/mooyoung/Developer/KuGlass_dev/\uc608\uc120_1.docx",
+  "fonts_by_char_count": {
+    "\ub098\ub214\uba85\uc870": 11395,
+    "\ub098\ub214\uace0\ub515": 83
+  },
+  "direct_run_formatting_runs": 385,
+  "direct_paragraph_formatting_paragraphs": 313,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 1,
+      "text": "\uad50\ub0b4 \ucc3d\uc758\uc124\uacc4\uacbd\uc9c4\ub300\ud68c \uc608\uc120 \ubcf4\uace0\uc11c",
+      "style": "Normal"
+    },
+    {
+      "para_index": 2,
+      "text": "[\uc790\ub3d9\ucc28/\ubaa8\ube4c\ub9ac\ud2f0]",
+      "style": "Normal"
+    },
+    {
+      "para_index": 99,
+      "text": "\ubd84\uc57c",
+      "style": "Normal"
+    },
+    {
+      "para_index": 101,
+      "text": "\ud300\uba85",
+      "style": "Normal"
+    },
+    {
+      "para_index": 103,
+      "text": "\uc791\ud488\uba85",
+      "style": "Normal"
+    },
+    {
+      "para_index": 105,
+      "text": "\uc791\ud488 \ubc94\uc704",
+      "style": "Normal"
+    },
+    {
+      "para_index": 107,
+      "text": "\ud604\uc7ac \ub2e8\uacc4",
+      "style": "Normal"
+    },
+    {
+      "para_index": 109,
+      "text": "\uc791\ud488 \uc124\uba85",
+      "style": "Normal"
+    },
+    {
+      "para_index": 113,
+      "text": "\uad6c\uc131\uc694\uc18c",
+      "style": "Normal"
+    },
+    {
+      "para_index": 114,
+      "text": "\uc8fc\uc694 \uad6c\uc131\u00b7\uae30\ub2a5",
+      "style": "Normal"
+    },
+    {
+      "para_index": 115,
+      "text": "\ucc45\uc784 \uacbd\uacc4",
+      "style": "Normal"
+    },
+    {
+      "para_index": 116,
+      "text": "\uce74\uba54\ub77c\u00b7\uc628\ub3c4",
+      "style": "Normal"
+    },
+    {
+      "para_index": 119,
+      "text": "ESP32_A",
+      "style": "Normal"
+    },
+    {
+      "para_index": 122,
+      "text": "ESP32_B",
+      "style": "Normal"
+    },
+    {
+      "para_index": 125,
+      "text": "Logic Carrier",
+      "style": "Normal"
+    },
+    {
+      "para_index": 128,
+      "text": "Power Stage \u00d74",
+      "style": "Normal"
+    },
+    {
+      "para_index": 131,
+      "text": "TabUI",
+      "style": "Normal"
+    },
+    {
+      "para_index": 134,
+      "text": "\ucc44\ub110",
+      "style": "Normal"
+    },
+    {
+      "para_index": 135,
+      "text": "PDLC \uc601\uc5ed",
+      "style": "Normal"
+    },
+    {
+      "para_index": 136,
+      "text": "\uce74\uba54\ub77c \uc785\ub825",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "\uad50\ub0b4 \ucc3d\uc758\uc124\uacc4\uacbd\uc9c4\ub300\ud68c \uc608\uc120 \ubcf4\uace0\uc11c",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "[\uc790\ub3d9\ucc28/\ubaa8\ube4c\ub9ac\ud2f0]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "KUGLASS  |  \uc791\uc131 \uae30\uc900 2026.08.10  |  \uae30\uc900 \ucee4\ubc0b 839666a4ca88",
+        "style": "Normal"
+      },
+      {
+        "para_index": 17,
+        "text": "\ub370\uc774\ud130\u00b7\uc81c\uc5b4 \ud750\ub984  \uce74\uba54\ub77c + DS18B20 \ub0b4\ubd80\uc628\ub3c4 \u2192 ESP32_A(\uc785\ub825\u00b7\uc815\ucc45\u00b7\ubaa9\ud45c MI) \u2192 \uc678\ubd80 3\uc120 UART \u2192 ESP32_B(\uac80\uc99d\u00b7SPWM\u00b7\ub85c\uceec \ucc28\ub2e8) \u2192 Logic Carrier \u2192 Power Stage",
+        "style": "Normal"
+      },
+      {
+        "para_index": 21,
+        "text": "MI \uae30\uc900  MI\uac00 \ud074\uc218\ub85d CLEAR \ubc29\ud5a5\uc774\uba70 \ud604\uc7ac \uc6b4\uc6a9 \uc0c1\ud55c 0.60\uc744 \uc644\uc804 \ud22c\uba85\uc73c\ub85c \ucde8\uae09\ud55c\ub2e4. MI 0.0 \ub610\ub294 disable\uc740 enable \ud574\uc81c\uc640 \uac15\uc0b0\ub780 \ubc29\ud5a5\uc758 safe-off\uc774\uba70, \uc804\uc6d0 rail \uc804\uccb4 \ucc28\ub2e8\uc744 ",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "\uad50\ub0b4 \ucc3d\uc758\uc124\uacc4\uacbd\uc9c4\ub300\ud68c \uc608\uc120 \ubcf4\uace0\uc11c",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "[\uc790\ub3d9\ucc28/\ubaa8\ube4c\ub9ac\ud2f0]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "KUGLASS  |  \uc791\uc131 \uae30\uc900 2026.08.10  |  \uae30\uc900 \ucee4\ubc0b 839666a4ca88",
+        "style": "Normal"
+      },
+      {
+        "para_index": 8,
+        "run_text": "\ucc28\ub7c9 \uc720\ub9ac\ub294 \uc678\ubd80 \ud658\uacbd\uc744 \ucc28\ub2e8\ud558\uba74\uc11c \uc6b4\uc804\uc790\uc640 \uc2b9\uac1d\uc758 \uc2dc\uc57c\ub97c \uc81c\uacf5\ud558\ub294 \ud575\uc2ec \uc778\ud130\ud398\uc774\uc2a4\uc774\ub2e4. \uace0\uc815 \ud22c\uacfc\uc728 \uc720\ub9ac\ub098 \uc218\ub3d9 \uac00\ub9bc\ub9c9\uc740 \uc8fc\ud589, \uc815\ucc28, \uc8fc\ucc28,",
+        "style": "KUG Bullet"
+      },
+      {
+        "para_index": 9,
+        "run_text": "\uac15\ud55c \uc5ed\uad11\uacfc \uc9c1\uc0ac\uad11\uc740 \uc6b4\uc804\uc790\uc5d0\uac8c \ubd88\ud3b8\uc744 \uc8fc\uace0 \uce74\uba54\ub77c\uc758 \ud3ec\ud654 \uc601\uc5ed\uc744 \ud655\ub300\ud560 \uc218 \uc788\ub2e4. \ud558\uc808\uae30 \uc77c\uc0ac\ub85c \uc778\ud55c \ucc28\ub7c9 \ub0b4\ubd80 \uc5f4\ubd80\ud558\ub294 \ub0c9\ubc29 \ubd80\ub2f4\uacfc \uc2b9\ucc28 \ubd88",
+        "style": "KUG Bullet"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

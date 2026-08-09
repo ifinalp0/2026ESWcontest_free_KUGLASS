@@ -53,6 +53,11 @@ int main() {
     assert(line[0] == '{');
     assert(line[std::strlen(line) - 1] == '}');
     assert(std::strstr(line, "\"type\":\"state\"") != nullptr);
+#if KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS
+    assert(std::strstr(line, "\"diagnostics_enabled\":true") != nullptr);
+#else
+    assert(std::strstr(line, "\"diagnostics_enabled\":false") != nullptr);
+#endif
     assert(std::strstr(line, "\"vehicle_mode\":\"stopped\"") != nullptr);
     assert(std::strstr(line, "\"camera_metrics\"") != nullptr);
     assert(std::strstr(line, "\"internal_temp_override\":true") != nullptr);

@@ -295,6 +295,10 @@ class StateStore:
         state_sequence = body.get("seq")
         if isinstance(state_sequence, int) and not isinstance(state_sequence, bool):
             controller["stateSeq"] = state_sequence
+        diagnostics = body.get("diagnosticsEnabled", body.get("diagnostics_enabled"))
+        if isinstance(diagnostics, bool):
+            self.firmware_diagnostics_enabled = diagnostics
+            controller["firmwareDiagnosticsEnabled"] = diagnostics
         thermal_risk = body.get("thermalRisk", body.get("thermal_risk"))
         if isinstance(thermal_risk, (int, float)) and not isinstance(thermal_risk, bool):
             thermal_number = float(thermal_risk)

@@ -55,6 +55,7 @@ class StateStoreTests(unittest.TestCase):
         store = StateStore()
         accepted = store.apply_record({
             "type": "state",
+            "diagnostics_enabled": True,
             "vehicle_mode": "camping",
             "demo_mode": "camping",
             "environment": {
@@ -96,6 +97,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(state["channels"][0]["opticalState"], "FROST")
         self.assertEqual(state["decisionReason"], "ESP32_A policy")
         self.assertEqual(state["controllerDiagnostics"]["stateSeq"], 44)
+        self.assertTrue(state["controllerDiagnostics"]["firmwareDiagnosticsEnabled"])
         self.assertEqual(state["controllerDiagnostics"]["thermalRisk"], 0.625)
         self.assertEqual(state["timestamp"], 1234.0)
 

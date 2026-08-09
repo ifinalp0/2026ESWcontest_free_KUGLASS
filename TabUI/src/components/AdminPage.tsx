@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  AlertTriangle,
   ArrowLeft,
   Camera,
   CheckCircle2,
@@ -22,6 +21,7 @@ import {
 import { channelDisplayName } from '../lib/labels';
 import { MAX_MI } from '../lib/mi';
 import { useTabUIClient } from '../lib/socket';
+import { displayedInternalTemperature } from '../lib/temperature';
 import type { ChannelState, DownstreamAdcChannel } from '../types';
 import '../styles/admin.css';
 
@@ -206,10 +206,20 @@ export function AdminPage() {
     if (!manualMode) setDrafts(buildDrafts(state.channels));
   }, [manualMode, state.channels]);
 
-  const updateDraft = (channel: number, patch: Partial<ManualDraft>) => {
+  const applyManualChange = (channel: number, nextDraft: ManualDraft) => {
+    const channelState = state.channels[channel];
+    if (!manualMode || !manualSendReady || channelState.fault) return;
     setDrafts((current) => current.map((draft, index) => (
-      index === channel ? { ...draft, ...patch } : draft
+      index === channel ? nextDraft : draft
     )));
+    sendCommand({
+      type: 'setManualChannel',
+      channel,
+      mi: nextDraft.mi,
+      enable: nextDraft.enable,
+      persistent: true
+    });
+    setNotice(`CH${channel} ${nextDraft.enable ? `ENABLE ON · MI ${nextDraft.mi.toFixed(3)}` : 'ENABLE OFF'} 변경을 즉시 요청했습니다.`);
   };
 
   const toggleManualMode = () => {
@@ -226,39 +236,7 @@ export function AdminPage() {
     if (!aOnline) return;
     setDrafts(buildDrafts(state.channels));
     setManualMode(true);
-    setNotice('관리자 수동이 열렸습니다. 값 편집 후 채널별 적용 또는 4채널 적용을 누르세요.');
-  };
-
-  const applyChannel = (channel: number) => {
-    const draft = drafts[channel];
-    const channelState = state.channels[channel];
-    if (!manualSendReady || channelState.fault) return;
-    sendCommand({
-      type: 'setManualChannel',
-      channel,
-      mi: draft.mi,
-      enable: draft.enable,
-      persistent: true
-    });
-    setNotice(`CH${channel} ${draft.enable ? `ENABLE ON · MI ${draft.mi.toFixed(3)}` : 'ENABLE OFF'} · AUTO 복귀 전까지 유지하도록 요청했습니다.`);
-  };
-
-  const applyAllChannels = () => {
-    if (!manualMode || !manualSendReady) return;
-    let submitted = 0;
-    state.channels.forEach((channel) => {
-      if (channel.fault) return;
-      const draft = drafts[channel.channel];
-      sendCommand({
-        type: 'setManualChannel',
-        channel: channel.channel,
-        mi: draft.mi,
-        enable: draft.enable,
-        persistent: true
-      });
-      submitted += 1;
-    });
-    setNotice(`${submitted}개 정상 채널을 AUTO 복귀 전까지 유지하도록 ESP32_A에 요청했습니다.`);
+    setNotice('관리자 수동이 열렸습니다. 슬라이더와 Enable 변경은 즉시 전송되며 AUTO 복귀 전까지 유지됩니다.');
   };
 
   const linkSummary = useMemo(() => {
@@ -321,15 +299,11 @@ export function AdminPage() {
       <section className="admin-command-strip" aria-live="polite">
         <div>
           <SlidersHorizontal size={17} />
-          <span><strong>{manualMode ? '관리자 수동 편집 가능' : 'ESP32_A AUTO 제어 유지'}</strong>{notice}</span>
+          <span><strong>{manualMode ? '관리자 수동 즉시 제어' : 'ESP32_A AUTO 제어 유지'}</strong>{notice}</span>
         </div>
-        <button
-          type="button"
-          disabled={!manualMode || !manualSendReady}
-          onClick={applyAllChannels}
-        >
-          4채널 적용
-        </button>
+        <StatusBadge tone={manualMode && manualSendReady ? 'ok' : manualMode ? 'warn' : 'muted'}>
+          {manualMode ? manualSendReady ? 'LIVE CONTROL' : 'CONTROL BLOCKED' : 'AUTO'}
+        </StatusBadge>
       </section>
 
       <section className="admin-grid admin-grid-top">
@@ -410,8 +384,7 @@ export function AdminPage() {
         {state.channels.map((channel) => {
           const draft = drafts[channel.channel];
           const sense = adc.channels[channel.channel];
-          const locked = !manualMode || !aOnline;
-          const applyBlocked = !manualSendReady || channel.fault;
+          const locked = !manualMode || !manualSendReady || channel.fault;
           return (
             <article className={`admin-channel-card${channel.fault ? ' fault' : ''}`} key={channel.channel}>
               <header>
@@ -452,7 +425,7 @@ export function AdminPage() {
                     aria-checked={draft.enable}
                     aria-label={`CH${channel.channel} 수동 Enable`}
                     disabled={locked}
-                    onClick={() => updateDraft(channel.channel, { enable: !draft.enable })}
+                    onClick={() => applyManualChange(channel.channel, { ...draft, enable: !draft.enable })}
                   ><i /></button>
                 </div>
                 <label className="admin-mi-control">
@@ -464,21 +437,13 @@ export function AdminPage() {
                     step="0.01"
                     value={draft.mi}
                     disabled={locked || !draft.enable}
-                    onChange={(event) => updateDraft(channel.channel, { mi: Number(event.target.value) })}
+                    onChange={(event) => applyManualChange(channel.channel, { ...draft, mi: Number(event.target.value) })}
                   />
                 </label>
                 <div className="admin-persistent-control">
                   <span>관리자 수동 유지</span>
                   <b>AUTO 복귀 전까지</b>
                 </div>
-                <button
-                  type="button"
-                  className="admin-apply-button"
-                  disabled={locked || applyBlocked}
-                  onClick={() => applyChannel(channel.channel)}
-                >
-                  {channel.fault ? <><AlertTriangle size={14} /> Fault 우선 · 적용 차단</> : <><Radio size={14} /> CH{channel.channel} 적용</>}
-                </button>
               </div>
             </article>
           );
@@ -545,7 +510,7 @@ export function AdminPage() {
             <StatusBadge tone={cameraValid ? 'ok' : 'warn'}>{cameraValid ? 'VALID' : state.cameraMetrics.valid === false ? 'INVALID' : 'UNKNOWN'}</StatusBadge>
           </header>
           <dl className="admin-card-body">
-            <DataRow label="Internal temp" value={state.environment.internalTemp === null ? '결측' : `${state.environment.internalTemp.toFixed(2)} °C`} mono />
+            <DataRow label="Internal temp" value={`${displayedInternalTemperature(state.environment).toFixed(2)} °C`} mono />
             <DataRow label="AE metadata" value={boolLabel(state.cameraMetrics.aeMetadataValid, 'VALID', 'EXCLUDED')} />
             <DataRow label="Driver-left saturation" value={`${(state.cameraMetrics.frontLeftSaturation * 100).toFixed(1)}%`} mono />
             <DataRow label="Passenger-right saturation" value={`${(state.cameraMetrics.frontRightSaturation * 100).toFixed(1)}%`} mono />

@@ -167,6 +167,8 @@ TabUI 명령, A→B actuator command, B status와 Fault reset의 전체 형식�
   받아야 완료 ACK합니다. 현재 timeout은 1,500 ms입니다.
 - `set_environment`와 `set_channel_fault`는
   `KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1`인 격리 HIL build에서만 허용합니다.
+- `diagnostics_enabled`는 부트 record뿐 아니라 주기 state에도 포함되어, TabUI가
+  ESP32_A 부팅 뒤 연결되어도 HIL 허용 상태를 복구합니다.
 
 ### MI servo 응답
 

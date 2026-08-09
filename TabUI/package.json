@@ -9,7 +9,7 @@
     "dev": "vite --host 0.0.0.0",
     "dev:api": ".venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
     "start": ".venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto",
-    "start:open": "sh -c '(sleep 1; open http://127.0.0.1:8080/demo) & exec .venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto'",
+    "start:open": "sh -c '(sleep 1; open http://127.0.0.1:8080/demo) & exec .venv/bin/python server.py --host 0.0.0.0 --port 8080 --transport usb --usb-port auto --hil'",
     "build": "tsc --noEmit --incremental false && vite build",
     "typecheck": "tsc --noEmit --incremental false",
     "check:python": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -v",

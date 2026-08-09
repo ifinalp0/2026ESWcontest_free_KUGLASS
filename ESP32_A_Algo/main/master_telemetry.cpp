@@ -42,9 +42,11 @@ bool format_master_state(const PolicyDecision& decision,
     size_t used = 0;
     if (!append(output, output_size, &used,
                 "{\"type\":\"state\",\"schema_version\":1,\"seq\":%lu,"
+                "\"diagnostics_enabled\":%s,"
                 "\"vehicle_mode\":\"%s\",\"demo_mode\":\"%s\","
                 "\"timestamp_ms\":%lu,\"environment\":{",
                 static_cast<unsigned long>(decision.seq),
+                KUGLASS_ALLOW_DIAGNOSTIC_COMMANDS ? "true" : "false",
                 vehicle_mode_name(decision.vehicle_mode),
                 demo_mode_name(decision.demo_mode),
                 static_cast<unsigned long>(now_ms))) {

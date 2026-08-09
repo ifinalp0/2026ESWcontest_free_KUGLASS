@@ -101,6 +101,14 @@ $CXX $CXXFLAGS \
     -o "$TEST_BUILD_DIR/test_telemetry"
 
 $CXX $CXXFLAGS \
+    -DKUGLASS_ALLOW_DIAGNOSTIC_COMMANDS=1 \
+    "$PROJECT_DIR/main/master_telemetry.cpp" \
+    "$PROJECT_DIR/main/policy_engine.cpp" \
+    "$PROJECT_DIR/main/ui_protocol.cpp" \
+    "$PROJECT_DIR/host_tests/test_master_telemetry.cpp" \
+    -o "$TEST_BUILD_DIR/test_telemetry_hil"
+
+$CXX $CXXFLAGS \
     "$PROJECT_DIR/main/app_main.cpp" \
     "$PROJECT_DIR/main/protocol.cpp" \
     "$PROJECT_DIR/main/ui_protocol.cpp" \
@@ -131,5 +139,8 @@ echo "camera pin contract ok"
 "$TEST_BUILD_DIR/test_telemetry" > "$TEST_BUILD_DIR/state.json"
 node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' \
     "$TEST_BUILD_DIR/state.json"
+"$TEST_BUILD_DIR/test_telemetry_hil" > "$TEST_BUILD_DIR/state_hil.json"
+node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' \
+    "$TEST_BUILD_DIR/state_hil.json"
 echo "master telemetry json ok"
 "$TEST_BUILD_DIR/test_master_app_link"

@@ -1,0 +1,170 @@
+{
+  "input": "/Users/mooyoung/Documents/\uac74\uad6d\ub300\ud559\uad50 2-1/DECA/\ucfe0\uae00(KUGLASS)/\ucfe0\uae00_\uc678/\uc784\uc18c\uacbd \uac1c\ubc1c\uacc4\ud68d\uc11c/\uc784\uc18c\uacbd \uac1c\ubc1c \uacc4\ud68d\uc11c.docx",
+  "fonts_by_char_count": {
+    "\ub098\ub214\uba85\uc870": 13098
+  },
+  "direct_run_formatting_runs": 814,
+  "direct_paragraph_formatting_paragraphs": 347,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "\u25a1 \uac1c\ubc1c \uac1c\uc694",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 18,
+      "text": " \u25a1 \uac1c\ubc1c \ubc29\ud5a5 \ubc0f \uc804\ub7b5",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 25,
+      "text": "\uc548\uc804 \uc124\uacc4 \ub0b4\uc7ac\ud654: ESP32 \ub85c\uceec Fault \uc989\uc2dc \ucc28\ub2e8, E-Stop NC \ud68c\ub85c, \uace0\uc804\uc555\ubd80/\uc800\uc804\uc555\ubd80 PCB \ubd84",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 30,
+      "text": "- \uc601\uc0c1\ucc98\ub9ac\u00b7\uce74\uba54\ub77c \uc785\ub825",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 36,
+      "text": "  - \ubc29\ud5a5\uc131 \uc870\ub3c4\u00b7\uc13c\uc11c\uc735\ud569",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 41,
+      "text": "  - \uc678\ubd80\uc815\ubcf4 \uc218\uc9d1",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 47,
+      "text": "  - \uc815\ucc45\u00b7\uc81c\uc5b4 \uc54c\uace0\ub9ac\uc998",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 51,
+      "text": "  - \uc2dc\uc2a4\ud15c\u00b7UI\u00b7\ub85c\uadf8",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 56,
+      "text": "  - ESP32 \uc2e4\uc2dc\uac04 \ud38c\uc6e8\uc5b4\u00b7\ud1b5\uc2e0",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 61,
+      "text": "    - \ud14c\uc2a4\ud2b8\u00b7\uac80\uc99d \uc790\ub3d9\ud654",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 65,
+      "text": "  - \uba54\uc778\u00b7\uc2e4\uc2dc\uac04 \uc81c\uc5b4\ubd80",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 68,
+      "text": "  - PDLC \uc804\ub825 \uad6c\ub3d9\ubd80",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 70,
+      "text": "  - PCB\u00b7\ubc30\uc120 \uad6c\uc870",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 73,
+      "text": "  - \uc13c\uc11c\u00b7\uc2dc\uc5f0 \uc7a5\uce58",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 77,
+      "text": "  - \uc548\uc804 \uc124\uacc4",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 82,
+      "text": "- \uacf5\uac1c SW\u00b7\uae30\uc874 \uad6c\ud604 \uc870\uc0ac \ubaa9\ub85d",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 92,
+      "text": "- \uac1c\ubc1c \ud658\uacbd",
+      "style": "\ubc14\ud0d5\uae00"
+    },
+    {
+      "para_index": 124,
+      "text": "- SW \uc0c1\uc138\uc124\uba85(\uac1c\ubc1c \ubc29\ubc95 \ubc0f \ud65c\uc6a9 \uae30\uc220)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 135,
+      "text": "- HW \uc0c1\uc138\uc124\uba85(\uac1c\ubc1c \ubc29\ubc95 \ubc0f \ud65c\uc6a9 \uae30\uc220)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 144,
+      "text": "\uc9c0\uc6d0 \uc7a5\ube44 \uc0ac\uc6a9 \ubc29\uc548",
+      "style": "List Paragraph"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 2,
+        "text": "\u25a1 \uac1c\ubc1c \uac1c\uc694",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 3,
+        "text": "\u25cb \uc694\uc57d \uc124\uba85",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 4,
+        "text": "",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 5,
+        "text": " \u25cb \uac1c\ubc1c \ubc30\uacbd \ubc0f \ub3d9\uae30",
+        "style": "\ubc14\ud0d5\uae00"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "\u25a1",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 2,
+        "run_text": " ",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 2,
+        "run_text": "\uac1c\ubc1c",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 2,
+        "run_text": " ",
+        "style": "\ubc14\ud0d5\uae00"
+      },
+      {
+        "para_index": 2,
+        "run_text": "\uac1c\uc694",
+        "style": "\ubc14\ud0d5\uae00"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}
