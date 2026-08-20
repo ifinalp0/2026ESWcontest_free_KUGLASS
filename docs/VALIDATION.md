@@ -81,7 +81,8 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 - 외부 3선 UART harness의 `A GPIO39 TX → B GPIO44 RX`,
   `A GPIO40 RX ← B GPIO43 TX`, `A GND ↔ B GND` 연속성
 - J7/J10 pin 1과 odd/even 방향, 모든 even pin GND
-- ADC 8개 raw/mV, validity mask, 실제 입력 범위, open/short, 보드별 calibration
+- ADC 8개 raw/mV, validity mask, 실제 입력 범위, open/short, TabUI의 TH1 명목 °C
+  변환과 보드별 calibration
 - GPIO3 source 연결 cold boot, GPIO19 reset glitch, GPIO38 LED contention
 
 ## 통과로 간주하지 않는 항목

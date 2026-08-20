@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -68,12 +69,15 @@ def validate_manifest(manifest: dict, integrity_paths: set[str]) -> None:
     for board_name, board in boards.items():
         if board.get("manufactured") is not True:
             fail(f"{board_name} must be marked manufactured")
-        for source in board.get("primary_sources", []):
-            path = source.get("path")
-            if not isinstance(path, str) or not (REPO_ROOT / path).is_file():
-                fail(f"{board_name} references missing source {path!r}")
-            if path not in integrity_paths:
-                fail(f"{board_name} source is not protected by SHA256SUMS: {path}")
+        for source_group in ("primary_sources", "component_sources"):
+            for source in board.get(source_group, []):
+                path = source.get("path")
+                if not isinstance(path, str) or not (REPO_ROOT / path).is_file():
+                    fail(f"{board_name} references missing source {path!r}")
+                if path not in integrity_paths:
+                    fail(
+                        f"{board_name} source is not protected by SHA256SUMS: {path}"
+                    )
 
 
 def expected_channel_tuple(channel: dict) -> tuple[int, ...]:
@@ -179,6 +183,25 @@ def validate_firmware_pinmap(io_contract: dict) -> None:
         fail("ESP32_B analog_monitor.h differs from the hardware contract")
 
 
+def validate_tabui_temperature_model(power_contract: dict) -> None:
+    temperature = power_contract["temperature_feedback"]
+    sensor = temperature["sensor"]
+    expected_constants = {
+        "TH1_SUPPLY_MV_NOMINAL": temperature["nominal_supply_v"] * 1000.0,
+        "TH1_PULLUP_OHM_NOMINAL": temperature["pullup_resistance_ohm"],
+        "TH1_R25_OHM_NOMINAL": sensor["nominal_resistance_ohm_at_25c"],
+        "TH1_B25_85_K_NOMINAL": sensor["b25_85_k"],
+    }
+    state_path = REPO_ROOT / "TabUI/backend/state.py"
+    state_text = state_path.read_text(encoding="utf-8")
+    for name, expected in expected_constants.items():
+        match = re.search(rf"^{name}\s*=\s*([0-9]+(?:\.[0-9]+)?)$", state_text, re.M)
+        if match is None:
+            fail(f"could not parse TabUI temperature constant {name}")
+        if not math.isclose(float(match.group(1)), float(expected)):
+            fail(f"TabUI {name} differs from the Power Stage temperature contract")
+
+
 def main() -> int:
     manifest = load_json("hardware/manifest.json")
     io_contract = load_json("hardware/contracts/esp32_b_io.json")
@@ -190,6 +213,7 @@ def main() -> int:
     validate_manifest(manifest, integrity_paths)
     validate_io_contract(io_contract, power_contract)
     validate_firmware_pinmap(io_contract)
+    validate_tabui_temperature_model(power_contract)
 
     invariants = safety_contract.get("invariants")
     if not isinstance(invariants, list) or not invariants:

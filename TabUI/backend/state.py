@@ -22,6 +22,52 @@ SAFE_TOKEN = re.compile(r"^[A-Z0-9_]{1,48}$")
 FAULT_CODES = {"NONE", "COMM_TIMEOUT", "INVALID_COMMAND", "POWER_STAGE_FAULT", "ESTOP"}
 RESET_FAILURES = {"RESET_UNSAFE", "TARGET_BOOT_MISMATCH", "CHALLENGE_MISMATCH"}
 
+TH1_SUPPLY_MV_NOMINAL = 3300.0
+TH1_PULLUP_OHM_NOMINAL = 10000.0
+TH1_R25_OHM_NOMINAL = 10000.0
+TH1_B25_85_K_NOMINAL = 3650.0
+TH1_T25_K = 298.15
+TH1_OPERATING_MIN_C = -40.0
+TH1_OPERATING_MAX_C = 125.0
+
+
+def th1_temperature_c_from_mv(millivolts: Any) -> float | None:
+    """Return the datasheet-derived nominal TH1 temperature.
+
+    This is intentionally based on calibrated ADC millivolts, not raw ADC
+    counts. The latter do not have a universal linear conversion on ESP32-S3.
+    """
+    if isinstance(millivolts, bool) or not isinstance(millivolts, (int, float)):
+        return None
+    voltage_mv = float(millivolts)
+    if (
+        not math.isfinite(voltage_mv)
+        or voltage_mv <= 0.0
+        or voltage_mv >= TH1_SUPPLY_MV_NOMINAL
+    ):
+        return None
+
+    resistance_ohm = (
+        TH1_PULLUP_OHM_NOMINAL
+        * voltage_mv
+        / (TH1_SUPPLY_MV_NOMINAL - voltage_mv)
+    )
+    reciprocal_temperature = (
+        1.0 / TH1_T25_K
+        + math.log(resistance_ohm / TH1_R25_OHM_NOMINAL)
+        / TH1_B25_85_K_NOMINAL
+    )
+    if reciprocal_temperature <= 0.0:
+        return None
+    temperature_c = 1.0 / reciprocal_temperature - 273.15
+    if (
+        not math.isfinite(temperature_c)
+        or temperature_c < TH1_OPERATING_MIN_C
+        or temperature_c > TH1_OPERATING_MAX_C
+    ):
+        return None
+    return temperature_c
+
 
 def _default_adc_state() -> dict[str, Any]:
     return {
@@ -37,6 +83,7 @@ def _default_adc_state() -> dict[str, Any]:
                 "temperatureRaw": None,
                 "currentMv": None,
                 "temperatureMv": None,
+                "temperatureNominalC": None,
             }
             for channel in range(4)
         ],
@@ -551,12 +598,20 @@ def _normalize_adc(adc: Any) -> dict[str, Any] | None:
     for channel in range(4):
         current_bit = 1 << channel
         temperature_bit = 1 << (channel + 4)
+        temperature_mv = (
+            arrays["t_mv"][channel] if mv_mask & temperature_bit else None
+        )
         channels.append({
             "channel": channel,
             "currentRaw": arrays["i_raw"][channel] if raw_mask & current_bit else None,
             "temperatureRaw": arrays["t_raw"][channel] if raw_mask & temperature_bit else None,
             "currentMv": arrays["i_mv"][channel] if mv_mask & current_bit else None,
-            "temperatureMv": arrays["t_mv"][channel] if mv_mask & temperature_bit else None,
+            "temperatureMv": temperature_mv,
+            "temperatureNominalC": (
+                th1_temperature_c_from_mv(temperature_mv)
+                if adc["t_cali"]
+                else None
+            ),
         })
     return {
         "initialized": adc["initialized"],

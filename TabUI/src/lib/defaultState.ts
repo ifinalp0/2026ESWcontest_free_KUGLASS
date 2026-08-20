@@ -14,7 +14,8 @@ function defaultDownstreamAdc(): DownstreamAdc {
       currentRaw: null,
       temperatureRaw: null,
       currentMv: null,
-      temperatureMv: null
+      temperatureMv: null,
+      temperatureNominalC: null
     }))
   };
 }

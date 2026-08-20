@@ -71,6 +71,7 @@ hardware/
 │   ├── power stage_.kicad_dru
 │   ├── Power_stage.pdf
 │   └── datasheets/
+│       └── TH1.pdf
 ├── validation/
 │   ├── README.md
 │   └── current-status.json
@@ -93,7 +94,8 @@ hardware/
 
 ## 자동 정합성 검사
 
-다음 명령은 원본 파일 해시, JSON 문법, GPIO 중복, J7/J10 매핑, ESP32_B C++ 핀맵과 ADC descriptor의 일치를 검사합니다.
+다음 명령은 원본·부품 자료 해시, JSON 문법, GPIO 중복, J7/J10 매핑,
+ESP32_B C++ 핀맵·ADC descriptor와 TabUI TH1 명목 환산 상수의 일치를 검사합니다.
 
 ```bash
 python3 hardware/tools/validate_hardware_contract.py
@@ -107,6 +109,9 @@ python3 hardware/tools/validate_hardware_contract.py
 - Logic Carrier PCB layout, Gerber, drill, placement와 조립 BOM은 저장소에 없습니다.
 - Power Stage에는 schematic과 PCB 원본이 있으나 custom library table과 fabrication 출력, 조립 BOM, 보드별 serial/revision 기록은 없습니다.
 - Power Stage schematic의 Q1~Q4 값은 `STP40NF20`이지만 Datasheet 속성은 IRF540N URL입니다. 실제 장착 MOSFET의 marking을 확인하기 전에는 해당 URL을 부품 확정 근거로 사용하지 않습니다.
+- `Power_stage/datasheets/TH1.pdf`는 TDK NTCG series catalog입니다. 회로의
+  10 kΩ@25 °C와 2012/EIA 0805 footprint는 `NTCG203NH103JT1` 항목에 대응하지만,
+  이 catalog match는 조립 BOM 또는 실물 부품 확인을 대신하지 않습니다.
 - KiCad 자동 검사 상태는 [`validation/current-status.json`](validation/current-status.json)에 기록합니다. 제작 완료 사실과 EDA 검사 통과 여부는 별개의 상태입니다.
 
 ## 하드웨어 작업 원칙

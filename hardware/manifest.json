@@ -84,6 +84,19 @@
           "canonical": true
         }
       ],
+      "component_sources": [
+        {
+          "path": "hardware/Power_stage/datasheets/TH1.pdf",
+          "role": "TDK_NTCG_series_catalog_for_TH1_nominal_temperature_model",
+          "catalog_date": "2024-09",
+          "match_basis": "schematic_10kohm_at_25C_and_2012_EIA0805_footprint",
+          "matched_catalog_part": "NTCG203NH103JT1",
+          "limitations": [
+            "catalog_match_does_not_replace_physical_part_or_BOM_verification",
+            "datasheet_model_is_not_board_level_temperature_calibration"
+          ]
+        }
+      ],
       "unavailable_artifacts": [
         "gerber",
         "drill",

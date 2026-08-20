@@ -55,7 +55,7 @@
     {
       "id": "HW-011",
       "severity": "high",
-      "rule": "ADC raw or millivolt telemetry must not be presented as calibrated amperes or degrees Celsius, or used for new software protection thresholds, until board measurements provide calibration and limits."
+      "rule": "ADC raw or millivolt telemetry must not be presented as calibrated amperes or calibrated/measured degrees Celsius, or used for new software protection thresholds, until board measurements provide calibration and limits. A datasheet-derived nominal TH1 temperature may be displayed only when its assumed part, nominal model and uncalibrated status are explicit, and only from valid ADC-calibrated millivolt telemetry rather than a universal linear raw-count formula."
     },
     {
       "id": "HW-012",

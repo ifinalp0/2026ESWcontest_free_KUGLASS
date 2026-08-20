@@ -60,6 +60,7 @@
     "boot_and_reset_waveforms": "not_recorded_in_repository",
     "current_calibration": "not_recorded_in_repository",
     "temperature_calibration": "not_recorded_in_repository",
+    "temperature_nominal_model": "TabUI_datasheet_derived_NTCG203NH103JT1_B25_85_3650K_not_board_calibrated",
     "fault_trip_measurement": "not_recorded_in_repository",
     "thermal_and_hv_results": "not_recorded_in_repository",
     "ab_uart_post_fix_logic_only_run": "not_recorded_in_repository; firmware reflash and 10-minute HIL pending"

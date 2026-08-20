@@ -136,7 +136,8 @@ idf.py build
 - ESP32_B strict full-frame 검증, 4채널 16 kHz/60 Hz SPWM, 채널별 Fault 차단과
   timeout 전체 safe-off
 - boot/session/challenge에 묶인 Fault reset과 결과 correlation
-- ESP32_B ADC 8채널 raw/mV 및 validity telemetry
+- ESP32_B ADC 8채널 raw/mV 및 validity telemetry와 TabUI의 TH1 데이터시트 기반
+  채널별 명목 온도 표시
 - TabUI LIVE/MOCK/REPLAY 상태 분리, 명령 gateway와 on-demand 카메라 영상
 - TabUI 독립 관리자 콘솔의 A/B 통신·센서·ADC 진단과 채널별 지속 Enable/MI 제어
 - 제작 완료된 Logic Carrier 1장과 동일 단일 채널 Power Stage PCB 4장의 원본·계약
@@ -179,6 +180,8 @@ sh hardware/validation/BAD_JSON/host_tests/run_tests.sh
 
 - ESP32_B는 제작된 Logic Carrier U3에 장착하고, Power Stage에 임의 직결하지 않습니다.
 - J5 E-Stop은 enable만 차단합니다. +24/+12/+5/+72 V rail은 계속 live일 수 있습니다.
-- ADC raw/mV를 calibration 전 전류 A 또는 온도 °C로 표시하거나 보호 판단에 쓰지 않습니다.
+- ADC raw/mV를 calibration 전 전류 A나 보정 완료 온도처럼 표시하지 않습니다.
+  TabUI의 `T °C (명목)`은 유효한 mV에 TH1 데이터시트 모델을 적용한 진단값이며
+  보호 판단에는 사용하지 않습니다.
 - 실제 Power Stage와 고전압은 logic-only·저전압 검증을 먼저 통과한 뒤 연결합니다.
 - 상세 실기 절차는 [하드웨어 검증 문서](hardware/validation/README.md)를 따릅니다.

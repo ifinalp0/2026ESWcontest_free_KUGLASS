@@ -11,7 +11,12 @@
 | `power stage_.kicad_pro` | KiCad project 설정 |
 | `power stage_.kicad_dru` | 저장된 custom design rule |
 | `Power_stage.pdf` | 1페이지 schematic release view |
-| `datasheets/` | U1/U2, U5, U13, U14 부품 자료 |
+| `datasheets/` | U1/U2, U5, U13, U14와 TH1 부품 자료 |
+
+`datasheets/TH1.pdf`는 2024년 9월판 TDK NTCG series catalog입니다. 회로의
+TH1 조건인 10 kΩ@25 °C와 `2012Metric/EIA 0805` footprint에 동시에 맞는 catalog
+항목은 `NTCG203NH103JT1`입니다. 이는 제공된 자료에 따른 설계상 catalog match이며,
+조립 BOM 또는 실물 확인을 대신하지 않습니다.
 
 회로 연결과 명목 계산값의 기계 판독 기준은 [`../contracts/power_stage.json`](../contracts/power_stage.json)입니다.
 
@@ -59,8 +64,31 @@ J10 홀수 핀의 상대 위치는 Logic Carrier J7 각 채널 block의 홀수 �
 - Current: R9 0.1 ohm이므로 이상적인 DC shunt 값은 0.1 V/A입니다. R10 10 kohm/C8 100 nF를 거쳐 raw ADC로 전달됩니다.
 - Comparator: R12 33 kohm/R13 1 kohm의 명목 기준은 약 97.1 mV이고, R9 값으로 나눈 명목 trip은 약 0.971 A입니다.
 - Temperature: R14 10 kohm과 TH1 10 kohm@25 °C의 명목 분압은 25 °C에서 약 1.65 V입니다.
+  `NTCG203NH103JT1`의 catalog 값은 B25/50=3590 K, B25/75=3635 K,
+  B25/85=3650 K, B25/100=3670 K, R25 허용오차 ±5%, B 허용오차 ±3%,
+  동작 범위 -40~125 °C입니다.
 
-이 값들은 schematic-derived 명목값입니다. 부품 허용오차, 장착 부품, 배선, ADC 오차와 온도 특성이 포함된 실측 calibration이 아니므로 현재 firmware는 raw/mV만 진단값으로 제공합니다. NTC beta/Steinhart-Hart 계수도 현재 자료에 없습니다.
+ESP32_B firmware는 계속 raw/mV만 회신합니다. TabUI는 유효한 mV telemetry에만
+다음 B25/85 단일-beta 명목 모델을 적용해 `T °C (명목)`을 표시합니다.
+
+```text
+V = t_mv / 1000
+R_NTC = 10000 * V / (3.3 - V)
+T_C = 1 / (1 / 298.15 + ln(R_NTC / 10000) / 3650) - 273.15
+```
+
+`t_raw`는 ESP32-S3 ADC의 비선형성과 칩별 calibration 때문에
+`raw * 3300 / 4095`로 변환하지 않습니다. ESP32_B가 12 dB attenuation에서
+`adc_cali_raw_to_voltage()` curve-fitting으로 만든 유효 `t_mv`를 먼저 사용합니다.
+0 mV나 3300 mV 이상, mV invalid, 또는 위 모델 결과가 catalog 동작 범위 밖이면
+TabUI는 °C를 표시하지 않습니다.
+
+3.3 V 명목 조건에서 TH1의 divider 자기발열 전력은 R_NTC=R14=10 kΩ일 때 최대
+약 0.272 mW입니다. catalog의 2012 size 방열계수 2 mW/°C를 그대로 적용하면
+catalog 시험 환경에서의 명목 자기발열은 약 0.136 °C입니다. 실제 보드에서는
+3.3 V rail, R14 허용오차, 장착 부품, 열결합, ADC 오차와 보드별 편차가 남으므로
+TabUI 값은 실측 calibration이나 protection 기준이 아닙니다. 정확한 nominal R-T
+table과 보드별 보정이 확보되면 단일-beta 모델의 잔차를 다시 검증해야 합니다.
 
 ## 현재 자료의 충돌과 경계
 

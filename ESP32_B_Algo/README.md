@@ -138,8 +138,10 @@ Actuator command, B status와 Fault reset의 frame은
   적용합니다. 100 ms보다 오래된 값은 invalid입니다.
 - current ADC는 0 dB, temperature ADC는 12 dB attenuation을 사용합니다.
 - calibration 생성이 실패해도 raw는 보고하되 해당 mV validity bit는 0입니다.
-- 보드별 slope/offset, NTC 계수와 보호 임계가 실측되기 전 raw/mV를 A/°C 또는
-  software trip 기준으로 사용하지 않습니다.
+- firmware와 wire status는 raw/mV만 제공합니다. TabUI는 유효한 temperature mV에
+  TH1 데이터시트의 명목 B25/85 모델을 적용해 별도 `T °C (명목)` 진단값을 만들지만,
+  보드별 slope/offset·실측 온도 보정과 보호 임계가 확정되기 전 이를 보정 완료
+  온도나 software trip 기준으로 사용하지 않습니다.
 
 ## 빌드와 검증
 

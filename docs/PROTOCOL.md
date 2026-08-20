@@ -129,7 +129,10 @@ B는 100 ms 주기로 독립 sequence를 증가시키며 status를 보낸다.
 - canonical B formatter는 `adc`를 마지막 top-level field로 출력한다. A는 이
   순서를 포함해 유효한 JSON object field 순서에 의존하지 않는다.
 - ADC validity mask의 bit 0~3은 CH0~CH3 current, bit 4~7은 temperature다.
-  raw/mV를 보정된 A/°C로 해석하지 않는다.
+  wire에는 raw/mV만 실린다. TabUI는 `t_cali=true`이고 해당 mV validity bit가
+  설정된 `t_mv`에만 TH1 데이터시트 명목 모델을 적용해 `temperatureNominalC`를
+  파생한다. 이 필드는 B status schema가 아니며, 보드별 보정 온도나 보호 기준으로
+  해석하지 않는다.
 
 ESP32_A는 version, type, controller, boot/challenge, E-Stop/Fault와 채널 집합을
 모두 검증한 status만 TabUI 상태와 freshness에 반영한다.

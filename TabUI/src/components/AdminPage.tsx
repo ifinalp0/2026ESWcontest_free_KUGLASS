@@ -487,7 +487,7 @@ export function AdminPage() {
           </div>
           <div className="admin-table-wrap">
             <table className="admin-adc-table">
-              <thead><tr><th>Channel</th><th>I RAW</th><th>I mV</th><th>T RAW</th><th>T mV</th></tr></thead>
+              <thead><tr><th>Channel</th><th>I RAW</th><th>I mV</th><th>T RAW</th><th>T mV</th><th>T °C (명목)</th></tr></thead>
               <tbody>
                 {adc.channels.map((channel) => (
                   <tr key={channel.channel}>
@@ -496,12 +496,13 @@ export function AdminPage() {
                     <td>{numeric(channel.currentMv)}</td>
                     <td>{numeric(channel.temperatureRaw)}</td>
                     <td>{numeric(channel.temperatureMv)}</td>
+                    <td>{numeric(channel.temperatureNominalC, 1)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="admin-footnote">표시는 ADC raw/mV 진단값입니다. 보드별 보정 전에는 전류 A 또는 온도 °C로 해석하지 않습니다.</p>
+          <p className="admin-footnote">T °C는 유효한 ADC→mV 값에 3.3 V, R14 10 kΩ, TH1 NTCG203NH103JT1의 β25/85=3650 K 명목 모델을 적용한 계산값입니다. RAW만 유효할 때는 표시하지 않으며, 보드별 실측 보정값이나 보호 기준이 아닙니다.</p>
         </article>
 
         <article className="admin-card">
@@ -565,5 +566,11 @@ function adcChannelValue(
   if (!channel) return '—';
   return source === 'current'
     ? adcValue(channel.currentMv, channel.currentRaw)
-    : adcValue(channel.temperatureMv, channel.temperatureRaw);
+    : [
+        channel.temperatureNominalC == null
+          ? null
+          : `${channel.temperatureNominalC.toFixed(1)} °C (명목)`,
+        channel.temperatureMv === null ? null : `${channel.temperatureMv} mV`,
+        channel.temperatureRaw === null ? null : `RAW ${channel.temperatureRaw}`
+      ].filter((value): value is string => value !== null).join(' · ') || 'VALID 데이터 없음';
 }

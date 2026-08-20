@@ -44,7 +44,8 @@ ESP32_A GND       --- ESP32_B GND
 - Topbar `CONTROLLER` 버튼의 ESP32_A USB 포트 재탐색·재연결
 - Topbar `BACKEND` 전원 버튼의 ESP32_A gateway 런타임 시작·종료
 - `/admin` 관리자 콘솔의 전체 A/B link·sequence·ACK·boot·sensor·ADC 진단 보기
-- Power Stage `I_sense`·`T_sense` ADC 정보는 일반 운영 화면에서 숨기고 `/admin`에서만 표시
+- Power Stage `I_sense`·`T_sense` ADC 정보는 일반 운영 화면에서 숨기고 `/admin`에서만
+  raw/mV와 TH1 데이터시트 기반 명목 °C를 표시
 - `관리자 수동` 잠금 안에서 CH0~CH3 Enable·MI 변경 즉시 지속 제어와 전체 AUTO 복귀
 - LIVE, MOCK, REPLAY의 명시적 구분
 
@@ -171,8 +172,12 @@ TabUI↔A 명령, ACK, A state, B status와 Fault reset은
 - B `protocol_error`는 즉시 표시하지만, 다음 A `state.downstream`이 현재 link
   error를 갱신합니다. 과거 오류 한 건을 현재 상태처럼 영구 latch하지 않습니다.
 - A/B 통신 상태와 E-Stop/Fault operational 상태를 분리합니다.
-- `I_sense`·`T_sense` ADC는 관리자 화면에서만 validity가 있는 raw 또는
-  mV로 표시하고 A/°C로 임의 변환하지 않습니다.
+- `I_sense`·`T_sense` ADC는 관리자 화면에서만 표시합니다. 전류는 raw/mV만
+  제공하며, 온도는 ESP32_B의 유효 ADC→mV 값이 있을 때만 TH1의 3.3 V·R14 10 kΩ·
+  `NTCG203NH103JT1` B25/85=3650 K 명목 모델로 `T °C (명목)`을 계산합니다.
+  RAW count에 선형식을 직접 적용하지 않으며, 이 값은 보드별 실측 보정이나
+  software protection 기준이 아닙니다. 상세 식과 허용오차는
+  [`../hardware/Power_stage/README.md`](../hardware/Power_stage/README.md)를 따릅니다.
 - Fault reset은 B `control_result`와 최종 A ACK가 일치할 때만 성공으로 표시합니다.
 
 ## 카메라 영상

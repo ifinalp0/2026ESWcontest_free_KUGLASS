@@ -49,6 +49,7 @@ export interface DownstreamAdcChannel {
   temperatureRaw: number | null;
   currentMv: number | null;
   temperatureMv: number | null;
+  temperatureNominalC: number | null;
 }
 
 export interface DownstreamAdc {

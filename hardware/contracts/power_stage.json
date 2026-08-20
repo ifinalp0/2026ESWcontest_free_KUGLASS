@@ -10,7 +10,8 @@
     "pcb": "hardware/Power_stage/power stage_.kicad_pcb",
     "project": "hardware/Power_stage/power stage_.kicad_pro",
     "design_rules": "hardware/Power_stage/power stage_.kicad_dru",
-    "release_view": "hardware/Power_stage/Power_stage.pdf"
+    "release_view": "hardware/Power_stage/Power_stage.pdf",
+    "temperature_sensor_catalog": "hardware/Power_stage/datasheets/TH1.pdf"
   },
   "j10": {
     "type": "2x8 odd/even",
@@ -107,13 +108,35 @@
     }
   },
   "temperature_feedback": {
-    "status": "schematic_derived_not_calibrated",
+    "status": "datasheet_derived_nominal_not_board_calibrated",
     "pullup": "R14 10kohm to 3.3V",
-    "sensor": "TH1 NTC 10kohm at 25C to GND",
+    "pullup_resistance_ohm": 10000,
+    "sensor": {
+      "reference": "TH1",
+      "schematic_value": "NTC 10kohm at 25C to GND",
+      "schematic_footprint": "2012 metric / EIA 0805",
+      "supplied_catalog": "TDK NTCG series, September 2024",
+      "catalog_match": "NTCG203NH103JT1",
+      "catalog_match_status": "derived_from_nominal_resistance_and_footprint_physical_part_unverified",
+      "nominal_resistance_ohm_at_25c": 10000,
+      "resistance_tolerance_percent": 5,
+      "b25_50_k": 3590,
+      "b25_75_k": 3635,
+      "b25_85_k": 3650,
+      "b25_100_k": 3670,
+      "b_tolerance_percent": 3,
+      "operating_temperature_c": [-40, 125],
+      "permissible_operating_current_ma_at_25c": 0.44
+    },
+    "nominal_supply_v": 3.3,
     "nominal_adc_v_at_25c": 1.65,
     "resistance_formula": "R_NTC = 10000 * V_ADC / (3.3 - V_ADC)",
-    "beta_or_steinhart_hart": "unknown",
-    "temperature_accuracy": "unknown"
+    "temperature_formula": "T_C = 1 / (1 / 298.15 + ln(R_NTC / 10000) / 3650) - 273.15",
+    "temperature_model": "single_beta_B25_85_nominal",
+    "raw_conversion": "ESP32_B adc_cali_raw_to_voltage curve fitting at ADC_ATTEN_DB_12; no universal linear raw-to-mV formula",
+    "tabui_field": "temperatureNominalC",
+    "temperature_accuracy": "not_board_calibrated",
+    "protection_use": "not_allowed_until_board_calibration_and_HIL"
   },
   "fault_interface": {
     "signal": "FAULT_N_CH0",
@@ -126,6 +149,7 @@
   "do_not_infer": [
     "physical MOSFET identity until markings are checked",
     "calibrated current or temperature from nominal component values",
+    "physical TH1 part identity from the catalog match without BOM or board verification",
     "measured over-current threshold from divider arithmetic",
     "DIR level to named optical polarity without HIL",
     "thermal capacity, maximum continuous current or insulation rating",

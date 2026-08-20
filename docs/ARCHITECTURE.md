@@ -144,8 +144,10 @@ TabUI는 A와 B의 online/stale 상태를 따로 표시한다. B status를 받�
   safe-off한다.
 - J5 E-Stop은 `CHx_ENABLE`만 하드웨어로 차단한다. 전원 rail은 계속 live일 수
   있으므로 safety-rated power disconnect로 간주하지 않는다.
-- ADC는 현재 raw/mV 진단 telemetry다. 보드별 calibration과 HIL 전에는 A/°C
-  값이나 software protection threshold로 사용하지 않는다.
+- ESP32_B의 ADC wire telemetry는 raw/mV다. TabUI는 유효한 temperature mV에
+  TH1 데이터시트 B25/85 명목 모델을 적용한 채널별 `T °C (명목)`을 진단 화면에
+  표시한다. 이는 보드별 calibration 완료값이 아니며 software protection
+  threshold로 사용하지 않는다. RAW count에는 고정 선형식을 직접 적용하지 않는다.
 - MI-Vrms-투과도 LUT, 온도 임계와 카메라 개선 수치는 실측 전 확정값이 아니다.
 - Power Stage와 고전압 시험은 [`hardware/validation/README.md`](../hardware/validation/README.md)의
   단계와 안전 조건을 따른다.

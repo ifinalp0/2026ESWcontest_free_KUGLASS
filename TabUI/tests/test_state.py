@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import unittest
 
-from backend.state import CHANNEL_NAMES, StateStore, estimated_transmittance, optical_state
+from backend.state import (
+    CHANNEL_NAMES,
+    StateStore,
+    estimated_transmittance,
+    optical_state,
+    th1_temperature_c_from_mv,
+)
 
 
 def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
@@ -39,6 +45,14 @@ def b_status(*channel_updates: dict, seq: int = 1, **overrides: object) -> dict:
 
 
 class StateStoreTests(unittest.TestCase):
+    def test_th1_nominal_temperature_uses_calibrated_mv_not_raw_counts(self) -> None:
+        self.assertAlmostEqual(th1_temperature_c_from_mv(1650), 25.0, places=9)
+        self.assertGreater(th1_temperature_c_from_mv(1000), 25.0)
+        self.assertLess(th1_temperature_c_from_mv(2400), 25.0)
+        self.assertIsNone(th1_temperature_c_from_mv(0))
+        self.assertIsNone(th1_temperature_c_from_mv(3300))
+        self.assertIsNone(th1_temperature_c_from_mv(None))
+
     def test_channel_names_match_the_physical_pdlc_layout(self) -> None:
         self.assertEqual(CHANNEL_NAMES, [
             "CH0 운전석 창문",
@@ -281,6 +295,23 @@ class StateStoreTests(unittest.TestCase):
         self.assertIsNone(diagnostics["adc"]["channels"][0]["temperatureRaw"])
         self.assertEqual(diagnostics["adc"]["channels"][1]["temperatureRaw"], 201)
         self.assertIsNone(diagnostics["adc"]["channels"][1]["temperatureMv"])
+        self.assertIsNone(diagnostics["adc"]["channels"][1]["temperatureNominalC"])
+
+    def test_downstream_temperature_mv_is_exposed_as_nominal_celsius(self) -> None:
+        store = StateStore()
+        record = b_status()
+        record["adc"]["t_mv"][0] = 1650
+
+        self.assertTrue(store.apply_record(record))
+        channel = store.snapshot()["downstreamDiagnostics"]["adc"]["channels"][0]
+        self.assertEqual(channel["temperatureMv"], 1650)
+        self.assertAlmostEqual(channel["temperatureNominalC"], 25.0, places=9)
+
+        no_mv_calibration = b_status(seq=2)
+        no_mv_calibration["adc"]["t_cali"] = False
+        self.assertTrue(store.apply_record(no_mv_calibration))
+        channel = store.snapshot()["downstreamDiagnostics"]["adc"]["channels"][0]
+        self.assertIsNone(channel["temperatureNominalC"])
 
     def test_malformed_downstream_status_is_rejected_without_mutation(self) -> None:
         store = StateStore()

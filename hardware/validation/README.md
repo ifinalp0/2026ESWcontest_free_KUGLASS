@@ -104,7 +104,11 @@ Power Stage와 72 V를 분리하고 current-limited 5 V/3.3 V 조건에서 수�
 - 명목 0.1 V/A와 실제 slope/offset을 보드별로 계산합니다.
 - TLV1701 `FAULT_N` assert/deassert 전류와 hysteresis를 보드별로 측정합니다.
 - TH1 근처의 기준 온도와 `ADC_TEMP_RAW`를 여러 점에서 기록합니다.
-- NTC beta 또는 Steinhart-Hart 계수와 허용오차를 확정하기 전에는 °C 변환을 production protection에 사용하지 않습니다.
+- 실제 장착 TH1이 설계상 catalog match인 `NTCG203NH103JT1`인지 BOM 또는 실물
+  근거로 확인하고, 실제 3.3 V rail과 R14 저항값을 기록합니다.
+- 기준 온도와 TabUI의 B25/85=3650 K `T °C (명목)` 차이를 네 보드에서 비교해
+  offset/잔차와 허용 범위를 정합니다. 이 보드별 calibration과 HIL이 끝나기 전에는
+  명목 °C 변환을 production protection에 사용하지 않습니다.
 - ADC 0 V, 정상 최대, open, short-to-GND, short-to-3.3 V, Power Stage-only powered와 ESP32-only powered 조건을 확인합니다.
 - Logic Carrier에는 ADC clamp가 없으므로 ESP32 pin 허용 범위를 넘는 주입 시험은 직접 pin에 가하지 않습니다.
 
