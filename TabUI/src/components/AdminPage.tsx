@@ -249,6 +249,10 @@ export function AdminPage() {
   }, [aOnline, anyChannelFault, bOnline, connected, controllerWideBlock, diagnostics.estopActive, diagnostics.faultCode, state.link.downstreamError]);
 
   const cameraValid = state.cameraMetrics.valid === true;
+  const internalTemperature = displayedInternalTemperature(state.environment);
+  const internalTemperatureText = internalTemperature === null
+    ? '—'
+    : `${internalTemperature.toFixed(2)} °C${state.environment.internalTempOverride ? ' (DEMO)' : ''}`;
   const adc = diagnostics.adc;
   const controlResult = diagnostics.controlResult;
 
@@ -511,7 +515,7 @@ export function AdminPage() {
             <StatusBadge tone={cameraValid ? 'ok' : 'warn'}>{cameraValid ? 'VALID' : state.cameraMetrics.valid === false ? 'INVALID' : 'UNKNOWN'}</StatusBadge>
           </header>
           <dl className="admin-card-body">
-            <DataRow label="Internal temp" value={`${displayedInternalTemperature(state.environment).toFixed(2)} °C`} mono />
+            <DataRow label="Internal temp" value={internalTemperatureText} mono />
             <DataRow label="AE metadata" value={boolLabel(state.cameraMetrics.aeMetadataValid, 'VALID', 'EXCLUDED')} />
             <DataRow label="Driver-left saturation" value={`${(state.cameraMetrics.frontLeftSaturation * 100).toFixed(1)}%`} mono />
             <DataRow label="Passenger-right saturation" value={`${(state.cameraMetrics.frontRightSaturation * 100).toFixed(1)}%`} mono />

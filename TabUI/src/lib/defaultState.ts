@@ -25,7 +25,7 @@ export const defaultState: SimulationState = {
   vehicleMode: 'driving',
   demoMode: 'none',
   environment: {
-    internalTemp: 27,
+    internalTemp: null,
     internalTempOverride: false,
     frontLeftSaturation: 0.08,
     frontRightSaturation: 0.07,

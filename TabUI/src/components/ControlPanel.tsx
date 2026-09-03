@@ -168,7 +168,13 @@ export function ControlPanel({ channels, environment, cameraInput, demoMode, sel
     setEnvironmentValue(key, normalized);
   };
 
-  const temperatureText = `${displayedInternalTemperature(environment).toFixed(1)} °C`;
+  const displayedTemperature = displayedInternalTemperature(environment);
+  const temperatureText = displayedTemperature === null
+    ? '측정값 없음'
+    : `${displayedTemperature.toFixed(1)} °C`;
+  const temperatureSource = displayedTemperature === null
+    ? externalTemperatureDemo ? '외부 시연값 결측' : 'DS18B20 결측'
+    : externalTemperatureDemo ? '외부 시연 입력' : '실측 센서';
 
   return (
     <section className="panel control-panel">
@@ -247,7 +253,7 @@ export function ControlPanel({ channels, environment, cameraInput, demoMode, sel
             <span>현재 온도</span>
             <small>DS18B20</small>
           </div>
-          <TemperatureReadout value={temperatureText} source="실측 센서" />
+          <TemperatureReadout value={temperatureText} source={temperatureSource} />
         </div>
       ) : null}
 
@@ -259,7 +265,7 @@ export function ControlPanel({ channels, environment, cameraInput, demoMode, sel
           </div>
           <TemperatureReadout
             value={temperatureText}
-            source={externalTemperatureDemo ? '외부 시연 입력' : '실측 센서'}
+            source={temperatureSource}
           />
           <button
             className={`temperature-demo-toggle${externalTemperatureDemo ? ' active' : ''}`}
